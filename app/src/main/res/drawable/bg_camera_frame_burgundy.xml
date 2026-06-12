@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Burgundy-stroked rounded rectangle used as the frame around the core-eye
+  camera preview on the chat panel.  The fill is transparent so the camera
+  TextureView behind it shows through.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#00000000" />
+    <stroke
+        android:width="2dp"
+        android:color="#FF7A1E2C" />
+    <corners android:radius="10dp" />
+</shape>

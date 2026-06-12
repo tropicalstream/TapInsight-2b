@@ -1,0 +1,656 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/chatRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:foreground="#1A000000">
+
+    <LinearLayout
+        android:id="@+id/hudContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:background="@color/bg_panel_opaque"
+        android:elevation="6dp"
+        android:orientation="vertical"
+        android:padding="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/hudTime"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/hud_time"
+                android:textColor="@color/text_primary"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/hudBatteryContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/hudAiStatusBadge"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:gravity="center"
+                    android:text="G"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/hudTapClawResultBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_tapclaw_ready_badge"
+                    android:contentDescription="@string/hud_tapclaw_result_ready"
+                    android:gravity="center"
+                    android:letterSpacing="0.08"
+                    android:minWidth="30dp"
+                    android:paddingHorizontal="7dp"
+                    android:text="OC"
+                    android:textAllCaps="true"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:id="@+id/hudBatteryIcon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:contentDescription="Battery status"
+                    android:src="@drawable/ic_battery_status"
+                    android:tint="#FFFFFFFF" />
+
+                <ImageView
+                    android:id="@+id/hudBatteryChargingIcon"
+                    android:layout_width="10dp"
+                    android:layout_height="14dp"
+                    android:layout_marginStart="3dp"
+                    android:contentDescription="@string/hud_battery_charging"
+                    android:src="@drawable/ic_battery_charging"
+                    android:tint="#FF00FFFF"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/hudBatteryText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="--%"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/hudAqiText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="AQI --"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <!-- OpenClaw / TapClaw status — crab silhouette. Visible
+                     when openclaw_enabled is on. Tinted red (unreachable)
+                     or green (reachable) by the OpenClaw ping. -->
+                <ImageView
+                    android:id="@+id/hudOpenClawStatusIcon"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="@string/hud_openclaw_status"
+                    android:src="@drawable/ic_openclaw_crab"
+                    android:tint="#FFFF5B5B"
+                    android:visibility="gone" />
+                <!-- Hermes status — winged-helmet silhouette. Visible when
+                     hermes_enabled is on. Tinted red (unreachable) or
+                     green (reachable) by the Hermes ping. The two icons
+                     sit side-by-side so the user sees both agents'
+                     status at a glance when both are enabled. -->
+                <ImageView
+                    android:id="@+id/hudHermesStatusIcon"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="6dp"
+                    android:contentDescription="@string/hud_hermes_status"
+                    android:src="@drawable/ic_hermes_status"
+                    android:tint="#FFFF5B5B"
+                    android:visibility="gone" />
+
+                <!-- HUD notification bell + unread badge. Long-press on the
+                     temple trackpad (or clicking here) toggles the
+                     notification list card below the status rows. The badge
+                     overhangs the bell's top-right corner — hence the
+                     padding + clipChildren=false on the container. -->
+                <FrameLayout
+                    android:id="@+id/hudBellContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:paddingTop="4dp"
+                    android:paddingEnd="5dp">
+
+                    <ImageView
+                        android:id="@+id/hudBellIcon"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_gravity="start|bottom"
+                        android:contentDescription="@string/hud_notifications_bell"
+                        android:src="@drawable/ic_notification_bell"
+                        android:tint="#CCFFFFFF" />
+
+                    <TextView
+                        android:id="@+id/hudBellBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end|top"
+                        android:background="@drawable/bg_notification_badge"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:minWidth="13dp"
+                        android:paddingHorizontal="2dp"
+                        android:paddingVertical="1dp"
+                        android:text="0"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="8sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- OpenClaw ticker: stationary for the last completed/requested action,
+             one-shot horizontal scroll for transient heartbeat updates.
+             We drive scrollX from code with an ObjectAnimator (see
+             ChatPanelFragment.renderHeartbeat) instead of using Android's
+             built-in ellipsize=marquee — the builtin loops forever and resets
+             to the start of the text when it finishes a cycle. We want the
+             text to scroll once and PARK at the end so the user can read the
+             tail of the latest heartbeat until a new one replaces it. -->
+        <TextView
+            android:id="@+id/hudHeartbeatText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/bg_heartbeat_bar"
+            android:drawablePadding="6dp"
+            android:maxLines="1"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:scrollHorizontally="true"
+            android:singleLine="true"
+            android:textColor="#FFFF5252"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/hudRadioText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#FF4DD0E1"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Connection status (green dot + G) below battery row -->
+        <LinearLayout
+            android:id="@+id/hudConnectionContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="end|center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <View
+                android:id="@+id/hudConnectionDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/bg_connection_dot" />
+
+            <TextView
+                android:id="@+id/hudConnectionText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:text="NET"
+                android:textColor="#CCFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- HUD bell notification list. Hidden until the bell is toggled
+             (long-press / bell click); rows are built in code by
+             ChatPanelFragment.renderNotificationList(). -->
+        <LinearLayout
+            android:id="@+id/hudNotificationsCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_hud_card"
+            android:orientation="vertical"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/hudNotificationsTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.08"
+                android:text="@string/hud_notifications_title"
+                android:textColor="#FFFFC857"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/hudNotificationsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/hudCalendarCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_hud_card"
+            android:orientation="vertical"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp">
+
+            <TextView
+                android:id="@+id/hudCalendar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/hud_calendar"
+                android:textColor="#FF00E5FF"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/hudTasksCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_hud_card"
+            android:orientation="vertical"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/hudTasks"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FF00E676"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/hudNewsCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_hud_card"
+            android:orientation="vertical"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/hudNews"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFB14A"
+                android:textSize="15sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!--
+      Chat recycler. Left edge tracks the camera column so the entire
+      history wraps around the preview when the camera is on:
+        • Camera ON  → start = cameraColumn.end (~224dp). Older
+          history reflows to the right of the preview; nothing scrolls
+          behind it.
+        • Camera OFF → cameraColumn collapses to a 0-width point;
+          goneMarginStart=14dp gives a clean parent-start anchor and
+          older history reads full screen width.
+      The orb is NOT in this constraint chain — it sits on top of
+      the bottom-left corner via elevation. ChatAdapter applies a
+      per-row marginStart to BOTH the most recent message AND the
+      New Chat sentinel so neither is obscured by the avatar.
+    -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/chatRecycler"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="16dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:overScrollMode="never"
+        android:scrollbars="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/cameraColumn"
+        app:layout_constraintTop_toBottomOf="@id/hudContainer"
+        app:layout_goneMarginStart="14dp" />
+
+    <TextView
+        android:id="@+id/chatStreamIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginEnd="22dp"
+        android:background="#66000000"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="2dp"
+        android:text="..."
+        android:textColor="#00FFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="@id/chatRecycler"
+        app:layout_constraintTop_toTopOf="@id/chatRecycler" />
+
+    <FrameLayout
+        android:id="@+id/readerOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#000000"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        android:elevation="24dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <View
+            android:id="@+id/readerBorder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_margin="10dp"
+            android:background="@drawable/bg_reader_border" />
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/readerScroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_margin="12dp"
+            android:clipToPadding="true"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:paddingHorizontal="18dp"
+            android:paddingTop="22dp"
+            android:paddingBottom="88dp"
+            android:scrollbars="none">
+
+            <TextView
+                android:id="@+id/readerText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:breakStrategy="high_quality"
+                android:fontFamily="sans-serif"
+                android:gravity="top|start"
+                android:hyphenationFrequency="normal"
+                android:includeFontPadding="false"
+                android:lineSpacingExtra="6dp"
+                android:lineSpacingMultiplier="1.08"
+                android:textColor="#FFFFFFFF"
+                android:textIsSelectable="false"
+                android:textSize="18sp" />
+        </androidx.core.widget.NestedScrollView>
+
+        <View
+            android:id="@+id/readerTopScrim"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="12dp"
+            android:alpha="0"
+            android:background="@drawable/bg_reader_top_scrim"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:layout_gravity="top" />
+
+        <View
+            android:id="@+id/readerBottomScrim"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginBottom="12dp"
+            android:alpha="0"
+            android:background="@drawable/bg_reader_bottom_scrim"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:layout_gravity="bottom" />
+    </FrameLayout>
+
+    <!--
+      chatInlineOscilloscope is kept as a zero-size, always-gone stub so
+      legacy references (MainActivity.pushOscilloscopeLevel/hideOscilloscope
+      and any code that does findViewById on this id) remain compatible.
+      The line waveform is no longer rendered — the earth orb in the
+      [orbColumn] below has taken over the "voice activity" indicator role.
+    -->
+    <com.rayneo.visionclaw.ui.VoiceOscilloscopeView
+        android:id="@+id/chatInlineOscilloscope"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!--
+      Camera preview column (left strip, top half). Shown only while the
+      "Core Eye" camera stream is active; collapses to zero width when
+      hidden so [chatRecycler] reclaims the screen for full-width history.
+      Bottom-constrained to the orb so the two visually stack without
+      overlapping when both are on. The orb lives in its own container
+      below so the recycler can render full-width history above an
+      activated orb instead of being forced narrow whenever voice
+      activity briefly turns the orb on.
+    -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/cameraColumn"
+        android:layout_width="208dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/orbContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/hudContainer">
+
+        <!-- Burgundy-stroked camera frame, 192×144 (doubled from the
+             original 96×72). 6dp inner padding from the burgundy stroke. -->
+        <FrameLayout
+            android:id="@+id/coreEyeContainer"
+            android:layout_width="192dp"
+            android:layout_height="144dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_camera_frame_burgundy"
+            android:padding="6dp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextureView
+                android:id="@+id/coreEyePreviewTexture"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <View
+                android:id="@+id/coreEyeRing"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_core_eye_ring"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/coreEyeIdleIcon"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="center"
+                android:alpha="0.82"
+                android:contentDescription="Core Eye idle"
+                android:src="@drawable/ic_camera_status"
+                android:tint="#FFFFFFFF"
+                android:visibility="gone" />
+        </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!--
+      Earth orb — standalone, bottom-left corner, ALWAYS in layout.
+      Sized 60×60 (orb image 48×48) so it occupies a modest patch in
+      the lower-left without forcing older chat history narrow.
+      Drawn ON TOP of the chat recycler via elevation so the latest
+      card visually flows around it (the streaming card gets a per-row
+      startMargin in ChatAdapter to leave a clean gutter). Older chat
+      rows have no margin — they stretch full-width over the orb's
+      vertical zone, the elevation makes the orb appear in front so
+      the older cards' left edge "tucks under" it visually but the
+      orb stays readable.
+    -->
+    <FrameLayout
+        android:id="@+id/orbContainer"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginBottom="18dp"
+        android:elevation="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- Halo behind the orb. Drawable swaps between the red and
+             blue variants from code; alpha is driven by the voice
+             level stream. -->
+        <View
+            android:id="@+id/orbGlow"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0"
+            android:background="@drawable/bg_orb_glow_blue"
+            android:contentDescription="@null" />
+
+        <ImageView
+            android:id="@+id/coreEyeOrb"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:contentDescription="Voice activity orb"
+            android:scaleType="fitCenter"
+            android:src="@drawable/earth_orb" />
+    </FrameLayout>
+
+    <!-- Battery-saving dark mode overlay: covers entire panel, shows only
+         battery % and charging indicator at 10% brightness. Elevation 32dp
+         guarantees it renders above everything including reader overlay (24dp). -->
+    <FrameLayout
+        android:id="@+id/darkModeOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#FF000000"
+        android:clipChildren="true"
+        android:elevation="32dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:id="@+id/darkModeBatteryRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:alpha="0.10"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/darkModeBatteryIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription="Battery"
+                android:src="@drawable/ic_battery_status"
+                android:tint="#FFFFFFFF" />
+
+            <ImageView
+                android:id="@+id/darkModeChargingIcon"
+                android:layout_width="12dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="3dp"
+                android:contentDescription="Charging"
+                android:src="@drawable/ic_battery_charging"
+                android:tint="#FF00FFFF"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/darkModeBatteryText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="--%"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <View
+            android:id="@+id/darkModeCameraDot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="12dp"
+            android:alpha="0.85"
+            android:background="@drawable/bg_dark_mode_camera_dot"
+            android:contentDescription="Camera on"
+            android:visibility="gone" />
+    </FrameLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

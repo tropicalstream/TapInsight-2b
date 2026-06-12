@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    HUD-strip Hermes icon: a tiny winged-helmet glyph that reads at 16dp.
+    Sits next to the battery percentage. Tint applied at the ImageView so
+    one drawable works for healthy/error/idle states.
+
+    The shape is deliberately simple: a small rounded helmet dome on the
+    bottom and two stylised wings flaring up-and-out from the top sides.
+    At 16dp every pixel counts; we avoid feather detail / outlines.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+
+    <!-- Helmet dome — slightly squashed half-ellipse on the lower half. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,16 C7,12 9,9 12,9 C15,9 17,12 17,16 L17,18 L7,18 Z" />
+
+    <!-- Left wing — angular up-and-out fan. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9,10 L4,4 L5,9 L2,7 L4,11 L1,11 L4,13 L9,12 Z" />
+
+    <!-- Right wing — mirror of left. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15,10 L20,4 L19,9 L22,7 L20,11 L23,11 L20,13 L15,12 Z" />
+
+    <!-- Tiny strap line across the helmet brim for definition. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.7"
+        android:pathData="M8,16 L16,16 L16,16.7 L8,16.7 Z" />
+</vector>

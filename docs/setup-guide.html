@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TapInsight — Setup Guide</title>
+<meta name="description" content="Step-by-step setup guide for TapInsight on RayNeo X3 Pro AR glasses: API keys, install, companion app, Cloudflare relay, and AI agents.">
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121823; --panel2:#0e141d; --line:#223044;
+    --text:#dbe7f3; --muted:#8fa3b8; --cyan:#00e5ff; --green:#69f0ae;
+    --amber:#ffd166; --red:#ff7a7a; --code:#0a0e13;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
+  a{color:var(--cyan);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px 90px}
+  header{padding:54px 0 10px;border-bottom:1px solid var(--line);margin-bottom:28px}
+  header h1{margin:0 0 6px;font-size:34px;letter-spacing:.4px}
+  header h1 .accent{color:var(--cyan)}
+  header p{color:var(--muted);margin:0;font-size:17px}
+  .pill{display:inline-block;margin-top:14px;padding:4px 12px;border:1px solid var(--line);border-radius:999px;color:var(--green);font-size:13px}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin:26px 0 38px}
+  nav.toc h2{margin:0 0 10px;font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+  nav.toc ol{margin:0;padding-left:22px}
+  nav.toc li{margin:7px 0}
+  nav.toc .opt{color:var(--muted);font-size:13px}
+  h2.step{display:flex;align-items:center;gap:12px;font-size:24px;margin:54px 0 6px;scroll-margin-top:20px}
+  h2.step .num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--cyan);color:#00222a;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  h2.plain{font-size:24px;margin:54px 0 10px;scroll-margin-top:20px}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--green)}
+  .est{color:var(--muted);font-size:13px;margin:0 0 14px 46px}
+  p{margin:12px 0}
+  .muted{color:var(--muted)}
+  code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-size:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-size:13.5px;line-height:1.55}
+  pre code{background:none;border:none;padding:0}
+  .box{border-radius:10px;padding:14px 18px;margin:16px 0;border:1px solid var(--line);background:var(--panel2)}
+  .box.tip{border-left:4px solid var(--green)}
+  .box.warn{border-left:4px solid var(--amber)}
+  .box.stop{border-left:4px solid var(--red)}
+  .box b:first-child{display:block;margin-bottom:4px}
+  .demo{background:linear-gradient(180deg,#0d1726,#0a1018);border:1px solid #1e3a52;border-radius:12px;padding:18px 20px;margin:18px 0}
+  .demo .label{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);margin-bottom:10px}
+  .demo .you{color:var(--amber);margin:8px 0}
+  .demo .glass{color:var(--text);margin:8px 0 8px 18px}
+  .demo .glass::before{content:"◈ ";color:var(--cyan)}
+  .demo .you::before{content:"🗣 "}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+  .req{color:var(--green);font-weight:700}
+  .opt2{color:var(--muted)}
+  .check{list-style:none;padding-left:4px}
+  .check li{margin:8px 0;padding-left:28px;position:relative}
+  .check li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:800}
+  .top{position:fixed;right:18px;bottom:18px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px}
+  footer{margin-top:70px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:14px}
+  @media (max-width:600px){header h1{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Tap<span class="accent">Insight</span> Setup Guide</h1>
+  <p>From a fresh pair of RayNeo X3 Pro glasses to a talking, captioning, music-playing AI companion — one step at a time.</p>
+  <span class="pill">Beta 0.2b · 30–60 minutes · no coding required for the basics</span>
+</header>
+
+<nav class="toc" id="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#need">What you need</a></li>
+    <li><a href="#keys">Get your API keys</a></li>
+    <li><a href="#adb">Prepare the glasses (developer mode + ADB)</a></li>
+    <li><a href="#install">Install TapInsight</a></li>
+    <li><a href="#firstboot">First boot &amp; permissions</a></li>
+    <li><a href="#companion">The companion app</a></li>
+    <li><a href="#talk">Your first conversation</a></li>
+    <li><a href="#relay">Media relay + Cloudflare tunnel <span class="opt">(optional)</span></a></li>
+    <li><a href="#agents">AI agents <span class="opt">(optional)</span></a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+    <li><a href="#faq">FAQ</a></li>
+  </ol>
+</nav>
+
+<h2 class="step" id="need"><span class="num">1</span>What you need</h2>
+<p class="est">⏱ 2 minutes to check</p>
+<ul class="check">
+  <li><b>RayNeo X3 Pro</b> AR glasses (the only tested device).</li>
+  <li>A <b>computer</b> (Mac, Windows, or Linux) with a USB-C cable — used once for install, and optionally to host the media relay.</li>
+  <li>A <b>Google account</b> for a free Gemini API key (this powers the voice assistant).</li>
+  <li>Wi-Fi that both the glasses and your computer can join.</li>
+</ul>
+<div class="box tip"><b>Tip</b> Everything optional really is optional. A working voice assistant with HUD, captions, and the media library needs only the Gemini key. Cloudflare, Python, and agents come later — or never.</div>
+
+<h2 class="step" id="keys"><span class="num">2</span>Get your API keys</h2>
+<p class="est">⏱ 5–10 minutes</p>
+<p>TapInsight has no backend — it talks directly to AI services using <i>your</i> keys, which you paste into the companion app in Step 6. You only need the first one to start:</p>
+<table>
+  <tr><th>Service</th><th>Powers</th><th>Needed?</th><th>Where to get it</th></tr>
+  <tr><td><b>Google Gemini</b></td><td>The voice assistant (Gemini Live), vision, TTS</td><td class="req">Required</td><td><a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> → "Create API key" (free tier works)</td></tr>
+  <tr><td><b>Groq</b></td><td>Fast chat in the browser panel, Whisper transcription</td><td class="opt2">Optional</td><td><a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></td></tr>
+  <tr><td><b>AudD</b></td><td>"What song is this?" live song identification on TapRadio</td><td class="opt2">Optional</td><td><a href="https://audd.io" target="_blank">audd.io</a></td></tr>
+  <tr><td><b>Fish Audio</b></td><td>Premium text-to-speech voices for agent readouts</td><td class="opt2">Optional</td><td><a href="https://fish.audio" target="_blank">fish.audio</a></td></tr>
+</table>
+<div class="box warn"><b>Keep keys private</b> Treat each key like a password. TapInsight stores them only on the glasses; never commit them to a public repository.</div>
+
+<h2 class="step" id="adb"><span class="num">3</span>Prepare the glasses</h2>
+<p class="est">⏱ 5 minutes</p>
+<h3>Enable Developer Mode</h3>
+<p>On the glasses (or through the RayNeo phone app, depending on firmware): <b>Settings → About → tap the build number 7 times</b>. You'll see "You are now a developer."</p>
+<h3>Enable USB debugging</h3>
+<p><b>Settings → Developer options → USB debugging → On.</b></p>
+<h3>Install ADB on your computer</h3>
+<pre><code># macOS (Homebrew)
+brew install android-platform-tools
+
+# Windows (winget)
+winget install Google.PlatformTools
+
+# Linux (Debian/Ubuntu)
+sudo apt install android-tools-adb</code></pre>
+<p>Plug the glasses in and confirm they're visible (accept the fingerprint prompt in the glasses if asked):</p>
+<pre><code>adb devices
+# → List of devices attached
+#   1234567890ABCDE   device</code></pre>
+
+<h2 class="step" id="install"><span class="num">4</span>Install TapInsight</h2>
+<p class="est">⏱ 2 minutes (APK) or ~10 minutes (build from source)</p>
+<h3>Option A — sideload the release APK (easiest)</h3>
+<p>Download <code>TapInsight-0.2b.apk</code> from the <a href="../../releases">Releases page</a>, then:</p>
+<pre><code>adb install -r TapInsight-0.2b.apk</code></pre>
+<h3>Option B — build from source</h3>
+<pre><code>git clone &lt;this repository&gt;
+cd TapInsight
+./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk</code></pre>
+<div class="box tip"><b>Build requirements</b> JDK 17 and the Android SDK (Android Studio installs both). No other secrets or properties are needed to build.</div>
+
+<h2 class="step" id="firstboot"><span class="num">5</span>First boot &amp; permissions</h2>
+<p class="est">⏱ 3 minutes</p>
+<p>Launch <b>TapInsight</b> from the glasses' app list. On first run:</p>
+<ul class="check">
+  <li>Grant <b>microphone</b> (voice assistant), <b>camera</b> (vision on demand), and <b>notification</b> permissions when prompted.</li>
+  <li>You'll see the TapInsight boot splash — starfield, a fun fact typing itself out, and "GLASSES ONLINE".</li>
+  <li>Set your swipe unlock code on the lock screen the first time it appears.</li>
+</ul>
+<p>After unlock you're in the <b>unipanel HUD</b>: clock and battery up top, the assistant avatar, browser panel, and the status ticker ("Assistant ready").</p>
+
+<h2 class="step" id="companion"><span class="num">6</span>The companion app</h2>
+<p class="est">⏱ 5 minutes</p>
+<p>The glasses run a small web server on your Wi-Fi. Configuration happens in any browser on your phone or computer — no extra app to install.</p>
+<ol>
+  <li>Make sure the glasses are on the same Wi-Fi as your phone/computer.</li>
+  <li>The HUD shows the companion address (e.g. <code>http://192.168.1.42:8765</code>). Open it in a browser.</li>
+  <li>Paste your <b>Gemini API key</b> into the key field and save. Add any optional keys the same way.</li>
+  <li>Browse the toggles: HUD items (calendar, tasks, news, AQI), caption preferences, readout voice, refresh intervals — every feature is documented inline.</li>
+</ol>
+<div class="box tip"><b>Demo: checking it worked</b> After saving the Gemini key, the HUD ticker should read <i>"Assistant ready"</i> within a few seconds. If it shows an error chip instead, re-check the key.</div>
+
+<h2 class="step" id="talk"><span class="num">7</span>Your first conversation</h2>
+<p class="est">⏱ right now</p>
+<p>Tap the <b>avatar orb</b> (left temple tap) and just talk:</p>
+<div class="demo">
+  <div class="label">Live demo — basics</div>
+  <div class="you">"What can you see right now?"</div>
+  <div class="glass">The camera turns on, and the assistant describes your surroundings.</div>
+  <div class="you">"Add milk to my shopping list."</div>
+  <div class="glass">Task created — and it shows up in the HUD task list.</div>
+  <div class="you">"Play some lo-fi on TapRadio."</div>
+  <div class="glass">TapRadio starts; the song ID and lyrics follow along.</div>
+</div>
+<div class="demo">
+  <div class="label">Live demo — dim mode &amp; captions</div>
+  <div class="you">Tap the eye icon (bottom-left) while a YouTube video plays.</div>
+  <div class="glass">Screen goes black; the video title and two-line live captions remain — great for listening with hearing assistance.</div>
+  <div class="you">Swipe up on the temple pad.</div>
+  <div class="glass">The night-sky breathing visualizer appears — captions and title stay out of this calm screen. Swipe down to return.</div>
+</div>
+
+<h3>Where notifications arrive</h3>
+<p>Everything notification-shaped lands in one place: the <b>bell at the top of the HUD</b>, right of the date. New items turn the bell amber with a red unread badge; the list survives reboots. Tap the bell to roll the panel down (it auto-closes after ~10s); tap any item to open it as a reader card; tap the card again to hear it read aloud. Agent replies, calendar/task reminders, and remote pushes through your relay's <code>/notify</code> endpoint all use this same bell — see Step 8 for receiving notifications away from home.</p>
+
+<h2 class="step" id="relay"><span class="num">8</span>Media relay + Cloudflare tunnel <span class="muted" style="font-size:15px">(optional)</span></h2>
+<p class="est">⏱ 20–30 minutes · needs a computer that stays on + a domain you own</p>
+<p>The relay is a single Python file that runs on your computer. It gives TapInsight two superpowers:</p>
+<ul class="check">
+  <li><b>File staging</b> — agents (or you) drop music, videos, and notes into a folder; the glasses pull them into the Media Library from anywhere.</li>
+  <li><b>Remote notifications</b> — bell notifications reach the glasses even when they're away from your home network.</li>
+</ul>
+<h3>8.1 Run the relay locally</h3>
+<pre><code>cd tools
+python3 image_relay.py
+# → relay listening on http://0.0.0.0:18790</code></pre>
+<p>Test it from the same machine:</p>
+<pre><code>curl http://localhost:18790/media-index.json
+# → {"ok": true, "files": [...]}</code></pre>
+<h3>8.2 Publish it with a Cloudflare tunnel</h3>
+<p>A (free) Cloudflare account and a domain you own turn that local port into a stable public URL like <code>https://relay.your-domain.com</code> — no port forwarding, no exposed home IP.</p>
+<ol>
+  <li>Add your domain to Cloudflare (free plan) and install <code>cloudflared</code>:
+  <pre><code># macOS
+brew install cloudflared
+cloudflared tunnel login</code></pre></li>
+  <li>Create the tunnel and route a subdomain to it:
+  <pre><code>cloudflared tunnel create tapinsight-relay
+cloudflared tunnel route dns tapinsight-relay relay.your-domain.com</code></pre></li>
+  <li>Create <code>~/.cloudflared/config.yml</code>:
+  <pre><code>tunnel: tapinsight-relay
+credentials-file: /Users/you/.cloudflared/&lt;tunnel-id&gt;.json
+ingress:
+  - hostname: relay.your-domain.com
+    service: http://localhost:18790
+  - service: http_status:404</code></pre></li>
+  <li>Run everything (relay + tunnel), telling the relay its public name:
+  <pre><code>export RELAY_PUBLIC_BASE="https://relay.your-domain.com"
+python3 tools/image_relay.py &amp;
+cloudflared tunnel run tapinsight-relay</code></pre></li>
+  <li>Verify from your phone (Wi-Fi off, on mobile data):
+  <pre><code>https://relay.your-domain.com/media-index.json</code></pre></li>
+</ol>
+<h3>8.3 Make it permanent (macOS)</h3>
+<p><code>tools/install-relay.sh</code> installs the relay as a login service (launchd) so it survives reboots. Run it once and forget it.</p>
+<h3>8.4 Point the app at your relay</h3>
+<p>Two ways — either works:</p>
+<ul class="check">
+  <li><b>Runtime</b>: in the companion app, set your agent endpoint / relay base to <code>https://relay.your-domain.com</code>.</li>
+  <li><b>Build time</b>: add <code>TAPINSIGHT_RELAY_BASE=https://relay.your-domain.com</code> to <code>~/.gradle/gradle.properties</code> and rebuild — the app then uses it as the default everywhere.</li>
+</ul>
+<div class="box warn"><b>Security</b> The relay supports a session token shared with the glasses (set it in the companion app). Anything in your staged-media folder becomes reachable through your tunnel — don't stage files you wouldn't want fetched, and keep the token set.</div>
+
+<h2 class="step" id="agents"><span class="num">9</span>AI agents <span class="muted" style="font-size:15px">(optional)</span></h2>
+<p class="est">⏱ depends on your agent setup</p>
+<p>If you run a personal AI agent (an OpenClaw-style session, a Hermes-style assistant, or anything with an HTTP endpoint), TapInsight can route voice requests to it by name and read the answer aloud:</p>
+<div class="demo">
+  <div class="label">Live demo — agents</div>
+  <div class="you">"Hermes, what's the latest on the weather this weekend?"</div>
+  <div class="glass">Ticker: <i>"Asking Hermes…"</i> → <i>"Hermes working… 10s"</i> → the reply is read aloud and lands in the notification bell.</div>
+  <div class="you">"Hermes." <span class="muted">(just the name)</span></div>
+  <div class="glass">"Yes?" — ask your question now; it routes straight to Hermes.</div>
+</div>
+<p>Configure your agent endpoints (URL + token) in the companion app's agent section. The endpoint host is also how the app derives your relay address automatically (<code>relay.&lt;your-domain&gt;</code>).</p>
+
+<h2 class="plain" id="troubleshooting">Troubleshooting</h2>
+<table>
+  <tr><th>Symptom</th><th>Fix</th></tr>
+  <tr><td>Assistant doesn't respond to the tap</td><td>Check the Gemini key in the companion app; watch the HUD connection chip. <code>adb logcat -s GeminiVoicePipe</code> shows the session lifecycle.</td></tr>
+  <tr><td>Voice cuts out mid-question, then answers a moment later</td><td>That's the auto-reconnect replaying your question after a server-side session drop — working as intended.</td></tr>
+  <tr><td>No captions in dim mode</td><td>Captions need CC enabled on the YouTube video itself; not all videos have captions. Radio lyrics need a song-ID match.</td></tr>
+  <tr><td>Companion page won't load</td><td>Same Wi-Fi? The address changes when your router reassigns IPs — check the HUD for the current one.</td></tr>
+  <tr><td>Relay URL 404s from outside</td><td><code>cloudflared tunnel run</code> must be running; test <code>localhost:18790</code> first, then the tunnel hostname.</td></tr>
+  <tr><td>Two TapInsight installs misbehave together</td><td>Run one at a time — both serve the companion app on the same LAN port.</td></tr>
+  <tr><td>Install fails with signature error</td><td><code>adb uninstall</code> the old build first, or use <code>adb install -r -d</code>.</td></tr>
+</table>
+
+<h2 class="plain" id="faq">FAQ</h2>
+<h3>Does TapInsight send my data anywhere?</h3>
+<p>Only to the AI services you configure, using your own keys. There is no project-run server; the optional relay is your machine, your domain.</p>
+<h3>Do I need the relay/Cloudflare part?</h3>
+<p>No. It's only for agent file delivery and away-from-home notifications. Everything else works without it.</p>
+<h3>What does it cost to run?</h3>
+<p>The Gemini free tier covers casual use. Cloudflare tunnels are free. Optional services (Groq, AudD, Fish) have their own free tiers or low-cost plans.</p>
+<h3>Other glasses? Phones?</h3>
+<p>Built for RayNeo X3 Pro's binocular display and temple-pad gestures. It may install elsewhere, but layout and gestures assume the X3 Pro.</p>
+<h3>How do I update?</h3>
+<p>Download the new APK and <code>adb install -r</code> over the old one — settings and media survive.</p>
+
+<footer>
+  TapInsight is free software under the <a href="../LICENSE">GPL-3.0 license</a>.
+  Found a problem with this guide? Please open an issue. ·
+  <a href="#toc">Back to top ↑</a>
+</footer>
+
+</div>
+<a class="top" href="#toc">Contents ↑</a>
+</body>
+</html>

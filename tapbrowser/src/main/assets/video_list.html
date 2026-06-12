@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Video Picks</title>
+<style>
+:root {
+  --bg: #000;
+  --card: #0a0a0a;
+  --card-hover: rgba(0, 229, 255, 0.06);
+  --accent: #00e5ff;
+  --accent-dim: rgba(0, 229, 255, 0.65);
+  --text: #f5f5f5;
+  --muted: #9aa0a6;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(0, 229, 255, 0.35);
+  --glow: rgba(0, 229, 255, 0.22);
+  --playlist: #ff2d55;
+  --playlist-glow: rgba(255, 45, 85, 0.25);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  max-width: 960px;
+  max-height: 480px;
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.topbar .title {
+  flex: 1;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar .count {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.play-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin: 8px 10px 4px;
+  background: linear-gradient(90deg, rgba(255, 45, 85, 0.16), rgba(255, 45, 85, 0.04));
+  border: 1px solid rgba(255, 45, 85, 0.4);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.play-all:active {
+  background: var(--playlist);
+  color: #fff;
+  box-shadow: 0 0 12px var(--playlist-glow);
+}
+.play-all .icon {
+  font-size: 14px;
+  color: var(--playlist);
+}
+.play-all:active .icon { color: #fff; }
+
+.hint {
+  padding: 4px 14px 6px;
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.videos {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 12px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+.videos::-webkit-scrollbar { width: 3px; }
+.videos::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.video {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 4px 2px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+}
+.video:active {
+  background: var(--card-hover);
+  border-color: var(--border-hover);
+  box-shadow: 0 0 10px var(--glow);
+}
+.video .idx {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(0, 229, 255, 0.08);
+  color: var(--accent-dim);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+.video .info {
+  flex: 1;
+  min-width: 0;
+}
+.video .title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.video .creator {
+  font-size: 11px;
+  color: var(--accent-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.video .reason {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.video .chev {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 20px;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="title" id="list-title">Video picks</div>
+    <div class="count" id="list-count"></div>
+  </div>
+  <button class="play-all" id="play-all">
+    <span class="icon">▶</span>
+    <span id="play-all-label">Play all as a playlist</span>
+  </button>
+  <div class="hint">Tap a video to play just that one, or tap the red button to play all of them in order.</div>
+  <div class="videos" id="videos"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  function parseData() {
+    try {
+      var qs = window.location.search || '';
+      if (qs.charAt(0) === '?') qs = qs.substring(1);
+      var pairs = qs.split('&');
+      for (var i = 0; i < pairs.length; i++) {
+        var eq = pairs[i].indexOf('=');
+        if (eq < 0) continue;
+        var k = decodeURIComponent(pairs[i].substring(0, eq));
+        if (k === 'data') {
+          var v = decodeURIComponent(pairs[i].substring(eq + 1).replace(/\+/g, ' '));
+          return JSON.parse(v);
+        }
+      }
+    } catch (e) { console.warn('video_list: failed to parse ?data', e); }
+    return null;
+  }
+
+  function encodeQuery(s) {
+    // YouTube search URL: spaces as '+'
+    return encodeURIComponent(String(s || '').trim()).replace(/%20/g, '+');
+  }
+
+  function playUrl(query) {
+    return 'https://www.youtube.com/results?search_query='
+      + encodeQuery(query) + '&taplink_autoplay=video';
+  }
+
+  function buildQueueSearchPhrase(video) {
+    var t = (video && video.title) ? String(video.title).trim() : '';
+    var c = (video && video.creator) ? String(video.creator).trim() : '';
+    if (t && c) return t + ' ' + c;
+    return t || c;
+  }
+
+  function queuePlayUrl(videos) {
+    // Build a URL that TapBrowser interprets as a video-queue request:
+    // the first item plays via search-and-autoplay; the remaining items
+    // are stored in `taplink_autoplay_queue` (URL-encoded JSON of strings)
+    // and TapBrowser advances to the next one when the current track ends.
+    // Same playback mechanism the voice "play <X> on YouTube" command uses.
+    var queue = [];
+    for (var i = 0; i < videos.length; i++) {
+      var phrase = buildQueueSearchPhrase(videos[i]);
+      if (phrase) queue.push(phrase);
+    }
+    if (!queue.length) return null;
+    var first = queue[0];
+    var queueJson = JSON.stringify(queue);
+    return 'https://www.youtube.com/results?search_query='
+      + encodeQuery(first)
+      + '&taplink_autoplay=video'
+      + '&taplink_autoplay_queue=' + encodeURIComponent(queueJson);
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function render(data) {
+    var title = (data && data.title) || (data && data.topic) || 'Video picks';
+    var topic = (data && data.topic) || title;
+    var videos = (data && Array.isArray(data.videos)) ? data.videos : [];
+
+    document.getElementById('list-title').textContent = title;
+    document.getElementById('list-count').textContent =
+      videos.length ? (videos.length + ' picks') : '';
+    // Label reflects the actual behaviour: we play the specific picks in
+    // order, NOT a YouTube-tab playlist search. So no more "as a playlist"
+    // language — that previously misled users into thinking it would queue
+    // someone else's saved playlist.
+    document.getElementById('play-all-label').textContent = videos.length
+      ? ('Play all ' + videos.length + ' picks')
+      : 'Play all picks';
+    document.getElementById('play-all').addEventListener('click', function () {
+      var url = queuePlayUrl(videos);
+      if (url) {
+        window.location.href = url;
+      }
+    });
+
+    var container = document.getElementById('videos');
+    container.innerHTML = '';
+    if (!videos.length) {
+      var empty = el('div', 'empty', 'No videos in this list.');
+      container.appendChild(empty);
+      return;
+    }
+
+    videos.forEach(function (v, i) {
+      var row = el('div', 'video');
+      row.appendChild(el('div', 'idx', String(i + 1)));
+
+      var info = el('div', 'info');
+      var t = (v && v.title) ? String(v.title) : 'Untitled';
+      var c = (v && v.creator) ? String(v.creator) : '';
+      var r = (v && v.reason) ? String(v.reason) : '';
+      info.appendChild(el('div', 'title', t));
+      if (c) info.appendChild(el('div', 'creator', c));
+      if (r) info.appendChild(el('div', 'reason', r));
+      row.appendChild(info);
+      row.appendChild(el('div', 'chev', '›'));
+
+      row.addEventListener('click', function () {
+        var q = c ? (t + ' ' + c) : t;
+        window.location.href = playUrl(q);
+      });
+      container.appendChild(row);
+    });
+  }
+
+  var data = parseData();
+  if (!data) {
+    // Fall back to a friendly empty state so we never render a blank page.
+    data = { title: 'Video picks', topic: '', videos: [] };
+  }
+  render(data);
+})();
+</script>
+</body>
+</html>

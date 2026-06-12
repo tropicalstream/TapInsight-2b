@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hermes HUD status icon — a bold letter "H". Sits beside the OpenClaw
+  crab in the HUD; tinted red (Hermes unreachable) or green (reachable)
+  via setColorFilter. Single fill path so the tint applies uniformly.
+
+  Geometry: 24x24 viewport. Left and right verticals are 4-units wide
+  bars from y=4 to y=20 (height 16). Crossbar spans them at y=10..14
+  (height 4, vertically centered on y=12). The result is a chunky, even,
+  highly-readable H that holds up at 16dp on a HUD strip.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,4 L9,4 L9,10 L15,10 L15,4 L19,4 L19,20 L15,20 L15,14 L9,14 L9,20 L5,20 Z" />
+</vector>

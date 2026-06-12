@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Media Library</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  /* DOCUMENT-LEVEL SCROLLING — see DualWebViewGroup.configureWebView.
+     The WebView's native scrollbar is reliably always-visible there
+     (scrollbarFadingEnabled=false). For that to actually fire, the
+     PAGE itself has to be the scrollable surface. The previous design
+     locked html/body with `overflow:hidden;height:100%` and put
+     `overflow-y:auto` on an inner <main> div, which used CSS
+     ::-webkit-scrollbar — and RayNeo's WebView is flaky about that
+     pseudo-element. By moving the scroll surface UP to the document
+     we route every scroll-needing page through the same reliable
+     native scrollbar. The header + breadcrumb stay pinned via
+     `position:sticky` so the navigation context never disappears. */
+  html,body{background:#000;color:#e0e0e0;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    -webkit-tap-highlight-color:transparent;user-select:none;
+    min-height:100%}
+  a{color:inherit;text-decoration:none}
+  button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+
+  /* ── Layout ──────────────────────────────────────────
+     #app is no longer height-constrained; it expands with content
+     so the document-level scrollbar appears as soon as the rows
+     overflow the viewport. */
+  #app{display:flex;flex-direction:column;min-height:100vh}
+  /* Sticky topbar holds header + crumbs so they stay visible while
+     the rest of the document scrolls underneath them. */
+  .topbar{position:sticky;top:0;z-index:10;background:#020a0f}
+  header{
+    flex-shrink:0;padding:10px 14px 8px;border-bottom:1px solid #0a2a3a;
+    background:linear-gradient(180deg,#071320 0%,#030709 100%);
+    display:flex;align-items:center;gap:10px;
+  }
+  header .logo{
+    width:28px;height:28px;border-radius:7px;flex-shrink:0;
+    background:linear-gradient(160deg,#112233,#061018);
+    border:1px solid #00e5ff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 10px rgba(0,229,255,.18);
+  }
+  header .title{flex:1;min-width:0}
+  header h1{font-size:14px;color:#00e5ff;letter-spacing:.3px;font-weight:700;line-height:1.1}
+  header .sub{font-size:10px;color:#6a8594;letter-spacing:1.4px;text-transform:uppercase;margin-top:2px}
+  header .tools{display:flex;gap:6px}
+  header .tool-btn{
+    width:32px;height:32px;border-radius:8px;border:1px solid #0a2a3a;
+    background:#04131c;display:flex;align-items:center;justify-content:center;
+    font-size:14px;color:#b8d6e2;transition:all .15s;
+  }
+  header .tool-btn:hover{border-color:#00e5ff;color:#fff;background:rgba(0,229,255,.08)}
+  header .tool-btn:disabled{opacity:.35;cursor:not-allowed}
+
+  nav.crumbs{
+    flex-shrink:0;padding:8px 14px;border-bottom:1px solid #0a1e2a;
+    background:#020a0f;font-size:12px;color:#6a8594;
+    display:flex;align-items:center;gap:4px;overflow-x:auto;white-space:nowrap;
+  }
+  nav.crumbs::-webkit-scrollbar{display:none}
+  nav.crumbs .crumb{color:#8cb8cc;cursor:pointer;padding:2px 4px;border-radius:4px}
+  nav.crumbs .crumb:hover{color:#00e5ff;background:rgba(0,229,255,.08)}
+  nav.crumbs .crumb.active{color:#e0e0e0;cursor:default}
+  nav.crumbs .sep{color:#3a5f73}
+
+  /* `<main>` is now a plain flow container — no inner scrolling,
+     no flex:1 height constraint. The document scrolls instead, so
+     the WebView's reliable native scrollbar paints on the right
+     edge of the whole viewport. We keep a right-side padding strip
+     on the row content so the entries' "X" delete buttons don't
+     crowd the scrollbar rail. */
+  main{padding:0 14px 24px 0}
+
+  .entry{
+    display:flex;align-items:center;gap:10px;padding:10px 14px;
+    border-bottom:1px solid #071825;cursor:pointer;transition:background .12s;
+  }
+  .entry:hover,.entry:focus{background:#071421;outline:none}
+  .entry .ic{
+    width:34px;height:34px;border-radius:8px;flex-shrink:0;
+    background:#04131c;border:1px solid #0a2a3a;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;color:#b8d6e2;
+  }
+  .entry.folder .ic{color:#ffd57c;border-color:#4a3b1c}
+  .entry.audio  .ic{color:#7cffda;border-color:#1c4a3c}
+  .entry.video  .ic{color:#b08cff;border-color:#3a1c4a}
+  .entry.playlist .ic{color:#00e5ff;border-color:#1c3a4a}
+  .entry.text .ic{color:#ffcc80;border-color:#4a351c}
+  .entry.image .ic{color:#86e8b8;border-color:#1c4a32}
+  .entry .txt{flex:1;min-width:0}
+  .entry .name{font-size:14px;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .entry .meta{font-size:11px;color:#6a8594;margin-top:2px}
+  .entry .arrow{color:#3a5f73;font-size:16px;flex-shrink:0}
+  .entry .del{
+    width:28px;height:28px;border-radius:6px;border:1px solid #331515;color:#ff7676;
+    font-size:12px;display:none;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .entry.playlist .del,.entry.audio .del,.entry.video .del,.entry.text .del,.entry.image .del,.entry.folder .del{display:flex}
+  .entry .del:hover{background:#4a1a1a;color:#fff}
+
+  .empty{
+    padding:48px 24px;text-align:center;color:#6a8594;font-size:13.5px;line-height:1.6;
+  }
+  .empty .big{font-size:36px;opacity:.5;margin-bottom:10px}
+  .empty code{color:#00e5ff;font-family:ui-monospace,'SF Mono',Menlo,monospace;
+    background:#02090d;padding:1px 6px;border-radius:4px;border:1px solid #0a2a3a;font-size:12px}
+
+  /* ── Now-playing row highlight ── */
+  .entry.nowplaying{border-color:rgba(0,229,255,.5);background:rgba(0,229,255,.06)}
+  .entry.nowplaying .nm{color:#7ef3ff}
+  .entry .npbadge{display:none;color:#00e5ff;font-size:12px;margin-right:4px;
+    animation:nppulse 1.6s ease-in-out infinite}
+  .entry.nowplaying .npbadge{display:inline}
+  @keyframes nppulse{0%,100%{opacity:.45}50%{opacity:1}}
+  /* ── "New from sync" dot ── */
+  .entry .newdot{display:none;width:8px;height:8px;border-radius:50%;
+    background:#00e5ff;box-shadow:0 0 6px #00e5ff;flex-shrink:0}
+  .entry.isnew .newdot{display:block}
+  /* ── Multi-select (long-press) ── */
+  .entry.selmode .del{display:none!important}
+  .entry .selbox{display:none;width:16px;height:16px;border:1.5px solid #3a5f73;
+    border-radius:4px;flex-shrink:0;align-items:center;justify-content:center;
+    font-size:11px;color:#00e5ff}
+  .entry.selmode .selbox{display:flex}
+  .entry.selected{background:rgba(0,229,255,.10);border-color:rgba(0,229,255,.45)}
+  .entry.selected .selbox{border-color:#00e5ff}
+  #selbar{position:fixed;left:8%;right:8%;bottom:12px;z-index:80;display:none;gap:10px;
+    padding:10px 14px;border-radius:12px;background:#06151d;border:1px solid #0e3346;
+    box-shadow:0 4px 18px rgba(0,0,0,.5)}
+  #selbar.show{display:flex}
+  #selbar .grow{flex:1;font-size:13px;color:#bfe8f5;align-self:center}
+  #selbar button{padding:8px 14px;border-radius:8px;border:none;font-weight:600;cursor:pointer}
+  #selbar .danger{background:#5b1717;color:#ffd7d7}
+  #selbar .plain{background:#0c2331;color:#cde}
+  /* ── Storage line ── */
+  #storageInfo{font-size:10.5px;color:#5f8696;margin-left:8px;white-space:nowrap;font-weight:400}
+
+  /* ── Play All bar (playlist view) ────────────────────
+     Previously `position:sticky;top:0` — designed to stick at the
+     top of the inner-scrolling <main>. With document-level scroll
+     it would now stick at viewport top:0 and overlap the topbar,
+     so we make it normal-flow. The Play-All button is the first
+     row of the playlist view; users naturally scroll up to find
+     it as they would the first item of any list. */
+  .playall-bar{
+    padding:10px 14px 6px;
+    background:linear-gradient(180deg,#020a0f 0%,rgba(2,10,15,.9) 100%);
+    border-bottom:1px solid #071825;
+  }
+  .playall{
+    width:100%;display:flex;align-items:center;gap:10px;
+    padding:10px 14px;border-radius:10px;
+    background:linear-gradient(135deg,#052636 0%,#072a3a 100%);
+    border:1px solid #00e5ff;
+    color:#e0ffff;font-size:14px;font-weight:600;letter-spacing:.3px;
+    box-shadow:0 0 12px rgba(0,229,255,.18);
+    transition:all .15s;
+  }
+  .playall:hover{background:linear-gradient(135deg,#063449 0%,#083a52 100%);
+    box-shadow:0 0 18px rgba(0,229,255,.28)}
+  .playall:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+  .playall .ico{
+    width:28px;height:28px;border-radius:50%;background:#00e5ff;color:#031018;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;flex-shrink:0;
+  }
+  .playall .lbl{flex:1;text-align:left}
+  .playall .ct{font-size:11.5px;color:#7ed6e8;font-weight:500;letter-spacing:.4px}
+
+  /* ── Toast ─────────────────────────────────────────── */
+  #toast{
+    position:fixed;left:50%;bottom:32px;transform:translate(-50%,20px);
+    background:#041b29;border:1px solid #00e5ff;color:#e0e0e0;padding:10px 14px;
+    border-radius:8px;font-size:12.5px;box-shadow:0 4px 20px rgba(0,229,255,.25);
+    opacity:0;pointer-events:none;transition:all .22s;z-index:10;max-width:80vw;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #toast.err{border-color:#b71c1c;color:#ffb3b3;box-shadow:0 4px 20px rgba(183,28,28,.3)}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Sticky topbar so the header + breadcrumb stay visible while
+       the document scrolls. Together they pin to the top of the
+       viewport; the rest of the page scrolls underneath the topbar
+       and triggers the WebView's native always-visible scrollbar. -->
+  <div class="topbar">
+    <header>
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="18" height="18">
+          <rect x="10" y="16" width="28" height="4" rx="2" fill="#00e5ff"/>
+          <rect x="10" y="28" width="24" height="4" rx="2" fill="#00e5ff" opacity=".7"/>
+          <rect x="10" y="40" width="20" height="4" rx="2" fill="#00e5ff" opacity=".45"/>
+          <circle cx="47" cy="43" r="12" fill="#00e5ff"/>
+          <polygon points="43,36 43,50 55,43" fill="#061018"/>
+        </svg>
+      </div>
+      <div class="title">
+        <h1>Media Library</h1>
+        <div class="sub" id="headerSub">On-Device</div>
+      </div>
+      <div class="tools">
+        <!-- ＋ "create M3U from folder" removed (user + UI review):
+             tapping any file already queues the whole folder for
+             ⏮/⏭ navigation, so the generated playlist added nothing.
+             Up-one-level took its slot — far more used. -->
+        <button class="tool-btn" id="btnUp" title="Up one level"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="14 9 9 4 4 9"/><path d="M20 20h-7a4 4 0 0 1-4-4V4"/></svg></button>
+        <!-- Sort toggle: A-Z → NEW (latest first) → OLD (oldest first).
+             Folders/playlists always stay pinned to the top. -->
+        <button class="tool-btn" id="btnSort" title="Sort: name / newest / oldest"
+                style="font-size:9px;font-weight:700;letter-spacing:.5px">A-Z</button>
+        <!-- Pull-sync from the relay staging folders (Hermes/OpenClaw on
+             the Mac). Glasses-side PULL so it works no matter what IP
+             the glasses have. -->
+        <button class="tool-btn" id="btnSync" title="Sync new files from Hermes/OpenClaw"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/></svg></button>
+        <button class="tool-btn" id="btnRefresh" title="Refresh">↻</button>
+        <!-- Home = back to the media ROOT directory. It used to link out
+             to the dashboard, which never returned the user to the
+             library root (user). Wired to openFolder('') in the script. -->
+        <button class="tool-btn" id="btnHome" title="Media root">⌂</button>
+      </div>
+    </header>
+
+    <nav class="crumbs" id="crumbs"></nav>
+  </div>
+
+  <main id="main">
+    <div class="empty" id="loading">
+      <div class="big">⋯</div>
+      <div>Loading library…</div>
+    </div>
+  </main>
+</div>
+
+<!-- Playback is handed off to media_player.html (same page the browser uses
+     for any tapped audio/video URL), so this file has no inline player. -->
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ── Bridge accessor ─────────────────────────────────────────────────
+  // window.TapMedia is injected by MediaLibraryBridge.kt when this page
+  // is loaded from an on-glasses origin (either file:///android_asset/...
+  // or https://appassets.androidplatform.net/assets/...). If the bridge
+  // is missing we're either on the wrong page or it didn't wire up, and
+  // every call returns a friendly error instead of crashing.
+  var TM = window.TapMedia;
+  function bridgeMissing(){
+    return !TM || typeof TM.listFolder !== 'function';
+  }
+  function callBridge(method, args){
+    try { return JSON.parse(TM[method].apply(TM, args || [])); }
+    catch (e) { return { error: String(e && e.message || e) }; }
+  }
+
+  // ── DOM refs ────────────────────────────────────────────────────────
+  var $main      = document.getElementById('main');
+  var $crumbs    = document.getElementById('crumbs');
+  var $subTitle  = document.getElementById('headerSub');
+  var $btnUp     = document.getElementById('btnUp');
+  var $btnRefresh= document.getElementById('btnRefresh');
+
+  var $toast     = document.getElementById('toast');
+
+  // ── State ──────────────────────────────────────────────────────────
+  var state = {
+    mode: 'folder',     // 'folder' | 'playlist'
+    currentFolder: '',  // relative path
+    folderEntries: [],  // for folder mode
+    playlistName: '',
+    playlistPath: '',
+    playlistEntries: [] // for playlist mode
+  };
+
+  // ── Toast ──────────────────────────────────────────────────────────
+  var toastTimer = null;
+  function toast(msg, isErr){
+    $toast.textContent = msg;
+    $toast.classList.toggle('err', !!isErr);
+    $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ $toast.classList.remove('show'); }, 2400);
+  }
+
+  // ── Formatting ─────────────────────────────────────────────────────
+  function humanSize(bytes){
+    if (bytes == null || bytes <= 0) return '';
+    var u = ['B','KB','MB','GB'], i = 0, n = bytes;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + ' ' + u[i];
+  }
+  function humanTime(sec){
+    if (!isFinite(sec) || sec < 0) return '0:00';
+    sec = Math.floor(sec);
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function shortDate(ms){
+    var d = new Date(ms);
+    if (isNaN(d.getTime())) return '';
+    var mm = d.getMinutes();
+    return MONTHS[d.getMonth()] + ' ' + d.getDate() + ' ' +
+      d.getHours() + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+
+  // ── Sort mode (persisted) ──────────────────────────────────────────
+  // 'name' (kind-grouped A-Z, the original), 'newest' (latest modified
+  // first), 'oldest'. Folders/playlists always pin to the top.
+  var sortMode = 'name';
+  try { sortMode = localStorage.getItem('taplib_sort') || 'name'; } catch (err) {}
+  function sortButtonLabel(){
+    return sortMode === 'newest' ? 'NEW' : sortMode === 'oldest' ? 'OLD' : 'A-Z';
+  }
+  function fileIcon(kind, name){
+    switch (kind) {
+      case 'FOLDER'  : return '📁';
+      case 'AUDIO'   : return '♪';
+      case 'VIDEO'   : return '▶';
+      case 'PLAYLIST': return '≡';
+      case 'TEXT'    : return '📄';
+      case 'IMAGE'   : return '🖼';
+      default        : return '·';
+    }
+  }
+
+  // ── Breadcrumbs ────────────────────────────────────────────────────
+  function renderCrumbs(crumbs){
+    $crumbs.innerHTML = '';
+    if (!crumbs || !crumbs.length) return;
+    crumbs.forEach(function(c, i){
+      if (i > 0) {
+        var sep = document.createElement('span');
+        sep.className = 'sep'; sep.textContent = '›';
+        $crumbs.appendChild(sep);
+      }
+      var el = document.createElement('span');
+      el.className = 'crumb' + (i === crumbs.length - 1 && state.mode === 'folder' ? ' active' : '');
+      el.textContent = c.name;
+      el.addEventListener('click', function(){ openFolder(c.path); });
+      $crumbs.appendChild(el);
+    });
+  }
+
+  // ── Folder view ────────────────────────────────────────────────────
+  function openFolder(path){
+    if (bridgeMissing()) { renderBridgeMissing(); return; }
+    var data = callBridge('listFolder', [path || '']);
+    if (data.error) {
+      toast('Could not open folder: ' + data.error, true);
+      return;
+    }
+    state.mode = 'folder';
+    state.currentFolder = data.relativePath || '';
+    // Normalize kind at the single ingestion point (defensive: the
+    // bridge emits enum names like 'FOLDER', but trim/uppercase here
+    // makes every downstream check — sort, CSS class, icon, click
+    // routing — immune to casing/whitespace drift forever).
+    state.folderEntries = (data.entries || []).map(function(en){
+      en.kind = String(en.kind || 'OTHER').trim().toUpperCase();
+      return en;
+    });
+    $subTitle.textContent = state.currentFolder ? state.currentFolder : 'On-Device';
+    renderCrumbs(data.breadcrumbs || [{name:'Media',path:''}]);
+    renderFolder();
+  }
+
+  function renderFolder(){
+    $main.innerHTML = '';
+    if (!state.folderEntries.length) {
+      renderEmptyFolder();
+      return;
+    }
+    // Folders first, then playlists, then files. File order follows the
+    // sort toggle: 'name' = the original kind-grouped A-Z; 'newest' /
+    // 'oldest' = modified date so a fresh Hermes drop surfaces on top.
+    var order = {FOLDER:0,PLAYLIST:1,AUDIO:2,VIDEO:3,IMAGE:4,TEXT:5,OTHER:6};
+    var sorted = state.folderEntries.slice().sort(function(a,b){
+      var aTop = (a.kind === 'FOLDER' || a.kind === 'PLAYLIST') ? order[a.kind] : 2;
+      var bTop = (b.kind === 'FOLDER' || b.kind === 'PLAYLIST') ? order[b.kind] : 2;
+      if (aTop !== bTop) return aTop - bTop;
+      if (aTop < 2) return a.name.localeCompare(b.name);  // folders/playlists A-Z
+      if (sortMode === 'newest') {
+        return (b.lastModifiedMs || 0) - (a.lastModifiedMs || 0);
+      }
+      if (sortMode === 'oldest') {
+        return (a.lastModifiedMs || 0) - (b.lastModifiedMs || 0);
+      }
+      var ka = order[a.kind] == null ? 6 : order[a.kind];
+      var kb = order[b.kind] == null ? 6 : order[b.kind];
+      if (ka !== kb) return ka - kb;
+      return a.name.localeCompare(b.name);
+    });
+    // Album support: any folder with 2+ audio tracks gets a Play All
+    // bar (same visual as playlist view). It routes through the
+    // (buttonless) native M3U generator + TapRadio's native playlist
+    // player — gapless ExoPlayer, prev/next, dim-mode controls free.
+    var albumTracks = sorted.filter(function(x){ return x.kind === 'AUDIO'; }).length;
+    if (albumTracks >= 2) {
+      var albumBar = document.createElement('div');
+      albumBar.className = 'playall-bar';
+      albumBar.innerHTML =
+        '<button class="playall" id="btnFolderPlayAll">' +
+        '<span class="ico">▶</span><span class="lbl">Play All</span>' +
+        '<span class="ct">' + albumTracks + ' tracks</span></button>';
+      $main.appendChild(albumBar);
+      albumBar.querySelector('#btnFolderPlayAll')
+        .addEventListener('click', playFolderAsAlbum);
+    }
+
+    sorted.forEach(function(e){
+      var row = document.createElement('div');
+      row.className = 'entry ' + e.kind.toLowerCase();
+      if (sel.on) row.classList.add('selmode');
+      row.tabIndex = 0;
+      row.innerHTML =
+        '<div class="selbox"></div>' +
+        '<div class="ic">' + fileIcon(e.kind, e.name) + '</div>' +
+        '<div class="newdot"></div>' +
+        '<div class="txt">' +
+          '<div class="name"><span class="npbadge">♪</span><span class="nm"></span></div>' +
+          '<div class="meta"></div>' +
+        '</div>' +
+        '<button class="del" title="Delete">✕</button>' +
+        '<div class="arrow">' + (e.kind === 'FOLDER' || e.kind === 'PLAYLIST' ? '›' : '') + '</div>';
+      row.querySelector('.nm').textContent = e.name;
+      if (newFilesSet[e.relativePath]) row.classList.add('isnew');
+      if (e.kind === 'AUDIO' || e.kind === 'VIDEO') {
+        try { row.dataset.murl = TM.getMediaUrl(e.relativePath); } catch(_){}
+      }
+      var meta = [];
+      if (e.kind === 'FOLDER') meta.push('Folder');
+      else if (e.kind === 'PLAYLIST') meta.push('Playlist');
+      else meta.push(e.kind.charAt(0) + e.kind.slice(1).toLowerCase());
+      if (e.sizeBytes > 0) meta.push(humanSize(e.sizeBytes));
+      // Modified date on file rows — makes a fresh Hermes drop obvious
+      // and gives the date-sort modes something visible to confirm.
+      if (e.kind !== 'FOLDER' && e.lastModifiedMs > 0) {
+        meta.push(shortDate(e.lastModifiedMs));
+      }
+      row.querySelector('.meta').textContent = meta.join(' · ');
+      // Long-press → selection mode (batch delete). pointermove cancels
+      // so scroll gestures never trigger it.
+      var lpTimer = null, lpFired = false;
+      row.addEventListener('pointerdown', function(){
+        if (sel.on) return;
+        // Folders can't be batch-selected, so never arm the timer on
+        // them — a deliberate temple-pad press can run past the
+        // threshold, and accidentally entering selection mode made
+        // folder taps look dead (user bug). Files keep long-press.
+        if (e.kind === 'FOLDER') return;
+        lpFired = false;
+        lpTimer = setTimeout(function(){
+          lpFired = true; enterSelMode(); toggleSelect(row, e);
+        }, 700);
+      });
+      ['pointerup','pointercancel','pointerleave','pointermove'].forEach(function(evn){
+        row.addEventListener(evn, function(){
+          if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+        });
+      });
+      row.addEventListener('click', function(ev){
+        if (lpFired) { lpFired = false; return; }
+        if (ev.target.classList.contains('del')) return;
+        if (sel.on) {
+          // Navigation beats selection for folders — selection only
+          // applies to files, so a folder tap exits the mode and opens.
+          if (e.kind === 'FOLDER') { exitSelMode(); handleEntryClick(e); return; }
+          toggleSelect(row, e);
+          return;
+        }
+        if (newFilesSet[e.relativePath]) {
+          try { TapMedia.markRelayFileSeen(e.relativePath); } catch(_){}
+          delete newFilesSet[e.relativePath];
+          row.classList.remove('isnew');
+        }
+        handleEntryClick(e);
+      });
+      row.querySelector('.del').addEventListener('click', function(ev){
+        ev.stopPropagation(); confirmDelete(e);
+      });
+      $main.appendChild(row);
+    });
+  }
+
+  function renderEmptyFolder(){
+    var info = callBridge('getRootInfo', []);
+    var hint = info && info.rootShortHint ? info.rootShortHint : 'Android/data/<app>/files/Media';
+    var el = document.createElement('div');
+    el.className = 'empty';
+    el.innerHTML =
+      '<div class="big">♪</div>' +
+      '<div>No media here yet.</div>' +
+      '<div style="margin-top:12px;font-size:11.5px">' +
+      'Upload from the TapInsight companion app (Library tab) ' +
+      'or drop files into<br><code>' + hint + '</code>' +
+      '</div>';
+    $main.appendChild(el);
+  }
+
+  function renderBridgeMissing(){
+    $main.innerHTML = '';
+    var el = document.createElement('div');
+    el.className = 'empty';
+    el.innerHTML =
+      '<div class="big">!</div>' +
+      '<div>Media bridge unavailable.</div>' +
+      '<div style="margin-top:12px;font-size:11.5px">' +
+      'Reopen from the dashboard — this page is only meant to run ' +
+      'inside the TapInsight browser.' +
+      '</div>';
+    $main.appendChild(el);
+  }
+
+  function handleEntryClick(e){
+    if (e.kind === 'FOLDER') {
+      // Photos folder is a special case: TapInsight now saves photos
+      // to DCIM/TapInsight via MediaStore (not the on-disk
+      // Media/Photos folder), so a plain file listing of Photos/
+      // would only show legacy saves and miss the user's recent
+      // captures. Route the whole folder to photos_gallery.html
+      // instead — it merges legacy Media/Photos entries with
+      // DCIM/TapInsight (and optionally device-wide DCIM when
+      // permission is granted) in one view.
+      if (e.relativePath === 'Photos' || e.relativePath.endsWith('/Photos')) {
+        openPhotoInGallery('');
+        return;
+      }
+      toast('Opening ' + (e.name || 'folder') + '…');
+      openFolder(e.relativePath);
+    } else if (e.kind === 'PLAYLIST') {
+      openPlaylist(e.relativePath, e.name);
+    } else if (e.kind === 'IMAGE') {
+      // Photos use a dedicated Material-style gallery, not the
+      // audio/video player. The gallery scrolls/zooms to ?focus=
+      // and provides rotate/share/download/delete in a lightbox.
+      openPhotoInGallery(e.relativePath);
+    } else if (e.kind === 'AUDIO' || e.kind === 'VIDEO' || e.kind === 'TEXT') {
+      // Hand off to the same media_player.html the browser uses for any
+      // tapped audio/video URL — the WebView's shouldInterceptRequest wire
+      // covers the /media/... stream with Range-aware partial content.
+      // TEXT entries get the built-in reader (Gemini 3.1 TTS).
+      // For AUDIO/VIDEO, we ALSO stash the surrounding folder's playable
+      // siblings as a queue so the player's prev/next buttons can step
+      // through them without the user having to come back here. TEXT
+      // files don't get the queue (skip-to-next-text-file isn't a thing
+      // we want — it'd just stop reading mid-paragraph).
+      if (e.kind === 'AUDIO' || e.kind === 'VIDEO') {
+        stashFolderQueue(e);
+      } else {
+        clearStashedQueue();
+      }
+      openInPlayer({
+        url:   TM.getMediaUrl(e.relativePath),
+        title: e.name.replace(/\.[^.]+$/, ''),
+        kind:  e.kind
+      });
+    }
+  }
+
+  /**
+   * Build a queue from the current folder's AUDIO + VIDEO entries
+   * (in render order — same order shown in the list), find the
+   * currently-tapped entry's position, and save the whole thing
+   * to sessionStorage under 'mediaPlayerQueue'.
+   *
+   * media_player.html reads this on load when ?hasQueue=1 is on
+   * the URL, sets up playlistEntries/playOrder from it, and reveals
+   * the ⏮/⏭ buttons in the audio panel.
+   *
+   * Stored via sessionStorage (not URL params) because folder
+   * listings can have hundreds of entries with long filenames —
+   * URL-encoded JSON would blow past the WebView's URL length cap.
+   */
+  function stashFolderQueue(tappedEntry){
+    try {
+      // Only build a folder queue when the user is currently in
+      // folder-browse mode. In playlist-view mode the playable
+      // siblings are state.playlistEntries with a different shape,
+      // and we'd rather defer to the existing playlist-mode flow
+      // than half-implement queue navigation across two state
+      // shapes. Clear any stale stash so the player falls back to
+      // single-file mode for this tap.
+      if (state.mode !== 'folder') { clearStashedQueue(); return; }
+      var siblings = (state.folderEntries || []).filter(function(s){
+        return s.kind === 'AUDIO' || s.kind === 'VIDEO';
+      });
+      if (!siblings.length) { clearStashedQueue(); return; }
+      var entries = siblings.map(function(s){
+        return {
+          title: s.name.replace(/\.[^.]+$/, ''),
+          url:   TM.getMediaUrl(s.relativePath),
+          kind:  s.kind.toLowerCase(),
+          relativePath: s.relativePath
+        };
+      });
+      var idx = 0;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].relativePath === tappedEntry.relativePath) { idx = i; break; }
+      }
+      sessionStorage.setItem('mediaPlayerQueue', JSON.stringify({
+        name: state.currentFolder ? state.currentFolder.replace(/\/$/, '') : 'Library',
+        entries: entries,
+        startIndex: idx,
+        savedAt: Date.now()
+      }));
+    } catch(e) {
+      // sessionStorage failures shouldn't break playback — just
+      // clear and let the player fall back to single-file mode.
+      try { sessionStorage.removeItem('mediaPlayerQueue'); } catch(_){}
+    }
+  }
+
+  function clearStashedQueue(){
+    try { sessionStorage.removeItem('mediaPlayerQueue'); } catch(_){}
+  }
+
+  // ── Playlist view ──────────────────────────────────────────────────
+  function openPlaylist(path, name){
+    if (bridgeMissing()) { renderBridgeMissing(); return; }
+    var data = callBridge('parsePlaylist', [path]);
+    if (data.error) {
+      toast('Could not open playlist: ' + data.error, true);
+      return;
+    }
+    if (dataLooksRadioPlaylist(data)) {
+      state.playlistName = data.name || name || 'Playlist';
+      openPlaylistInTapRadio(data.relativePath || path, 0);
+      return;
+    }
+    state.mode = 'playlist';
+    state.playlistPath = data.relativePath || path;
+    state.playlistName = data.name || name || 'Playlist';
+    state.playlistEntries = data.entries || [];
+    $subTitle.textContent = 'Playlist · ' + state.playlistName;
+
+    var folderPath = state.currentFolder;
+    var crumbs = [{name:'Media',path:''}];
+    if (folderPath) {
+      var parts = folderPath.split('/').filter(Boolean);
+      var acc = '';
+      parts.forEach(function(p){ acc = acc ? acc + '/' + p : p; crumbs.push({name:p,path:acc}); });
+    }
+    crumbs.push({name:state.playlistName, path:state.playlistPath, playlist:true});
+    renderCrumbs(crumbs);
+    renderPlaylist(data.warnings || []);
+  }
+
+  function renderPlaylist(warnings){
+    $main.innerHTML = '';
+    if (warnings && warnings.length) {
+      var w = document.createElement('div');
+      w.className = 'empty';
+      w.style.padding = '12px 14px';
+      w.style.textAlign = 'left';
+      w.innerHTML =
+        '<div style="color:#ffb870;font-size:12px">' +
+        warnings.map(function(m){ return '⚠ ' + m; }).join('<br>') + '</div>';
+      $main.appendChild(w);
+    }
+    if (!state.playlistEntries.length) {
+      var el = document.createElement('div');
+      el.className = 'empty';
+      el.innerHTML = '<div class="big">∅</div><div>Playlist is empty.</div>';
+      $main.appendChild(el);
+      return;
+    }
+
+    // Count playables so the header can tell us how many tracks Play All will
+    // queue, and so we can disable the button when nothing is streamable.
+    var playableCount = state.playlistEntries.filter(function(x){
+      return !!x.playUrl;
+    }).length;
+    var playAllBar = document.createElement('div');
+    playAllBar.className = 'playall-bar';
+    playAllBar.innerHTML =
+      '<button class="playall" id="btnPlayAll" ' +
+        (playableCount ? '' : 'disabled') + '>' +
+        '<span class="ico">▶</span>' +
+        '<span class="lbl">Play All</span>' +
+        '<span class="ct">' + playableCount + ' track' +
+          (playableCount === 1 ? '' : 's') + '</span>' +
+      '</button>';
+    $main.appendChild(playAllBar);
+    var btnPlayAll = playAllBar.querySelector('#btnPlayAll');
+    if (playableCount) {
+      btnPlayAll.addEventListener('click', function(){
+        openPlaylistInPlayer(state.playlistPath, 0);
+      });
+    }
+
+    state.playlistEntries.forEach(function(e, i){
+      var row = document.createElement('div');
+      var cls = e.kind === 'VIDEO' ? 'video' : 'audio';
+      row.className = 'entry ' + cls;
+      row.tabIndex = 0;
+      row.innerHTML =
+        '<div class="ic">' + (i + 1) + '</div>' +
+        '<div class="txt">' +
+          '<div class="name"></div>' +
+          '<div class="meta"></div>' +
+        '</div>' +
+        '<div class="arrow">›</div>';
+      row.querySelector('.name').textContent = e.title || e.rawPath;
+      var metaBits = [];
+      if (e.isAbsoluteUrl) metaBits.push('Remote');
+      else if (e.resolvedRelativePath) metaBits.push(e.resolvedRelativePath);
+      if (e.durationSeconds != null) metaBits.push(humanTime(e.durationSeconds));
+      row.querySelector('.meta').textContent = metaBits.join(' · ');
+      row.addEventListener('click', function(){
+        if (!e.playUrl) {
+          toast('This entry is not playable from here', true);
+          return;
+        }
+        // Tap-to-start-here: open the same media_player.html playlist mode
+        // the browser uses for TapClaw media, seeded at this track's index.
+        openPlaylistInPlayer(state.playlistPath, i);
+      });
+      $main.appendChild(row);
+    });
+  }
+
+  // ── Player hand-off ───────────────────────────────────────────────
+  // Tapping audio/video anywhere in the library navigates to the same
+  // media_player.html page the main browser uses for any tapped media URL
+  // (see DualWebViewGroup.interceptMediaUrl). Keeps a single playback
+  // surface with unified TTS, captions, visualizer, scrubber, etc.
+
+  // Navigate to media_player.html on the SAME virtual origin that serves
+  // our /media/ URLs — https://appassets.androidplatform.net/assets/... —
+  // so the <audio>/<video> element's request for the interceptor-backed
+  // media URL is same-origin and isn't dropped as a cross-origin sub-
+  // resource from a file:// page.
+  var PLAYER_URL = 'https://appassets.androidplatform.net/assets/media_player.html';
+  // Material-style photos gallery — separate page from the audio/video
+  // player because the affordances (grid, lightbox, rotate, swipe) don't
+  // overlap. MediaFileInterceptor.ALLOWED_ASSET_PAGES must include this
+  // filename or the WebView main-frame load 404s.
+  var PHOTOS_URL = 'https://appassets.androidplatform.net/assets/photos_gallery.html';
+
+  function openPhotoInGallery(relativePath){
+    // Empty relativePath = open the gallery in its default state
+    // (Photos folder click); a path opens the lightbox on that photo.
+    if (relativePath) {
+      window.location.href = PHOTOS_URL + '?focus=' + encodeURIComponent(relativePath);
+    } else {
+      window.location.href = PHOTOS_URL;
+    }
+  }
+
+  // Same virtual https origin as PLAYER_URL — using file:///android_asset/
+  // here would be a cross-protocol top-level navigation from this https page,
+  // which the WebView silently blocks (tapping a stream playlist did
+  // nothing). MediaFileInterceptor.ALLOWED_ASSET_PAGES now includes
+  // radio.html so this URL resolves through the asset interceptor.
+  var RADIO_URL = 'https://appassets.androidplatform.net/assets/radio.html';
+
+  function dataLooksRadioPlaylist(data){
+    var entries = data && data.entries || [];
+    return entries.some(function(e){
+      var url = String(e.playUrl || e.url || e.rawPath || '').trim().toLowerCase();
+      var kind = String(e.kind || '').toUpperCase();
+      return !!url &&
+        (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) &&
+        kind !== 'VIDEO' &&
+        kind !== 'TEXT';
+    });
+  }
+
+  function isRadioPlaylist(){
+    if (state.mode !== 'playlist' || !state.playlistEntries.length) return false;
+    return state.playlistEntries.some(function(e){
+      var url = String(e.playUrl || e.rawPath || '').trim().toLowerCase();
+      var kind = String(e.kind || '').toUpperCase();
+      return !!url &&
+        (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) &&
+        kind !== 'VIDEO' &&
+        kind !== 'TEXT';
+    });
+  }
+
+  function openInPlayer(item){
+    if (!item || !item.url) { toast('Nothing to play', true); return; }
+    var kind = (item.kind || 'AUDIO').toLowerCase();
+    if (kind !== 'audio' && kind !== 'video' && kind !== 'text') kind = 'audio';
+    var qp = '?type=' + kind +
+             '&url=' + encodeURIComponent(item.url) +
+             '&title=' + encodeURIComponent(item.title || '');
+    // Tell the player to look for a folder-queue stashed in
+    // sessionStorage. Only set when stashFolderQueue actually wrote
+    // one — TEXT and one-off URLs skip this and play single-file.
+    try {
+      if (sessionStorage.getItem('mediaPlayerQueue')) qp += '&hasQueue=1';
+    } catch(_){}
+    window.location.href = PLAYER_URL + qp;
+  }
+
+  function openPlaylistInPlayer(path, startIdx){
+    if (!path) { toast('No playlist to play', true); return; }
+    if (isRadioPlaylist()) {
+      openPlaylistInTapRadio(path, startIdx);
+      return;
+    }
+    var qp = '?type=playlist' +
+             '&playlist=' + encodeURIComponent(path) +
+             '&start=' + (startIdx | 0) +
+             '&source=bridge';
+    window.location.href = PLAYER_URL + qp;
+  }
+
+  function openPlaylistInTapRadio(path, startIdx){
+    if (!path) { toast('No playlist to play', true); return; }
+    var playlistUrl = TM.getMediaUrl(path);
+    var qp = '?playUrl=' + encodeURIComponent(playlistUrl) +
+             '&playName=' + encodeURIComponent(state.playlistName || 'Playlist') +
+             '&playGenre=' + encodeURIComponent('Playlist') +
+             '&playKind=playlist' +
+             '&playStart=' + (startIdx | 0) +
+             '&autoplay=1' +
+             '&_t=' + Date.now();
+    window.location.href = RADIO_URL + qp;
+  }
+
+  // ── Toolbar actions ────────────────────────────────────────────────
+  function parentOf(p){
+    p = String(p || '').replace(/\/+$/, '');
+    var i = p.lastIndexOf('/');
+    return i > 0 ? p.slice(0, i) : '';
+  }
+  $btnUp.addEventListener('click', function(){
+    if (bridgeMissing()) { renderBridgeMissing(); return; }
+    if (state.mode === 'playlist') {
+      // Up from a playlist view = the folder containing the .m3u.
+      openFolder(parentOf(state.playlistPath));
+      return;
+    }
+    if (!state.currentFolder) { toast('Already at media root'); return; }
+    openFolder(parentOf(state.currentFolder));
+  });
+  var $btnSync = document.getElementById('btnSync');
+  var syncPollTimer = null;
+  if ($btnSync) {
+    // Busy-state contract (UI review): a network-cost button must show
+    // it is working — disabled + hourglass while the sync runs, glyph
+    // restored on completion either way. Refresh (instant, local) needs
+    // no such state; keeping their behaviors visibly different is what
+    // makes two icon buttons side-by-side legible.
+    var SYNC_ICON_HTML = $btnSync ? $btnSync.innerHTML : '';
+    function setSyncBusy(busy) {
+      $btnSync.disabled = !!busy;
+      $btnSync.style.opacity = busy ? '.5' : '';
+      $btnSync.innerHTML = busy ? '⌛' : SYNC_ICON_HTML;
+    }
+    $btnSync.addEventListener('click', function(){
+      if (!(window.TapMedia && TapMedia.syncFromRelay)) {
+        toast('Sync needs the app update', true);
+        return;
+      }
+      var started;
+      try { started = JSON.parse(TapMedia.syncFromRelay()); }
+      catch (e) { toast('Sync failed to start', true); return; }
+      if (started && started.status === 'already-running') {
+        toast('Sync already running…');
+      } else {
+        toast('Syncing from Hermes/OpenClaw…');
+      }
+      setSyncBusy(true);
+      if (syncPollTimer) clearInterval(syncPollTimer);
+      var polls = 0;
+      syncPollTimer = setInterval(function(){
+        var st = null;
+        try { st = JSON.parse(TapMedia.getRelaySyncStatus()); } catch (e) {}
+        if (st && st.syncing && ++polls < 120) return;
+        clearInterval(syncPollTimer); syncPollTimer = null;
+        setSyncBusy(false);
+        var sum = null;
+        try { sum = JSON.parse((st && st.lastSummary) || '{}'); } catch (e) {}
+        if (!sum || sum.ok === false) {
+          toast('Sync failed: ' + ((sum && sum.error) || 'relay unreachable'), true);
+          return;
+        }
+        var got = sum.fetched || 0;
+        toast(got > 0
+          ? ('Synced ' + got + ' new file' + (got === 1 ? '' : 's'))
+          : 'Library already up to date');
+        refreshNewFiles();
+        updateStorageInfo();
+        if (got > 0 && state.mode === 'folder') openFolder(state.currentFolder);
+      }, 1000);
+    });
+  }
+
+  $btnRefresh.addEventListener('click', function(){
+    // Visible feedback (user: the button looked dead because a refresh
+    // that changes nothing re-renders an identical list silently).
+    toast('Refreshing…');
+    if (state.mode === 'folder') {
+      openFolder(state.currentFolder);
+      toast('Refreshed — ' + state.folderEntries.length + ' item' +
+        (state.folderEntries.length === 1 ? '' : 's'));
+    } else if (state.mode === 'playlist') {
+      openPlaylist(state.playlistPath, state.playlistName);
+      toast('Playlist refreshed');
+    }
+  });
+
+  // Sort toggle: A-Z → NEW (latest first) → OLD (oldest first) → A-Z.
+  var $btnSort = document.getElementById('btnSort');
+  if ($btnSort) {
+    $btnSort.textContent = sortButtonLabel();
+    $btnSort.addEventListener('click', function(){
+      sortMode = sortMode === 'name' ? 'newest'
+        : sortMode === 'newest' ? 'oldest' : 'name';
+      try { localStorage.setItem('taplib_sort', sortMode); } catch (err) {}
+      $btnSort.textContent = sortButtonLabel();
+      toast(sortMode === 'newest' ? 'Sorted: latest first'
+        : sortMode === 'oldest' ? 'Sorted: oldest first' : 'Sorted: A-Z');
+      if (state.mode === 'folder') renderFolder();
+    });
+  }
+  // ⌂ Home → media ROOT directory. Works from any depth and from
+  // playlist mode (openFolder resets mode to 'folder').
+  var $btnHome = document.getElementById('btnHome');
+  if ($btnHome) {
+    $btnHome.addEventListener('click', function(){
+      if (bridgeMissing()) { renderBridgeMissing(); return; }
+      openFolder('');
+    });
+  }
+
+  // Up is meaningful everywhere except the media root in folder mode.
+  function syncToolbar(){
+    var atRoot = state.mode === 'folder' && !state.currentFolder;
+    $btnUp.disabled = atRoot;
+    $btnUp.style.opacity = atRoot ? '.35' : '';
+  }
+
+  // ── New-from-sync dots ─────────────────────────────────────────────
+  var newFilesSet = {};
+  function refreshNewFiles(){
+    try {
+      if (window.TapMedia && TapMedia.getRelayNewFiles) {
+        newFilesSet = JSON.parse(TapMedia.getRelayNewFiles()) || {};
+      }
+    } catch (e) { newFilesSet = {}; }
+  }
+
+  // ── Storage line (header) ──────────────────────────────────────────
+  (function(){
+    var t = document.querySelector('header .title');
+    if (t && !document.getElementById('storageInfo')) {
+      var s = document.createElement('span');
+      s.id = 'storageInfo';
+      t.appendChild(s);
+    }
+  })();
+  function updateStorageInfo(){
+    try {
+      var el = document.getElementById('storageInfo');
+      if (!el) return;
+      var info = callBridge('getRootInfo', []);
+      if (info && info.freeBytes > 0) {
+        el.textContent = '· ' + humanSize(info.freeBytes) + ' free';
+      }
+    } catch (e) {}
+  }
+
+  // ── Multi-select / batch delete (long-press to enter) ─────────────
+  var sel = { on: false, set: {} };
+  var $selbar = (function(){
+    var d = document.createElement('div');
+    d.id = 'selbar';
+    d.innerHTML =
+      '<div class="grow" id="selCount"></div>' +
+      '<button class="plain" id="selCancel">Cancel</button>' +
+      '<button class="danger" id="selDelete">Delete</button>';
+    document.body.appendChild(d);
+    d.querySelector('#selCancel').addEventListener('click', exitSelMode);
+    d.querySelector('#selDelete').addEventListener('click', batchDelete);
+    return d;
+  })();
+  function enterSelMode(){
+    if (sel.on) return;
+    sel.on = true; sel.set = {};
+    document.querySelectorAll('.entry').forEach(function(r){ r.classList.add('selmode'); });
+    $selbar.classList.add('show');
+    updateSelBar();
+  }
+  function exitSelMode(){
+    sel.on = false; sel.set = {};
+    document.querySelectorAll('.entry').forEach(function(r){
+      r.classList.remove('selmode'); r.classList.remove('selected');
+      var b = r.querySelector('.selbox'); if (b) b.textContent = '';
+    });
+    $selbar.classList.remove('show');
+  }
+  function toggleSelect(row, e){
+    if (e.kind === 'FOLDER') { toast('Folders can\'t be batch-deleted'); return; }
+    var k = e.relativePath;
+    var box = row.querySelector('.selbox');
+    if (sel.set[k]) {
+      delete sel.set[k];
+      row.classList.remove('selected');
+      if (box) box.textContent = '';
+    } else {
+      sel.set[k] = e.name;
+      row.classList.add('selected');
+      if (box) box.textContent = '✓';
+    }
+    updateSelBar();
+  }
+  function updateSelBar(){
+    var n = Object.keys(sel.set).length;
+    document.getElementById('selCount').textContent =
+      n + ' selected — tap rows to add';
+    document.getElementById('selDelete').disabled = n === 0;
+  }
+  function batchDelete(){
+    var keys = Object.keys(sel.set);
+    if (!keys.length) return;
+    if (!confirm('Delete ' + keys.length + ' file' + (keys.length === 1 ? '' : 's') +
+      '?\n\nThis cannot be undone.')) return;
+    var ok = 0, bad = 0;
+    keys.forEach(function(k){
+      var data = callBridge('deleteEntry', [k]);
+      if (data && data.status === 'deleted') ok++; else bad++;
+    });
+    toast('Deleted ' + ok + (bad ? (' · ' + bad + ' failed') : ''), bad > 0);
+    exitSelMode();
+    openFolder(state.currentFolder);
+    updateStorageInfo();
+  }
+
+  // ── Now-playing row highlight (native player poll, 2 s) ───────────
+  setInterval(function(){
+    if (document.hidden) return;
+    var url = '', playing = false;
+    try {
+      if (typeof AndroidInterface !== 'undefined' &&
+          AndroidInterface.getNativeRadioPlaybackState) {
+        var st = JSON.parse(AndroidInterface.getNativeRadioPlaybackState());
+        playing = !!(st.playing || st.preparing || st.buffering);
+        url = st.url || '';
+      }
+    } catch (e) {}
+    document.querySelectorAll('.entry').forEach(function(r){
+      var m = r.dataset ? r.dataset.murl : null;
+      r.classList.toggle('nowplaying', !!(playing && m && url && m === url));
+    });
+  }, 2000);
+
+  // ── Folder-as-album playback ───────────────────────────────────────
+  function playFolderAsAlbum(){
+    if (bridgeMissing()) { renderBridgeMissing(); return; }
+    var data = callBridge('generatePlaylist', [state.currentFolder]);
+    if (data.error || !data.path) {
+      toast(data.error || 'Could not build album queue', true);
+      return;
+    }
+    // LOCAL files must play through media_player.html — the WebView is
+    // the only process whose interceptor resolves appassets:// media
+    // URLs; TapRadio's NATIVE ExoPlayer cannot fetch that host (it
+    // failed silently when routed there). Same route .m3u rows use.
+    window.location.href = PLAYER_URL +
+      '?type=playlist' +
+      '&playlist=' + encodeURIComponent(data.path) +
+      '&start=0' +
+      '&source=bridge';
+  }
+
+  // ── Delete confirmation ────────────────────────────────────────────
+  function confirmDelete(entry){
+    var msg = entry.kind === 'FOLDER'
+      ? 'Delete the folder "' + entry.name + '" and EVERYTHING inside it?\n\nThis cannot be undone.'
+      : 'Delete "' + entry.name + '"?\n\nThis cannot be undone.';
+    if (!confirm(msg)) return;
+    var data = callBridge('deleteEntry', [entry.relativePath]);
+    if (data.status === 'deleted') {
+      toast('Deleted: ' + entry.name);
+      openFolder(state.currentFolder);
+      updateStorageInfo();
+    } else {
+      toast('Could not delete: ' + (data.error || 'unknown error'), true);
+    }
+  }
+
+  // ── Hook mode changes to toolbar ───────────────────────────────────
+  var originalOpenFolder   = openFolder;
+  var originalOpenPlaylist = openPlaylist;
+  openFolder   = function(p){ originalOpenFolder(p);   syncToolbar(); };
+  openPlaylist = function(p,n){ originalOpenPlaylist(p,n); syncToolbar(); };
+  refreshNewFiles();
+  updateStorageInfo();
+
+  // ── Init ───────────────────────────────────────────────────────────
+  // ?folder=<media-root-relative path> deep-links straight into that
+  // folder on load — the media player's ‹ back button uses this to
+  // return into the EXACT folder the playing file lives in. Probe the
+  // folder first and fall back to the root when the param is missing,
+  // malformed, or the folder no longer exists (openFolder's own error
+  // path only toasts, which would leave the page empty on a bad link).
+  document.addEventListener('DOMContentLoaded', function(){
+    if (bridgeMissing()) { renderBridgeMissing(); return; }
+    var startFolder = '';
+    try {
+      var fm = window.location.search.match(/[?&]folder=([^&]+)/);
+      if (fm) startFolder = decodeURIComponent(fm[1]);
+    } catch (_) { startFolder = ''; }
+    if (startFolder) {
+      var probe = callBridge('listFolder', [startFolder]);
+      if (!probe || probe.error) startFolder = '';
+    }
+    openFolder(startFolder);
+  });
+})();
+</script>
+</body>
+</html>

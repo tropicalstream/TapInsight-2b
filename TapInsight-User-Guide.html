@@ -1,0 +1,2176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TapInsight — The Complete User Guide</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   TAPINSIGHT USER GUIDE — STYLES
+   Dark theme with cyan accent matching the TapBrowser / companion app.
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg:        #05070a;
+  --bg-2:      #0a0d12;
+  --panel:     #0d1117;
+  --panel-2:   #141a22;
+  --border:    rgba(255,255,255,0.08);
+  --border-2:  rgba(0,229,255,0.22);
+  --text:      #e6edf3;
+  --text-dim:  #8b949e;
+  --muted:     #636b72;
+  --accent:    #00e5ff;
+  --accent-2:  #36cfff;
+  --accent-dim:rgba(0,229,255,0.15);
+  --playlist:  #ff2d55;
+  --warn:      #ffb14a;
+  --ok:        #33d07a;
+  --purple:    #b088ff;
+  --mono: "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+
+body {
+  background: radial-gradient(ellipse at top, #0a1015 0%, var(--bg) 50%);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+/* ── Layout grid ────────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  max-width: 1380px;
+  margin: 0 auto;
+}
+
+/* ── Sidebar / TOC ──────────────────────────────────────────────────── */
+aside.toc {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 28px 18px 40px 28px;
+  border-right: 1px solid var(--border);
+  background: rgba(8, 10, 14, 0.6);
+  backdrop-filter: blur(10px);
+}
+aside.toc::-webkit-scrollbar { width: 6px; }
+aside.toc::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+.toc-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.toc-brand .logo {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: conic-gradient(from 40deg, var(--accent), var(--playlist), var(--purple), var(--accent));
+  box-shadow: 0 0 18px rgba(0,229,255,0.35);
+  flex-shrink: 0;
+}
+.toc-brand .name { font-weight: 700; font-size: 16px; letter-spacing: 0.3px; }
+.toc-brand .sub  { font-size: 10.5px; color: var(--text-dim); margin-top: 2px; letter-spacing: 0.7px; text-transform: uppercase; }
+
+.toc h4 {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--accent);
+  margin: 22px 0 8px 2px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(0,229,255,0.15);
+}
+.toc h4:first-of-type { margin-top: 0; }
+
+.toc ul { list-style: none; margin: 0; padding: 0; }
+.toc li { margin: 0; }
+.toc a {
+  display: block;
+  padding: 5px 10px;
+  margin: 1px 0;
+  border-radius: 6px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13.5px;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+.toc a:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.toc a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+
+/* ── Main content ───────────────────────────────────────────────────── */
+main {
+  padding: 40px 56px 120px;
+  max-width: 960px;
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  padding: 64px 40px 56px;
+  margin-bottom: 48px;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(0,229,255,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse at 100% 100%, rgba(255,45,85,0.14) 0%, transparent 55%),
+    linear-gradient(135deg, #0a1520 0%, #0d0d18 100%);
+  border: 1px solid var(--border-2);
+  overflow: hidden;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse at center, #000 40%, transparent 80%);
+}
+.hero h1 {
+  position: relative;
+  margin: 0 0 14px;
+  font-size: 44px;
+  line-height: 1.05;
+  letter-spacing: -0.8px;
+  font-weight: 800;
+  background: linear-gradient(92deg, var(--accent) 0%, #7fe6ff 60%, #c8f5ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero .subtitle {
+  position: relative;
+  font-size: 18px;
+  color: var(--text-dim);
+  max-width: 640px;
+  line-height: 1.55;
+}
+.hero .meta {
+  position: relative;
+  display: flex;
+  gap: 22px;
+  margin-top: 28px;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.hero .meta span { display: flex; align-items: center; gap: 6px; }
+.hero .meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+/* Typography */
+h2 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  margin: 56px 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+h2 .part-tag {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+h3 {
+  font-size: 21px;
+  font-weight: 700;
+  margin: 36px 0 10px;
+  color: #f5f9ff;
+}
+h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 24px 0 6px;
+  color: var(--accent-2);
+}
+p { margin: 0 0 14px; }
+p + p { margin-top: 0; }
+strong { color: #ffffff; font-weight: 600; }
+em { color: #c8e6ff; font-style: italic; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px dashed rgba(0,229,255,0.35); }
+a:hover { color: #7fe6ff; border-bottom-color: var(--accent); }
+
+ul, ol { margin: 6px 0 14px; padding-left: 22px; }
+li { margin: 4px 0; }
+li::marker { color: var(--accent); }
+
+/* Inline code */
+code {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,229,255,0.08);
+  color: #7fe6ff;
+  border: 1px solid rgba(0,229,255,0.14);
+}
+
+/* Code blocks */
+pre {
+  background: #05080c;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c5e4f0;
+  margin: 12px 0;
+}
+pre code { background: none; border: none; padding: 0; color: inherit; }
+
+/* Callouts */
+.callout {
+  border-left: 3px solid var(--accent);
+  background: rgba(0,229,255,0.05);
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 18px 0;
+}
+.callout.tip     { border-color: var(--ok);       background: rgba(51,208,122,0.06); }
+.callout.warn    { border-color: var(--warn);     background: rgba(255,177,74,0.06); }
+.callout.try     { border-color: var(--purple);   background: rgba(176,136,255,0.06); }
+.callout.example { border-color: var(--playlist); background: rgba(255,45,85,0.05); }
+.callout .title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.callout.tip .title     { color: var(--ok); }
+.callout.warn .title    { color: var(--warn); }
+.callout.try .title     { color: var(--purple); }
+.callout.example .title { color: var(--playlist); }
+.callout p:last-child { margin-bottom: 0; }
+
+/* Cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+.card:hover {
+  border-color: var(--border-2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,229,255,0.08);
+}
+.card h4 { margin: 0 0 8px; color: var(--accent); font-size: 14px; }
+.card p { font-size: 13px; color: var(--text-dim); margin: 0; }
+
+/* Feature grid (square icon tiles) */
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.feature {
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.feature .ic {
+  width: 32px; height: 32px;
+  border-radius: 7px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,229,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 15px;
+}
+.feature .t { font-weight: 600; font-size: 13.5px; margin-top: 4px; }
+.feature .d { font-size: 12px; color: var(--text-dim); line-height: 1.45; }
+
+/* Voice command showcase */
+.say {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  background: linear-gradient(90deg, rgba(0,229,255,0.08), rgba(0,229,255,0.02));
+  border: 1px solid rgba(0,229,255,0.2);
+  border-radius: 24px;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  color: #d4f3ff;
+}
+.say::before {
+  content: "";
+  width: 14px; height: 14px; border-radius: 50%;
+  background: radial-gradient(circle, var(--accent) 0%, rgba(0,229,255,0.2) 70%);
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(0,229,255,0.5);
+}
+.say .tag {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.7;
+  font-family: var(--sans);
+  margin-left: auto;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  font-size: 13.5px;
+}
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: rgba(0,229,255,0.06); font-weight: 600; color: var(--accent); letter-spacing: 0.3px; font-size: 12px; text-transform: uppercase; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+td code { font-size: 12px; }
+
+/* Numbered setup steps */
+.steps { counter-reset: step; margin: 16px 0; }
+.step {
+  position: relative;
+  padding: 14px 16px 14px 52px;
+  margin: 10px 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  counter-increment: step;
+}
+.step::before {
+  content: counter(step);
+  position: absolute;
+  left: 14px; top: 14px;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step h4 { margin: 0 0 4px; color: #fff; font-size: 15px; }
+.step p { margin: 0; color: var(--text-dim); font-size: 13.5px; }
+.step p + p { margin-top: 6px; }
+
+/* Diagram box */
+.diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 22px 18px;
+  margin: 20px 0;
+  background: var(--panel);
+  border: 1px dashed var(--border-2);
+  border-radius: 10px;
+}
+.diagram .node {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid rgba(0,229,255,0.22);
+  font-size: 12.5px;
+  font-weight: 500;
+  min-width: 90px;
+  text-align: center;
+  line-height: 1.35;
+}
+.diagram .node small { display: block; color: var(--muted); font-size: 10.5px; font-weight: 400; margin-top: 3px; }
+.diagram .arrow { color: var(--accent); font-size: 22px; opacity: 0.65; }
+
+/* Visualizer preview tiles */
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.viz {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  transition: all 0.2s;
+}
+.viz:hover { border-color: var(--border-2); box-shadow: 0 0 18px rgba(0,229,255,0.1); }
+.viz .swatch {
+  height: 80px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.viz .swatch.breathe    { background: radial-gradient(circle at 50% 50%, #4ed9ff 0%, #1e3a5c 45%, #050810 80%); }
+.viz .swatch.wave       { background: linear-gradient(90deg, #0a1420 0%, #07101a 100%); }
+.viz .swatch.wave::before { content:""; position:absolute; inset:0;
+  background-image: radial-gradient(ellipse at 20% 50%, rgba(0,229,255,0.5), transparent 40%),
+                    radial-gradient(ellipse at 50% 60%, rgba(0,229,255,0.4), transparent 40%),
+                    radial-gradient(ellipse at 80% 40%, rgba(0,229,255,0.5), transparent 40%); }
+.viz .swatch.atom      { background: radial-gradient(circle, transparent 20%, rgba(0,229,255,0.1) 21%, rgba(0,229,255,0.1) 23%, transparent 24%, transparent 40%, rgba(0,229,255,0.2) 41%, rgba(0,229,255,0.2) 43%, transparent 44%), #050810; }
+.viz .swatch.medit     { background: conic-gradient(from 0deg, #6a3fd1, #00e5ff, #6a3fd1, #ff2d55, #6a3fd1, #00e5ff, #6a3fd1); }
+.viz .swatch.tron      { background: repeating-linear-gradient(90deg, transparent 0 8px, rgba(0,229,255,0.35) 8px 10px), linear-gradient(180deg, #0b1220 0%, #050810 100%); }
+.viz .swatch.ce3k      { background: linear-gradient(180deg, #1a0d26 0%, #050810 60%), radial-gradient(circle at 50% 80%, rgba(255,45,85,0.5), transparent 30%); }
+.viz .swatch.fractal   { background: radial-gradient(ellipse at 50% 50%, rgba(176,136,255,0.3), transparent 50%), #050810;
+  background-size: 4px 4px, 100% 100%; }
+.viz .swatch.winampbar { background: linear-gradient(180deg, #ff2d55 0%, #ffb14a 50%, #33d07a 100%);
+  mask-image: repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 14px); }
+.viz .swatch.scope    { background: linear-gradient(180deg, #001a0a 0%, #000 100%); }
+.viz .swatch.scope::after { content:""; position:absolute; top:50%; left:0; right:0; height:2px; background: #33d07a; box-shadow: 0 0 10px #33d07a; }
+.viz .swatch.stars     { background: radial-gradient(circle at 50% 50%, #fff 0.5px, transparent 1px) 0 0 / 12px 12px, #050810; }
+.viz .name { font-size: 13px; font-weight: 600; }
+.viz .desc { font-size: 11.5px; color: var(--text-dim); line-height: 1.4; margin-top: 4px; }
+
+/* Tool listing */
+.tool {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.tool:last-child { border-bottom: none; }
+.tool .name {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+  word-break: break-all;
+}
+.tool .body p { margin: 0; font-size: 13.5px; }
+.tool .body .ex { margin-top: 6px; font-size: 12.5px; color: var(--text-dim); font-style: italic; }
+
+/* Lightning hint rows (for compact lists of say-this) */
+.sayrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 860px) { .sayrow { grid-template-columns: 1fr; } }
+
+/* Part dividers */
+.part {
+  text-align: center;
+  margin: 72px 0 -12px;
+  padding: 0;
+}
+.part .label {
+  display: inline-block;
+  padding: 6px 18px;
+  border: 1px solid var(--border-2);
+  background: rgba(0,229,255,0.05);
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Mini icons drawn in CSS (no emojis, no external assets) */
+.i { display: inline-block; vertical-align: middle; width: 14px; height: 14px; margin-right: 6px; }
+
+/* Footer */
+footer {
+  margin: 80px 0 20px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Mobile collapse */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  aside.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  main { padding: 24px; }
+  .hero { padding: 36px 22px; }
+  .hero h1 { font-size: 32px; }
+  .tool { grid-template-columns: 1fr; gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SIDEBAR — TABLE OF CONTENTS
+     ═══════════════════════════════════════════════════════════════════ -->
+<aside class="toc">
+  <div class="toc-brand">
+    <div class="logo"></div>
+    <div>
+      <div class="name">TapInsight</div>
+      <div class="sub">User Guide</div>
+    </div>
+  </div>
+
+  <h4>Part I · Getting Started</h4>
+  <ul>
+    <li><a href="#welcome">Welcome</a></li>
+    <li><a href="#what-you-need">What You'll Need</a></li>
+    <li><a href="#install">Install via ADB</a></li>
+    <li><a href="#first-boot">First Boot &amp; Pairing</a></li>
+    <li><a href="#api-keys">API Keys Explained</a></li>
+    <li><a href="#oauth">OAuth Explained</a></li>
+    <li><a href="#companion-tour">The Companion App</a></li>
+  </ul>
+
+  <h4>Part II · Companion Settings</h4>
+  <ul>
+    <li><a href="#setup-tab">Setup Tab</a></li>
+    <li><a href="#live-ai-tab">Gemini Live &amp; Voice</a></li>
+    <li><a href="#accessibility-tab">Accessibility</a></li>
+    <li><a href="#hud-tab">HUD Display Settings</a></li>
+    <li><a href="#timeouts-tab">Timeouts</a></li>
+    <li><a href="#prompts-tab">Custom System Prompts</a></li>
+    <li><a href="#dashboard-tab">Dashboard Tab</a></li>
+    <li><a href="#browser-tab">Browser Tab</a></li>
+    <li><a href="#radio-tab">Radio Tab</a></li>
+    <li><a href="#openclaw-tab">OpenClaw Tab</a></li>
+  </ul>
+
+  <h4>Part III · Core Concepts</h4>
+  <ul>
+    <li><a href="#gemini-live">Gemini 3.1 Flash Live</a></li>
+    <li><a href="#voice-sessions">Voice Sessions</a></li>
+    <li><a href="#routing">How Gemini Routes You</a></li>
+    <li><a href="#barge-in">Barge-In &amp; Interruption</a></li>
+    <li><a href="#camera-modes">Camera vs Audio-Only</a></li>
+  </ul>
+
+  <h4>Part IV · Features</h4>
+  <ul>
+    <li><a href="#hud">HUD (Heads-Up Display)</a></li>
+    <li><a href="#tapbrowser">TapBrowser</a></li>
+    <li><a href="#library">Library &amp; Local Media</a></li>
+    <li><a href="#visualizers">Audio Visualizers</a></li>
+    <li><a href="#tapradio">TapRadio &amp; Podcasts</a></li>
+    <li><a href="#youtube">YouTube Workflow</a></li>
+    <li><a href="#research">Research &amp; Deep Dives</a></li>
+    <li><a href="#learnlm">LearnLM Tutor</a></li>
+    <li><a href="#google-search">Google Search Grounding</a></li>
+    <li><a href="#maps-3d">3D Maps (Ask Maps)</a></li>
+    <li><a href="#routes">Directions &amp; Traffic</a></li>
+    <li><a href="#places">Places Nearby</a></li>
+    <li><a href="#calendar">Calendar</a></li>
+    <li><a href="#tasks">Tasks &amp; Reminders</a></li>
+    <li><a href="#keep">Notes (Keep)</a></li>
+    <li><a href="#contacts">Contacts Lookup</a></li>
+    <li><a href="#spotify">Spotify</a></li>
+    <li><a href="#sonos">Sonos</a></li>
+    <li><a href="#weather">Weather &amp; Air Quality</a></li>
+    <li><a href="#news">News Headlines</a></li>
+    <li><a href="#briefing">Daily Briefing</a></li>
+    <li><a href="#camera">Camera Actions</a></li>
+    <li><a href="#translation">Translation</a></li>
+    <li><a href="#battery">Battery Saver</a></li>
+    <li><a href="#quick-actions">Quick Actions / Macros</a></li>
+    <li><a href="#tapclaw">TapClaw / OpenClaw</a></li>
+  </ul>
+
+  <h4>Part V · Reference</h4>
+  <ul>
+    <li><a href="#voice-cheatsheet">Voice Command Cheat Sheet</a></li>
+    <li><a href="#tool-reference">Every Native Tool</a></li>
+    <li><a href="#trackpad">Trackpad &amp; Gestures</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+  </ul>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     MAIN CONTENT
+     ═══════════════════════════════════════════════════════════════════ -->
+<main>
+
+<!-- ── HERO ─────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <h1>TapInsight</h1>
+  <p class="subtitle">
+    A complete guide to using your AR glasses like they belong in the future. Voice,
+    vision, and the web — routed through Gemini 3.1 Flash Live and a stack of native tools.
+  </p>
+  <div class="meta">
+    <span><span class="dot"></span>Companion app · v1.1.2</span>
+    <span><span class="dot"></span>RayNeo X3 compatible</span>
+    <span><span class="dot"></span>Gemini 3.1 Flash Live</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART I — GETTING STARTED
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="part"><span class="label">Part I — Getting Started</span></div>
+
+<section id="welcome">
+<h2><span class="part-tag">§ 1.1</span>Welcome</h2>
+
+<p>TapInsight turns your RayNeo AR glasses into a hands-free assistant that can see what you see, hear what you say, and act across the services you already use. It's built around three layers:</p>
+
+<div class="cards">
+  <div class="card"><h4>Gemini Live</h4><p>A continuously-streaming voice session with Google's Gemini 3.1 Flash Live — the brain that listens, speaks, and decides.</p></div>
+  <div class="card"><h4>Native Tools</h4><p>Two dozen on-device tools for Calendar, Tasks, Spotify, Maps, YouTube, translation, and more. Gemini calls them; you see the results on the HUD.</p></div>
+  <div class="card"><h4>TapBrowser</h4><p>A full-featured AR browser with its own dashboard, music visualizers, and reader mode — so anything Gemini finds becomes something you can actually <em>use</em>.</p></div>
+</div>
+
+<p>This guide walks through every capability — from the first <code>adb install</code> command, through your API keys, all the way to asking TapClaw to help with your homework. If you only read one section, make it <a href="#routing">How Gemini Routes You</a>; it's the mental model everything else hangs on.</p>
+</section>
+
+<section id="what-you-need">
+<h2><span class="part-tag">§ 1.2</span>What You'll Need</h2>
+
+<h3>Hardware</h3>
+<ul>
+  <li><strong>RayNeo X3</strong> AR glasses (the app targets this device's display and trackpad)</li>
+  <li>A <strong>USB-C cable</strong> for the first-time install (the glasses pair to your computer over ADB)</li>
+  <li>Either <strong>Wi-Fi</strong> on the glasses <em>or</em> a persistent USB tether to your computer</li>
+</ul>
+
+<h3>Accounts &amp; Keys (free tiers are fine)</h3>
+<ul>
+  <li>A <strong>Google Cloud project</strong> (free to create) — this is the container for all your Google API keys and OAuth credentials</li>
+  <li>A <strong>Gemini API key</strong> — the only required key; it powers the voice assistant</li>
+  <li>Optional, but strongly recommended: <strong>Calendar</strong>, <strong>Maps / Directions / Places</strong>, <strong>Air Quality</strong>, and <strong>Cloud TTS</strong> keys</li>
+  <li>Optional: <strong>Spotify</strong> client ID/secret if you want music playback</li>
+</ul>
+
+<div class="callout tip">
+  <div class="title">Start small</div>
+  <p>You don't need every key on day one. Get Gemini working, then add Calendar, then Maps. Each section of this guide tells you which key is needed for that feature.</p>
+</div>
+</section>
+
+<section id="install">
+<h2><span class="part-tag">§ 1.3</span>Install via ADB</h2>
+
+<p>Android Debug Bridge (ADB) is the command-line tool your computer uses to push apps to Android devices. The glasses present themselves to your machine as an Android device, so installation looks exactly like sideloading any APK.</p>
+
+<h3>One-time install</h3>
+<pre><code>adb install TapInsight.apk</code></pre>
+
+<p>Once installed, TapInsight launches from the glasses app drawer. That's all ADB needs to do — unless you want the next, much more convenient, trick.</p>
+
+<h3>Connecting to the companion page over USB</h3>
+
+<p>The companion app (where you enter API keys, arrange the HUD, and tweak behavior) runs <em>inside</em> the glasses on port <strong>19110</strong>. You have two ways to reach it from your phone or laptop browser:</p>
+
+<div class="steps">
+  <div class="step">
+    <h4>Option A — Same Wi-Fi (simplest)</h4>
+    <p>Find the glasses' IP in their Settings → Wi-Fi screen, then open <code>https://&lt;glasses-ip&gt;:19110</code> in any browser on the same network and accept the certificate warning. If the device falls back to non-TLS mode, try <code>http://&lt;glasses-ip&gt;:19110</code>.</p>
+  </div>
+  <div class="step">
+    <h4>Option B — USB port forwarding (no Wi-Fi needed)</h4>
+    <p>Plug the glasses into your computer and run:</p>
+    <pre><code>adb forward tcp:19110 tcp:19110</code></pre>
+    <p>Now <code>https://localhost:19110</code> on your computer tunnels through USB to the companion app on the glasses. Accept the certificate warning on first use. If the device falls back to non-TLS mode, try <code>http://localhost:19110</code>. This is the fastest, most reliable path for setup — no Wi-Fi involved.</p>
+  </div>
+  <div class="step">
+    <h4>Option C — Persistent USB forward</h4>
+    <p>The repo includes <code>setup_usb.sh</code> — run <code>./setup_usb.sh --watch</code> and the port forward auto-reconnects every time you replug.</p>
+  </div>
+</div>
+
+<div class="callout">
+  <div class="title">Why port 19110?</div>
+  <p>The companion app ships a lightweight companion server (<code>CompanionServer.kt</code>) that serves the setup HTML and accepts your settings over HTTPS when available. Port 19110 was chosen to be high, unambiguous, and unlikely to collide with anything else on your phone or laptop. Each tab in the companion UI — Setup, Browser, Dashboard, Radio, OpenClaw — is a separate page served by this server.</p>
+</div>
+
+<div class="callout warn">
+  <div class="title">Can the glasses start the ADB forward themselves?</div>
+  <p>No. <code>adb forward</code> is a host-side command — it runs on the computer, not the Android device. The glasses can't issue it on their own because they're the target, not the initiator. The alternatives are Wi-Fi mode (Option A), the watcher script (Option C), or just leaving the forward command in your terminal history to re-run after each replug.</p>
+</div>
+</section>
+
+<section id="first-boot">
+<h2><span class="part-tag">§ 1.4</span>First Boot &amp; Pairing</h2>
+
+<ol>
+  <li>Power the glasses on and launch <strong>TapInsight</strong> from the app drawer.</li>
+  <li>On your phone or laptop, open the companion page (see previous section).</li>
+  <li>Paste your <strong>Gemini API key</strong> into Step 2 and hit <strong>Save</strong>.</li>
+  <li>Double-tap the right temple of the glasses — you'll hear Gemini greet you.</li>
+  <li>Try: <span class="say">What can you do?<span class="tag">voice</span></span></li>
+</ol>
+
+<p>You're live. Everything else in this guide is optional polish — but the rest of Part I walks through the two concepts that make the app click: API keys and OAuth.</p>
+</section>
+
+<section id="api-keys">
+<h2><span class="part-tag">§ 1.5</span>API Keys Explained</h2>
+
+<p>API keys are long random strings you get from cloud providers. They tell the provider <em>"this app, owned by this account, is allowed to make requests."</em> TapInsight stores them <strong>locally on the glasses</strong> — they never pass through any third-party server — and sends them directly to Google / Spotify / etc. when making calls.</p>
+
+<h3>Which key unlocks what</h3>
+
+<table>
+  <thead><tr><th>Key</th><th>What It Unlocks</th><th>Where to Get It</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Gemini</strong></td><td>The whole voice assistant — required. Powers Live sessions, Research, LearnLM, all tool-calling.</td><td>aistudio.google.com/apikey</td></tr>
+    <tr><td><strong>Calendar</strong></td><td>The HUD calendar widget, "what's next?" queries, "am I free at 3pm?"</td><td>Google Cloud Console, enable Calendar API</td></tr>
+    <tr><td><strong>Maps / Directions / Places</strong></td><td>"Directions to X," "find a cafe," traffic on HUD, 3D Ask Maps, nearby search</td><td>Google Cloud Console, enable Maps + Routes + Places APIs</td></tr>
+    <tr><td><strong>Air Quality</strong></td><td>"What's the AQI?" and the Daily Briefing's air quality line</td><td>Google Cloud Console, enable Air Quality API</td></tr>
+    <tr><td><strong>Cloud TTS</strong></td><td>Premium neural voices (WaveNet, Neural2, Studio) for read-aloud. Not required — there's a built-in fallback.</td><td>Google Cloud Console, enable Text-to-Speech API</td></tr>
+    <tr><td><strong>Spotify Client ID + Secret</strong></td><td>Music playback and search. Premium streams full tracks; free tier gets 30-second previews.</td><td>developer.spotify.com/dashboard</td></tr>
+    <tr><td><strong>Research Key (optional)</strong></td><td>Lets Research calls use a different provider (OpenAI, Groq) instead of Gemini.</td><td>Depends on provider</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip">
+  <div class="title">Free tier reality</div>
+  <p>Gemini's free tier is 15 requests per minute and 1M tokens per day on Flash models — more than enough for all-day glasses use. Maps and Directions have generous monthly quotas. Air Quality is free for small volumes. Cloud TTS is the first to bill if you use neural voices heavily.</p>
+</div>
+</section>
+
+<section id="oauth">
+<h2><span class="part-tag">§ 1.6</span>OAuth Explained</h2>
+
+<p>Some Google features — like <strong>writing</strong> to your calendar, creating <strong>Tasks</strong>, or saving <strong>Keep</strong> notes — need more than an API key. They need <em>your</em> permission, granted via Google's sign-in screen. That's OAuth.</p>
+
+<div class="diagram">
+  <div class="node">Companion App<small>your phone</small></div>
+  <div class="arrow">→</div>
+  <div class="node">Google Sign-In<small>you approve scopes</small></div>
+  <div class="arrow">→</div>
+  <div class="node">Access Token<small>saved locally</small></div>
+  <div class="arrow">→</div>
+  <div class="node">Calendar · Tasks · Keep · Contacts</div>
+</div>
+
+<h3>The three-step OAuth setup</h3>
+
+<div class="steps">
+  <div class="step">
+    <h4>Create an OAuth client</h4>
+    <p>In the Google Cloud Console, create an OAuth 2.0 Web client and enable the APIs you want: <strong>Calendar</strong>, <strong>Keep</strong>, <strong>People (Contacts)</strong>, <strong>Tasks</strong>.</p>
+  </div>
+  <div class="step">
+    <h4>Paste the Client ID &amp; Secret</h4>
+    <p>Step 3 of the companion app has fields for both. Save.</p>
+  </div>
+  <div class="step">
+    <h4>Authorize</h4>
+    <p>Click <strong>Start OAuth</strong>. A Google sign-in page opens, shows the scopes you're granting, and hands back a token that TapInsight stores on the glasses. After that, Gemini can read and write on your behalf — no more prompts.</p>
+  </div>
+</div>
+
+<h3>Spotify OAuth (similar pattern)</h3>
+<p>Step 6 of the setup tab does the same handshake with Spotify. The glasses need both a Client ID and Secret, plus a verified <strong>Redirect URI</strong> (the companion page tells you exactly what URI to register). Once authorized, you get streaming, search, and playback control via voice.</p>
+
+<div class="callout warn">
+  <div class="title">Keep tokens, not keys, for user data</div>
+  <p>If a feature reads <em>your</em> data (your calendar, your email, your tasks), it needs OAuth — an API key alone won't work. If a feature queries a <em>public</em> service (places, air quality, news RSS, Gemini, TTS), an API key is enough.</p>
+</div>
+</section>
+
+<section id="companion-tour">
+<h2><span class="part-tag">§ 1.7</span>The Companion App — A Tour</h2>
+
+<p>The companion page is a mini web app served by the glasses on port 19110. It has several tabs across the top of the page:</p>
+
+<div class="cards">
+  <div class="card"><h4>Setup</h4><p>API keys, OAuth, calendars, Spotify, Gemini Live voice &amp; behavior, accessibility, HUD widgets, quick actions.</p></div>
+  <div class="card"><h4>Browser</h4><p>Desktop / mobile mode, dark mode, pointer sensitivity, cookie-import to log sites in.</p></div>
+  <div class="card"><h4>Dashboard</h4><p>Manage the TapBrowser homepage — grouped quick-launch links (YouTube, Reddit, Hacker News, etc).</p></div>
+  <div class="card"><h4>Library</h4><p>Upload local audio, video, text, and <code>.m3u</code> playlists; auto-generate playlists; add the Media Library tile to the glasses dashboard.</p></div>
+  <div class="card"><h4>Radio</h4><p>Search 30,000+ internet radio stations and sync favorites to the glasses.</p></div>
+  <div class="card"><h4>OpenClaw</h4><p>Pair a remote TapClaw/OpenClaw agent so Gemini can reach beyond the glasses.</p></div>
+</div>
+
+<p>Every tab is covered in detail in <a href="#setup-tab">Part II</a>.</p>
+
+<div class="callout">
+  <div class="title">Bookmark it</div>
+  <p>Put <code>https://localhost:19110</code> in your browser bookmarks bar. Accept the certificate warning once, and keep <code>http://localhost:19110</code> in mind only as a fallback if the device serves plain HTTP.</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART II — COMPANION APP SETTINGS WALKTHROUGH
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="part"><span class="label">Part II — Companion App Settings</span></div>
+
+<section id="setup-tab">
+<h2><span class="part-tag">§ 2.1</span>Setup Tab</h2>
+
+<p>Every setup-tab section is numbered in the UI. Here's what each one is for, field by field.</p>
+
+<h3>Step 1 — Google Cloud Project</h3>
+<p>Not a form, just instructions: create a project at <code>console.cloud.google.com</code>, name it (e.g. "TapInsight"), enable billing. Every key you'll paste later should come from <em>this</em> project so quotas are consolidated and easy to monitor.</p>
+
+<h3>Step 2 — Gemini</h3>
+<ul>
+  <li><strong>Gemini API Key</strong> — required.</li>
+  <li><strong>Model Override</strong> — leave blank unless you want to pin a specific model. Defaults: <code>gemini-3.1-flash-live-preview</code> for Live (voice + camera), <code>gemini-3.1-pro-preview</code> for regular turns, and <code>gemini-3-flash-preview</code> for fast fallbacks.</li>
+  <li><strong>Research Provider</strong> — who handles deep-dive research: <code>gemini</code> (default, search-grounded), <code>openai_codex</code> (code-heavy), or <code>groq</code> (fast Llama).</li>
+  <li><strong>Research API Key &amp; Model</strong> — required if you picked a non-Gemini provider above. Presets are <em>fast / balanced / deep</em>.</li>
+  <li><strong>Research Role / Persona</strong> — tone of voice for briefs: analyst, engineer, journalist, academic.</li>
+  <li><strong>Gemini Readout Model</strong> &amp; <strong>Voice</strong> — which TTS voice reads research aloud (Kore, Puck, Zephyr, etc).</li>
+  <li><strong>TTS Language</strong> + <strong>Director Notes</strong> — e.g. <em>"calm, precise, analytical"</em> — shapes how the TTS performs.</li>
+  <li><strong>LearnLM Tutor Model</strong> — the model LearnLM uses when you say <code>learnlm</code> before a question.</li>
+</ul>
+
+<h3>Step 3 — Google OAuth</h3>
+<p>Client ID + Secret + <strong>Start OAuth</strong> button. One-time; grants access to Calendar, Keep, Contacts, Tasks.</p>
+
+<h3>Step 4 — Google Calendar</h3>
+<p>An API key for read-only calendar queries (overlaps with OAuth but is needed for the HUD widget to pull data without round-tripping OAuth). <strong>Calendar ID</strong> defaults to your primary.</p>
+
+<h3>Step 5 — Maps, Routes &amp; Places</h3>
+<p>One Maps API key covers Directions (routes + traffic + ETA), Places (nearby search), and the 3D Ask Maps tool.</p>
+
+<h4>Phone GPS Bridge (optional)</h4>
+<p>If the glasses don't have GPS or Wi-Fi-based location working well, toggle this to <em>"Share This Phone's GPS"</em>. Your phone becomes the glasses' location source over the local network. Security notice: the phone must be on the same Wi-Fi/hotspot as the glasses, and the network can't have client isolation.</p>
+
+<h3>Step 6 — Spotify</h3>
+<p>Client ID + Secret, plus a Redirect URI the companion page will show you. Click <strong>Authorize Spotify</strong> to complete OAuth. Once linked, Gemini can search, play, skip, and scrub via Spotify Connect (the Spotify app must remain running on your phone).</p>
+
+<h3>Step 7 — Personality &amp; Behavior</h3>
+<p>See <a href="#prompts-tab">§2.6 Custom System Prompts</a> for the breakdown. Short version: a <strong>Personality</strong> field for one-sentence vibes, plus four editable prompt sections (Identity, Routing Rules, Behavior, URL Rules) and a <strong>Full Override</strong> for advanced users.</p>
+
+<h3>Step 8 — Audio Settings</h3>
+<ul>
+  <li><strong>TTS Volume</strong> + <strong>Mute TTS</strong></li>
+  <li><strong>Cloud TTS API Key</strong>, <strong>Voice Name</strong> (Standard / WaveNet / Neural2 / Studio tiers), <strong>Language</strong></li>
+</ul>
+
+<h3>Step 10 — Skill Manager</h3>
+<p>View all enabled skills/tools. Add custom skills by scanning a skill QR code.</p>
+
+<h3>API Verification</h3>
+<p>Test buttons for each API: <strong>Test Calendar</strong>, <strong>Test Directions</strong>, <strong>Test Tasks</strong>, <strong>Test Places</strong>, <strong>Test Air Quality</strong>, <strong>Test Research</strong>, <strong>Test Location</strong>, <strong>Test Traffic</strong>. Run these after pasting a key to make sure it's working before you take the glasses on the road.</p>
+</section>
+
+<section id="live-ai-tab">
+<h2><span class="part-tag">§ 2.2</span>Gemini Live &amp; Voice (Step 8b)</h2>
+
+<p>This section is where the assistant's <em>personality on the wire</em> is shaped. Most users can leave the defaults alone — but every field has a reason to exist.</p>
+
+<table>
+  <tbody>
+    <tr><td><strong>Live Voice Name</strong></td><td>Which Gemini Live voice you hear: Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr. Each has a different timbre and cadence.</td></tr>
+    <tr><td><strong>TTS Voice Name</strong></td><td>Voice for non-Live readbacks (research briefs, long cards). ~30 voices available.</td></tr>
+    <tr><td><strong>Cloud TTS Voice / Language</strong></td><td>If you've set a Cloud TTS key, select premium neural voices here.</td></tr>
+    <tr><td><strong>Thinking Level</strong></td><td>Minimal / Low / Medium / High. Higher = more reasoning, slightly slower first audio. Minimal is best for snappy back-and-forth.</td></tr>
+    <tr><td><strong>Temperature</strong></td><td><code>-1</code> = model default. Higher (0.8+) for creative answers, lower (0.2–0.4) for precise tool-calling.</td></tr>
+    <tr><td><strong>Session Resumption</strong></td><td>On by default. Briefly dropped Wi-Fi won't kill the conversation.</td></tr>
+    <tr><td><strong>Context Compression</strong></td><td>Compresses older turns so you can talk for longer sessions without hitting the token ceiling.</td></tr>
+    <tr><td><strong>Compression Tokens</strong></td><td>When to start compressing. 0 = auto.</td></tr>
+    <tr><td><strong>Proactive Audio</strong></td><td>Lets Gemini speak first when it has something time-sensitive (traffic alert, meeting reminder).</td></tr>
+    <tr><td><strong>Language Code</strong></td><td>Tells Live what language to expect. Leave blank for auto-detect.</td></tr>
+    <tr><td><strong>Barge-In Sensitivity</strong></td><td><code>0.6–2.5</code>. Higher = easier to interrupt Gemini mid-sentence. Default <code>1.0</code>.</td></tr>
+    <tr><td><strong>Silence Threshold</strong></td><td>PCM16 peak amplitude that counts as "quiet." Default <code>600</code>. Raise it in noisy environments.</td></tr>
+    <tr><td><strong>Interrupt Mode</strong></td><td><em>Auto</em> (default) lets background noise and your voice interrupt Gemini. <em>Never</em> makes Gemini always finish speaking — great for museums, concerts, noisy streets.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="accessibility-tab">
+<h2><span class="part-tag">§ 2.3</span>Accessibility (Step 8d)</h2>
+
+<p>Everything that makes the app comfortable for the eyes and ears, in one place.</p>
+
+<ul>
+  <li><strong>Display Brightness</strong> — 5 %–100 % slider with a live percentage readout. Default 100 % (matches system brightness). Lower for indoor viewing or to save battery. Does not affect your phone's system-wide brightness.</li>
+  <li><strong>HUD Font Scale</strong> — 0.5×–3.0× multiplier for on-glass text size. Raise it for low vision.</li>
+  <li><strong>High Contrast HUD</strong> — thicker outlines, bolder colors for bright daylight.</li>
+  <li><strong>TTS Speech Rate</strong> — 0.5–4.0. Slow it down for learners and language study, speed it up for skimming briefs.</li>
+  <li><strong>Auto-Read Responses</strong> — on by default. Turn off if you want the HUD cards without voice every time.</li>
+  <li><strong>Default Assistant Mode</strong> — <em>Audio Only</em> (default) or <em>Camera + Audio</em> when you double-tap to start a session. Double-tap again to swap mid-session; third tap ends it.</li>
+</ul>
+</section>
+
+<section id="hud-tab">
+<h2><span class="part-tag">§ 2.4</span>HUD Display Settings (Step 9)</h2>
+
+<p>Decide what appears on the glasses when you're not actively talking. Each widget is a toggle:</p>
+
+<div class="features">
+  <div class="feature"><div class="ic">C</div><div class="t">Calendar Widget</div><div class="d">Next event, time, location.</div></div>
+  <div class="feature"><div class="ic">T</div><div class="t">Tasks</div><div class="d">Pending Google Tasks. Configure count 1–10.</div></div>
+  <div class="feature"><div class="ic">N</div><div class="t">News Headlines</div><div class="d">Top Google News RSS. Count 1–10, refresh 60–3600s.</div></div>
+  <div class="feature"><div class="ic">R</div><div class="t">Traffic &amp; Commute</div><div class="d">Live ETA to next event or home/work.</div></div>
+  <div class="feature"><div class="ic">E</div><div class="t">Event Time &amp; Date</div><div class="d">Shows time/date beside event name.</div></div>
+  <div class="feature"><div class="ic">A</div><div class="t">Notifications</div><div class="d">System and messaging notifications.</div></div>
+</div>
+
+<h3>More controls</h3>
+<ul>
+  <li><strong>HUD Refresh Interval</strong> — 5–300 s. Lower = more current, higher = lighter on battery.</li>
+  <li><strong>Display Order</strong> — drag-reorder Calendar, Tasks, and News to decide what's on top.</li>
+  <li><strong>Enabled Calendars</strong> — if you have multiple Google calendars, pick which ones feed the widget.</li>
+</ul>
+</section>
+
+<section id="timeouts-tab">
+<h2><span class="part-tag">§ 2.5</span>Timeouts (Step 8c)</h2>
+
+<p>Every network request has a timeout. If a model is slow or your connection is spotty, raising these stops Gemini from giving up too early. <code>0</code> means <em>use the default</em>.</p>
+<ul>
+  <li><strong>Gemini Live Idle</strong> — how long Live stays open with no speech. Default ~120 s.</li>
+  <li><strong>Standard Gemini</strong> — per-turn timeout for non-Live calls. Default 45 s.</li>
+  <li><strong>Research</strong> — long briefs can take a while. Default 45 s; raise to 90–120 s for deep reports.</li>
+  <li><strong>LearnLM Tutor</strong> — same idea for tutoring responses.</li>
+</ul>
+</section>
+
+<section id="prompts-tab">
+<h2><span class="part-tag">§ 2.6</span>Custom System Prompts (Step 7)</h2>
+
+<p>The system prompt is the instructions Gemini reads <em>before</em> every conversation. TapInsight ships a solid default but lets you swap any part of it. Expand the "System Prompt Sections" panel in Step 7 to see four editable blocks:</p>
+
+<ul>
+  <li><strong>Identity</strong> — <em>"You are TapInsight, a proactive AI assistant integrated into RayNeo X3 AR glasses…"</em> Change this to shift how Gemini refers to itself.</li>
+  <li><strong>Routing Rules</strong> — the decision tree Gemini uses to pick which tool to call for a given request. Edit only if you want to change default behavior (e.g. make research a different trigger word).</li>
+  <li><strong>Behavior</strong> — proactive rules, HUD output length (1–6 lines), privacy rules, "don't say 'I think' when stating facts," etc.</li>
+  <li><strong>URL Rules</strong> — when to send a direct URL vs. a search link. This is where YouTube, the video-list picker, and other browser routing get calibrated.</li>
+</ul>
+
+<div class="callout warn">
+  <div class="title">Full Override</div>
+  <p>If you paste anything into the <strong>Custom System Prompt (Full Override)</strong> field, it <em>replaces</em> all four sections above. Powerful but dangerous — the default prompt is carefully tuned for tool-calling. Edit the individual sections first.</p>
+</div>
+
+<h3>Personality</h3>
+<p>A separate short field injected after the system prompt. Try <em>"dry, technical, precise — no pleasantries"</em> for a focused assistant, or <em>"warm, encouraging, always offer a next step"</em> for a coach vibe.</p>
+</section>
+
+<section id="dashboard-tab">
+<h2><span class="part-tag">§ 2.7</span>Dashboard Tab</h2>
+
+<p>Your TapBrowser homepage is a grid of launch tiles grouped by category: Navigation, Social, Music/Streaming, Creative, Productivity, AI/LLMs, AI Music, AI Video, Voice, Utilities. The Dashboard tab is where you edit that grid — add, remove, reorder, rename. Changes push live to the glasses.</p>
+</section>
+
+<section id="browser-tab">
+<h2><span class="part-tag">§ 2.8</span>Browser Tab</h2>
+
+<ul>
+  <li><strong>Desktop Mode</strong> — TapBrowser identifies as a desktop browser (no mobile redirects).</li>
+  <li><strong>Force Dark Mode</strong> — CSS filter that darkens light-themed sites. Default on.</li>
+  <li><strong>Show Browser Status Overlay</strong> — Wi-Fi, battery, and time strip. Toggle off for a cleaner view.</li>
+  <li><strong>Pointer Sensitivity</strong> — 0.4 (slow, precise) to 1.8 (fast, flicky). Default 1.0.</li>
+  <li><strong>Login Sync</strong> — paste cookies from a desktop browser to sign the glasses into YouTube, Gmail, Reddit, Twitter/X, Radio Garden, etc. The UI walks through where to copy each site's cookies from.</li>
+</ul>
+</section>
+
+<section id="radio-tab">
+<h2><span class="part-tag">§ 2.9</span>Radio Tab</h2>
+
+<p>Search and favorite internet radio stations — the results drive the <code>tapradio</code> tool. Data comes from the public Radio Browser API (30,000+ stations). You can favorite stations from the companion page and they sync to the glasses for instant voice playback.</p>
+</section>
+
+<section id="openclaw-tab">
+<h2><span class="part-tag">§ 2.10</span>OpenClaw Tab</h2>
+
+<p>Pair TapInsight with an OpenClaw agent running elsewhere (laptop, home server, cloud VM). Covered in depth under <a href="#tapclaw">§ 4.24 — TapClaw / OpenClaw</a>.</p>
+
+<ul>
+  <li><strong>Scan QR / paste setup URL</strong> — one-step pairing if the OpenClaw host is reachable.</li>
+  <li><strong>Gateway URL</strong> — <code>ws://…:18789</code> (local) or <code>wss://…</code> (Cloudflare Tunnel / Tailscale).</li>
+  <li><strong>Gateway Token</strong> — bearer token from <code>openclaw config get gateway.auth.token</code>.</li>
+  <li><strong>Session ID</strong> — default <code>main</code>.</li>
+  <li><strong>Heartbeat Update Interval</strong> — 10–120 s. How often TapClaw streams progress to your HUD.</li>
+  <li><strong>Test TapClaw Connection</strong> — ping the gateway.</li>
+  <li><strong>Vision Relay</strong> — view status, saved images, install instructions for Mac / Linux / Windows.</li>
+</ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART III — CORE CONCEPTS
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="part"><span class="label">Part III — Core Concepts</span></div>
+
+<section id="gemini-live">
+<h2><span class="part-tag">§ 3.1</span>Gemini 3.1 Flash Live — the Brain</h2>
+
+<p>"Live" means a persistent, bidirectional audio stream between the glasses and Google's servers. You speak; Gemini starts generating speech within a few hundred milliseconds; the two of you can talk over each other like humans. Unlike text chat, there's no "send" button — turn-taking is detected from pauses.</p>
+
+<h3>What Flash Live is good at</h3>
+<ul>
+  <li><strong>Latency.</strong> Replies start streaming while you're still finishing your sentence.</li>
+  <li><strong>Multimodal grounding.</strong> If camera mode is on, Gemini sees a live video feed alongside your voice. "What bird is that?" works.</li>
+  <li><strong>Tool calling.</strong> Gemini knows about every tool TapInsight has registered and picks the right one for your question.</li>
+  <li><strong>Search grounding.</strong> For current-event questions, Gemini automatically cites Google Search results — you get "today's" weather, not 2024's.</li>
+</ul>
+
+<h3>Real examples</h3>
+
+<div class="callout example">
+  <div class="title">At a café with camera mode</div>
+  <p><strong>You:</strong> "What's this dish called?"<br>
+  <strong>Gemini (sees the plate):</strong> "Looks like shakshuka — eggs poached in spiced tomato sauce. Want the recipe pulled up?"<br>
+  <strong>You:</strong> "Yeah, send it to the glasses."<br>
+  <em>A reader-mode recipe page opens in TapBrowser.</em></p>
+</div>
+
+<div class="callout example">
+  <div class="title">Walking to a meeting</div>
+  <p><strong>You:</strong> "What's my next thing and how long will it take to get there?"<br>
+  <strong>Gemini:</strong> "Dentist at 3:15 on Oak St. — 12-minute drive in current traffic, so you should leave by 3:00."<br>
+  <em>(Calendar + Routes + Traffic, called in one turn.)</em></p>
+</div>
+</section>
+
+<section id="voice-sessions">
+<h2><span class="part-tag">§ 3.2</span>Voice Sessions — Starting and Ending</h2>
+
+<p>The glasses wake on a <strong>double-tap</strong> of the right temple. That starts a Live session in the mode you picked in <a href="#accessibility-tab">Accessibility</a>:</p>
+
+<ul>
+  <li><strong>Audio Only</strong> (default) — just mic + speaker. Lightest on battery.</li>
+  <li><strong>Camera + Audio</strong> — adds the forward camera so Gemini can see what you see.</li>
+</ul>
+
+<p>During a session:</p>
+<ul>
+  <li><strong>Double-tap again</strong> → swap between audio-only and camera+audio mid-conversation.</li>
+  <li><strong>Double-tap a third time</strong> → end the session. Gemini says goodbye and the mic closes.</li>
+  <li>No speech for the configured idle timeout (default 120 s) also ends the session automatically.</li>
+</ul>
+</section>
+
+<section id="routing">
+<h2><span class="part-tag">§ 3.3</span>How Gemini Routes You — The Mental Model</h2>
+
+<p>When you speak, Gemini doesn't just generate text. It chooses from three paths:</p>
+
+<div class="diagram">
+  <div class="node">Your voice</div>
+  <div class="arrow">→</div>
+  <div class="node">Gemini Live</div>
+  <div class="arrow">→</div>
+  <div class="node">Talk<small>natural reply</small></div>
+  <div class="node">Tool<small>call a function</small></div>
+  <div class="node">Search<small>Google grounding</small></div>
+</div>
+
+<p>The routing rules in the system prompt tell Gemini <em>when</em> to pick a tool instead of just talking. A small set of high-priority triggers:</p>
+
+<table>
+  <thead><tr><th>You say…</th><th>Gemini picks…</th></tr></thead>
+  <tbody>
+    <tr><td>"tapclaw&nbsp;&hellip;"</td><td>Routes the whole request to the <code>tapclaw_agent</code> — no other tools in the same turn</td></tr>
+    <tr><td>"research&nbsp;&hellip;"</td><td><code>research_topic</code> with verbatim readback</td></tr>
+    <tr><td>"learnlm&nbsp;&hellip;"</td><td><code>learn_topic</code> (switches to the tutor model)</td></tr>
+    <tr><td>"translate&nbsp;&hellip;"</td><td><code>translate_text</code></td></tr>
+    <tr><td>"save battery"</td><td><code>battery_saver</code></td></tr>
+    <tr><td>"what's on my to-do list"</td><td><code>google_tasks</code></td></tr>
+    <tr><td>"what's my next meeting"</td><td><code>google_calendar</code></td></tr>
+    <tr><td>"directions to&nbsp;X"</td><td><code>google_routes</code> with <code>origin='current'</code></td></tr>
+    <tr><td>any word matching "podcast"</td><td><code>tapradio</code> (highest priority — never answer from memory)</td></tr>
+    <tr><td>"who sings&nbsp;X" / "what album"</td><td><code>spotify_player</code> action='search'</td></tr>
+    <tr><td>"play&nbsp;X"</td><td><code>spotify_player</code> action='play'</td></tr>
+  </tbody>
+</table>
+
+<p>For anything <em>not</em> matched by a routing rule, Gemini either answers directly or invokes Google Search grounding to pull live web results. See <a href="#voice-cheatsheet">the cheat sheet</a> for the full list.</p>
+</section>
+
+<section id="barge-in">
+<h2><span class="part-tag">§ 3.4</span>Barge-In &amp; Interruption</h2>
+
+<p>Barge-in lets you interrupt Gemini mid-sentence by speaking. It's on by default — just start talking and Gemini yields. Two settings tune it:</p>
+
+<ul>
+  <li><strong>Barge-In Sensitivity</strong> — higher = more eager to cut Gemini off. Lower if you find it interrupting itself on background noise.</li>
+  <li><strong>Silence Threshold</strong> — audio below this level counts as "quiet." Raise in noisy environments.</li>
+  <li><strong>Interrupt Mode: Never</strong> — Gemini always finishes its current sentence before listening. Useful on stage, in a museum tour, or anywhere you <em>will</em> have background speech you don't want misread.</li>
+</ul>
+</section>
+
+<section id="camera-modes">
+<h2><span class="part-tag">§ 3.5</span>Camera vs Audio-Only Mode</h2>
+
+<p>The camera is a power-hungry sensor; you don't always want it on. TapInsight lets you pick per-session, with global default.</p>
+
+<div class="cards">
+  <div class="card"><h4>Audio Only</h4><p>Best for driving, walking, or any task where you're looking at the real world and just want voice back. No visual context goes to Gemini.</p></div>
+  <div class="card"><h4>Camera + Audio</h4><p>Best for "what is that," "translate this sign," "help me identify a plant," or anything needing visual grounding. Burns more battery.</p></div>
+</div>
+
+<p>Commands that implicitly need camera will still work with audio-only mode — they'll just ask you to flip to Camera + Audio first, or they rely on the OpenClaw Vision Relay for a recent still frame (see <a href="#tapclaw">§4.24</a>).</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART IV — FEATURES (detailed, with examples)
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="part"><span class="label">Part IV — Features</span></div>
+
+<section id="hud">
+<h2><span class="part-tag">§ 4.1</span>HUD — Your Heads-Up Display</h2>
+
+<p>The HUD is the always-on display layer. It shows the widgets you enable in <a href="#hud-tab">Step 9</a> — calendar, tasks, news, traffic, notifications — and is also where Gemini's replies surface as concise text cards (1–6 lines per card, by default).</p>
+
+<h3>What Gemini puts on the HUD</h3>
+<ul>
+  <li><strong>Reply cards</strong> — short text summaries of what Gemini just said.</li>
+  <li><strong>Tool results</strong> — calendar events, route ETAs, place cards, research briefs, translation output.</li>
+  <li><strong>Progress indicators</strong> — when Gemini calls a slow tool (research, TapClaw), a status line appears so you know something is still happening.</li>
+</ul>
+
+<h3>Commands that modify the HUD</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">Show calendar<span class="tag">hud</span></span>
+    <span class="say">Hide calendar<span class="tag">hud</span></span>
+    <span class="say">Clear the HUD<span class="tag">hud</span></span>
+  </div>
+  <div>
+    <span class="say">Show traffic<span class="tag">hud</span></span>
+    <span class="say">Show news<span class="tag">hud</span></span>
+    <span class="say">What's on my HUD?<span class="tag">hud</span></span>
+  </div>
+</div>
+</section>
+
+<section id="tapbrowser">
+<h2><span class="part-tag">§ 4.2</span>TapBrowser — The AR Web Browser</h2>
+
+<p>When Gemini needs to show you something bigger than a card — a YouTube video, an article, a map, a recipe — it opens TapBrowser. It's a full Chromium-based browser tuned for the glasses.</p>
+
+<h3>What's in it</h3>
+<ul>
+  <li><strong>Dashboard homepage</strong> with grouped quick-launch links (edit in the Dashboard tab).</li>
+  <li><strong>Reader mode</strong> for clean article reading.</li>
+  <li><strong>Picture-in-picture</strong> for videos.</li>
+  <li><strong>TTS read-aloud</strong> for articles and anything selectable.</li>
+  <li><strong>Audio visualizers</strong> (see next section) that activate when music or video is playing.</li>
+  <li><strong>Desktop or mobile mode</strong> — site compatibility lever for difficult pages.</li>
+  <li><strong>Force dark mode</strong> — easier on the eyes at night.</li>
+  <li><strong>Volume and brightness</strong> sliders via gestures or a settings overlay.</li>
+  <li><strong>Text zoom</strong> independent of overall UI scale.</li>
+  <li><strong>QR code scanner</strong> — quick URL entry without typing.</li>
+  <li><strong>Bookmarks</strong> — add favorites, open from the dashboard.</li>
+  <li><strong>Cookie import</strong> — paste cookies from your desktop browser to log sites in on the glasses.</li>
+</ul>
+
+<h3>Common voice paths into the browser</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">Open YouTube<span class="tag">browser</span></span>
+    <span class="say">Open Reddit<span class="tag">browser</span></span>
+  </div>
+  <div>
+    <span class="say">Read this article to me<span class="tag">tts</span></span>
+    <span class="say">Open my dashboard<span class="tag">browser</span></span>
+  </div>
+</div>
+</section>
+
+<section id="library">
+<h2><span class="part-tag">§ 4.2A</span>Library — Local Media &amp; Playlists</h2>
+
+<p>The Library is TapInsight's on-device shelf for media you own: local music, videos, text files, and playlists stored directly on the glasses. It is designed for offline or low-friction playback when you do not want to depend on YouTube, Spotify, or a network connection.</p>
+
+<div class="cards">
+  <div class="card"><h4>Local files</h4><p>Drop audio or video into the glasses and browse it later from the Media Library tile in TapBrowser.</p></div>
+  <div class="card"><h4>Playlist aware</h4><p>Each folder can contain its own <code>.m3u</code> or <code>.m3u8</code> playlist, with paths resolved relative to that playlist file.</p></div>
+  <div class="card"><h4>Text + TTS</h4><p>Text files open in the media viewer and can be read aloud through Gemini TTS, so notes and transcripts live alongside your media.</p></div>
+</div>
+
+<h3>Where the files live</h3>
+<p>TapInsight creates an app-private media folder on first run:</p>
+<pre><code>/storage/emulated/0/Android/data/com.rayneo.visionclaw/files/Media/</code></pre>
+
+<ul>
+  <li><strong>Music/</strong> — default audio folder.</li>
+  <li><strong>Videos/</strong> — default video folder.</li>
+  <li><strong>README.txt</strong> — a built-in reminder of the folder rules and supported formats.</li>
+  <li><strong>Nested folders</strong> — fully supported, so you can organize by artist, album, topic, course, project, or anything else.</li>
+</ul>
+
+<p>This storage is visible over USB / MTP, requires no runtime permission prompts, survives reboot, and is normally wiped only if you fully uninstall the app.</p>
+
+<h3>Supported formats</h3>
+<ul>
+  <li><strong>Audio</strong> — <code>mp3</code>, <code>m4a</code>, <code>aac</code>, <code>ogg</code>, <code>opus</code>, <code>wav</code>, <code>flac</code>, <code>weba</code></li>
+  <li><strong>Video</strong> — <code>mp4</code>, <code>webm</code>, <code>mkv</code>, <code>mov</code>, <code>m4v</code>, <code>3gp</code>, <code>avi</code></li>
+  <li><strong>Text / TTS</strong> — <code>txt</code>, <code>md</code>, <code>markdown</code>, <code>log</code>, <code>csv</code>, <code>json</code>, <code>xml</code>, <code>html</code>, <code>rtf</code>, <code>ini</code>, <code>cfg</code>, <code>conf</code>, <code>yaml</code>, <code>yml</code>, <code>toml</code></li>
+  <li><strong>Playlists</strong> — <code>m3u</code>, <code>m3u8</code></li>
+</ul>
+
+<h3>How <code>.m3u</code> playlists behave</h3>
+<p>Playlist paths are resolved relative to the playlist file's own directory. That means a playlist can reference files next to it, in child folders, or in sibling folders using standard relative paths such as <code>../Videos/clip.mp4</code>.</p>
+
+<pre><code>#EXTM3U
+#EXTINF:180,Morning Coffee
+coffee.mp3
+#EXTINF:240,Subway Ride
+../Videos/commute.mp4</code></pre>
+
+<p>The companion Library page can also auto-generate a playlist for the current folder and open a visual editor so you can add, remove, and reorder entries without hand-editing the file.</p>
+
+<h3>How to use it</h3>
+<ul>
+  <li><strong>From the companion app</strong> — open the <strong>Library</strong> tab to upload media, browse folders, generate playlists, or edit existing <code>.m3u</code> files.</li>
+  <li><strong>On the glasses</strong> — open the <strong>Media Library</strong> tile from the TapLink Dashboard. If it is missing, the companion Library page can add it back for you.</li>
+  <li><strong>For reading</strong> — open a text file in the library and let Gemini TTS read it back like a local audiobook or spoken note.</li>
+</ul>
+
+<div class="callout example">
+  <div class="title">A practical setup</div>
+  <p>Create <code>Media/Music/Focus/</code> for instrumental tracks, <code>Media/Videos/Tutorials/</code> for saved walkthroughs, and keep a <code>Focus.m3u</code> playlist next to them. The playlist can pull from both folders, and the glasses can play it without touching a streaming service.</p>
+</div>
+</section>
+
+<section id="visualizers">
+<h2><span class="part-tag">§ 4.3</span>Audio Visualizers — All Ten Themes</h2>
+
+<p>Whenever audio or video is playing in TapBrowser, you can tap the visualizer button in the on-screen controls to overlay a music-reactive scene. Tap again to cycle through the themes. Each one is a hand-tuned aesthetic; pick the one that matches your mood or your music.</p>
+
+<div class="viz-grid">
+  <div class="viz"><div class="swatch breathe"></div><div class="name">1 · Breathing (default)</div><div class="desc">Soft pulsing ring that inhales/exhales with a slow gradient — calm, meditative, unobtrusive.</div></div>
+  <div class="viz"><div class="swatch wave"></div><div class="name">2 · Wave</div><div class="desc">Flowing oscilloscope-style waveform tied to the audio spectrum.</div></div>
+  <div class="viz"><div class="swatch atom"></div><div class="name">3 · Atomic Pulse Ring</div><div class="desc">Electron-orbit rings that pulse out from a nucleus on beats — bass drives the expansion.</div></div>
+  <div class="viz"><div class="swatch medit"></div><div class="name">4 · Meditative</div><div class="desc">12-petal rotating mandala, concentric breathing rings, ambient stars. For long sessions.</div></div>
+  <div class="viz"><div class="swatch tron"></div><div class="name">5 · Tron</div><div class="desc">Tron-arcade light wall, Recognizer tank, bricked spectrum columns, rotating horizon.</div></div>
+  <div class="viz"><div class="swatch ce3k"></div><div class="name">6 · Close Encounters</div><div class="desc">The five CE3K spaceship tones visualized as layered geometric structures against a violet sky.</div></div>
+  <div class="viz"><div class="swatch fractal"></div><div class="name">7 · 3D Fractal</div><div class="desc">Chaos-game IFS points tumbling through 3D space with a warp-speed starfield.</div></div>
+  <div class="viz"><div class="swatch winampbar"></div><div class="name">8 · Winamp Bars</div><div class="desc">Classic spectrum analyzer — yellow→red bars with peak caps and a floor reflection.</div></div>
+  <div class="viz"><div class="swatch scope"></div><div class="name">9 · Winamp Scope</div><div class="desc">Green oscilloscope on black — the purist's choice.</div></div>
+  <div class="viz"><div class="swatch stars"></div><div class="name">10 · Winamp Starfield</div><div class="desc">vis_nsfs warp-speed stars with bass-reactive streaks.</div></div>
+</div>
+
+<div class="callout tip">
+  <div class="title">Swap themes fast</div>
+  <p>Single-tap the visualizer button to enable/disable. Hold it (or keep single-tapping) to cycle through themes. Your last-used theme is remembered per session.</p>
+</div>
+</section>
+
+<section id="tapradio">
+<h2><span class="part-tag">§ 4.4</span>TapRadio &amp; Podcasts</h2>
+
+<p>TapRadio is a first-class tool — <code>tapradio</code> — that handles internet radio <em>and</em> podcasts. It pulls from the Radio Browser public API (30,000+ stations) and standard podcast feeds. The routing rule makes it the <strong>highest-priority</strong> responder for anything involving the word "podcast" — Gemini never makes up podcast names from memory; it always calls the tool first.</p>
+
+<h3>Radio</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">Play BBC Radio 6<span class="tag">radio</span></span>
+    <span class="say">Find a lo-fi station<span class="tag">radio</span></span>
+    <span class="say">Play jazz radio<span class="tag">radio</span></span>
+    <span class="say">Play my favorite station<span class="tag">radio</span></span>
+  </div>
+  <div>
+    <span class="say">What's playing on this station?<span class="tag">radio</span></span>
+    <span class="say">Stop the radio<span class="tag">radio</span></span>
+    <span class="say">Search for classical stations from Vienna<span class="tag">radio</span></span>
+    <span class="say">Play a talk-radio station<span class="tag">radio</span></span>
+  </div>
+</div>
+
+<h3>Podcasts</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">List recent podcasts<span class="tag">podcast</span></span>
+    <span class="say">Top philosophy podcasts<span class="tag">podcast</span></span>
+    <span class="say">Search Lex Fridman podcast<span class="tag">podcast</span></span>
+  </div>
+  <div>
+    <span class="say">Play the latest episode of Huberman<span class="tag">podcast</span></span>
+    <span class="say">Classical music podcasts<span class="tag">podcast</span></span>
+    <span class="say">Skip to the next episode<span class="tag">podcast</span></span>
+  </div>
+</div>
+
+<h3>Favorites</h3>
+<p>Favorite stations from the <a href="#radio-tab">Radio tab</a> of the companion app sync to the glasses. "Play my favorite station" picks the most-recent favorite, or you can name one — "Play my Radio Paradise favorite."</p>
+</section>
+
+<section id="youtube">
+<h2><span class="part-tag">§ 4.5</span>YouTube Workflow</h2>
+
+<p>YouTube is one of TapInsight's most polished flows because it's routed through Gemini in <em>two phases</em> — describe first, play on command — so you never end up with a video playing when you just wanted to know what's out there.</p>
+
+<h3>Phase A — Describe &amp; send</h3>
+<p>When you ask an informational question, Gemini gives a short verbal summary, sends a tappable list of picks to your glasses, and ends with "tap one to play, or hit the red button to open them all as a playlist."</p>
+
+<div class="callout example">
+  <div class="title">Phase A</div>
+  <p><strong>You:</strong> "Find me videos on lock picking for beginners."<br>
+  <strong>Gemini:</strong> "I've got a few. LockPickingLawyer has a great beginner series; BosnianBill has a hands-on tutorial; Deviant Ollam covers the theory. I'm sending the list to your glasses — tap one to play, or hit the red button to open them all as a playlist."<br>
+  <em>A scrollable picker appears on the HUD with three tappable rows.</em></p>
+</div>
+
+<h3>Phase B — Play</h3>
+<p>When you say a playback verb — "play that," "play the first one," "watch the Deviant Ollam one" — Gemini opens the matching video in TapBrowser with autoplay.</p>
+
+<h3>YouTube-specific voice commands</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">Play X on YouTube<span class="tag">youtube</span></span>
+    <span class="say">Search YouTube for X<span class="tag">youtube</span></span>
+    <span class="say">Send a list to my glasses<span class="tag">youtube</span></span>
+    <span class="say">Play those as a playlist<span class="tag">youtube</span></span>
+  </div>
+  <div>
+    <span class="say">Open my YouTube subscriptions<span class="tag">youtube</span></span>
+    <span class="say">Open my YouTube history<span class="tag">youtube</span></span>
+    <span class="say">Show me my playlists<span class="tag">youtube</span></span>
+    <span class="say">Play the first one<span class="tag">youtube</span></span>
+  </div>
+</div>
+
+<div class="callout tip">
+  <div class="title">Follow-ups just work</div>
+  <p>After Gemini lists options, you can say "play that one" or "the second one" — the follow-up still targets YouTube, not a fresh search. Try to include a distinguishing word ("the one by Lex") if you have multiple possible matches.</p>
+</div>
+</section>
+
+<section id="research">
+<h2><span class="part-tag">§ 4.6</span>Research &amp; Deep Dives</h2>
+
+<p>The <code>research_topic</code> tool produces long-form, search-grounded briefs that Gemini <strong>reads verbatim</strong> — no paraphrasing, no summarizing. It's for when you actually want to learn something, not just get a one-liner.</p>
+
+<h3>Triggers</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">Research the Baltic countries' energy mix<span class="tag">research</span></span>
+    <span class="say">Do research on mRNA vaccine durability<span class="tag">research</span></span>
+  </div>
+  <div>
+    <span class="say">Deep dive into the history of Y Combinator<span class="tag">research</span></span>
+    <span class="say">Research the best mattress brands under $1000<span class="tag">research</span></span>
+  </div>
+</div>
+
+<p>Don't use "research" for casual "tell me about," "analyze," "brief me on," or "explain" — those route to normal Gemini and come back much faster.</p>
+
+<h3>Presets (set in Step 2)</h3>
+<ul>
+  <li><strong>Fast</strong> — a tight one-pager, ~15–30 seconds.</li>
+  <li><strong>Balanced</strong> — default. 2–3 paragraphs with citations.</li>
+  <li><strong>Deep</strong> — multi-section brief with structured headings, up to a minute or two.</li>
+</ul>
+
+<h3>Readout voice</h3>
+<p>The brief is read aloud with the voice and director notes you set in Step 2. Try <em>"calm, precise, analytical"</em> for a podcast feel, or <em>"energetic, curious, warm"</em> for a morning briefing.</p>
+
+<h3>Alternate providers</h3>
+<p>Change <strong>Research Provider</strong> in Step 2 to <code>openai_codex</code> (for code-heavy topics with GPT-5.2-codex) or <code>groq</code> (Llama 3.3 70B — very fast). You need that provider's API key pasted below.</p>
+</section>
+
+<section id="learnlm">
+<h2><span class="part-tag">§ 4.7</span>LearnLM — The Tutor</h2>
+
+<p>LearnLM is Google's tutoring model. It teaches rather than answers: it asks probing questions, scaffolds concepts, and remembers your past cards across sessions. Activate it by prefixing your request with <code>learnlm</code>.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">learnlm explain matrices<span class="tag">tutor</span></span>
+    <span class="say">learnlm teach me electronics<span class="tag">tutor</span></span>
+    <span class="say">learnlm walk me through calculus derivatives<span class="tag">tutor</span></span>
+  </div>
+  <div>
+    <span class="say">learnlm quiz me on Spanish verbs<span class="tag">tutor</span></span>
+    <span class="say">learnlm how do I solder a through-hole resistor<span class="tag">tutor</span></span>
+    <span class="say">learnlm break down the Krebs cycle<span class="tag">tutor</span></span>
+  </div>
+</div>
+
+<div class="callout example">
+  <div class="title">Building a skill over weeks</div>
+  <p>LearnLM remembers recent cards. Start Monday with <em>"learnlm teach me chess openings — start with the Italian Game"</em>. Come back Thursday with <em>"learnlm quiz me on what we covered"</em> and it picks up where you left off. The <em>recent cards provider</em> passes your last exchanges in as context.</p>
+</div>
+</section>
+
+<section id="google-search">
+<h2><span class="part-tag">§ 4.8</span>Google Search Grounding</h2>
+
+<p>Gemini 3.1 has native Google Search grounding. You don't toggle it — TapInsight leaves it on so any current-world question (weather, stock prices, recent news, sports scores, "who won the Nobel Prize this year") pulls fresh search results and cites them in the reply.</p>
+
+<p>Grounding is different from the <code>research_topic</code> tool:</p>
+
+<table>
+  <thead><tr><th></th><th>Casual Q&amp;A (Gemini + grounding)</th><th>Research Tool</th></tr></thead>
+  <tbody>
+    <tr><td>Speed</td><td>Sub-second first audio</td><td>15 s – 2 min</td></tr>
+    <tr><td>Length</td><td>1–3 sentences</td><td>2–3 paragraphs or multi-section brief</td></tr>
+    <tr><td>Voice style</td><td>Conversational</td><td>Read verbatim with director notes</td></tr>
+    <tr><td>Use for</td><td>"What's the weather?"</td><td>"Research the history of the weather forecast."</td></tr>
+  </tbody>
+</table>
+
+<div class="callout example">
+  <div class="title">Media questions — Gemini picks the grounding path</div>
+  <p><strong>You:</strong> "What's the song Free Bird about?"<br>
+  <strong>Gemini (routed to Google Search, not Spotify):</strong> "It's Lynyrd Skynyrd's 1973 ballad written in memory of Duane Allman. The extended guitar solo at the end is widely considered one of the greatest in rock history…"<br>
+  <em>(Factual Spotify questions — 'who sings X' — go to Spotify's catalog. Story/context questions go to Google Search.)</em></p>
+</div>
+</section>
+
+<section id="maps-3d">
+<h2><span class="part-tag">§ 4.9</span>3D Maps — Ask Maps</h2>
+
+<p>The <code>ask_maps</code> tool combines Google's 3D photorealistic map tiles with landmark data and directions. It's the "show me" for geography.</p>
+
+<h3>Ways to invoke it</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">Show me a 3D map of Tokyo<span class="tag">maps</span></span>
+    <span class="say">What's around the Eiffel Tower?<span class="tag">maps</span></span>
+    <span class="say">Navigate to Golden Gate Park in 3D<span class="tag">maps</span></span>
+  </div>
+  <div>
+    <span class="say">Fly over Central Park<span class="tag">maps</span></span>
+    <span class="say">What landmark am I looking at?<span class="tag">maps + camera</span></span>
+    <span class="say">Show me the route to X from above<span class="tag">maps</span></span>
+  </div>
+</div>
+
+<h3>Camera integration</h3>
+<p>Point the glasses at a landmark with Camera + Audio mode on, and <em>"What is that?"</em> triggers Ask Maps to ID the building, park, or natural feature in view, with a short card of info and an option to navigate there.</p>
+</section>
+
+<section id="routes">
+<h2><span class="part-tag">§ 4.10</span>Directions &amp; Traffic</h2>
+
+<p>Backed by Google Directions. The tool is <code>google_routes</code>. Origin defaults to your current location unless you specify otherwise.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Directions to the nearest Home Depot<span class="tag">routes</span></span>
+    <span class="say">How long to get to the airport?<span class="tag">routes</span></span>
+    <span class="say">What's traffic like to work?<span class="tag">routes</span></span>
+  </div>
+  <div>
+    <span class="say">Drive to mom's house<span class="tag">routes</span></span>
+    <span class="say">ETA to 1600 Amphitheatre Parkway<span class="tag">routes</span></span>
+    <span class="say">Take me home<span class="tag">routes</span></span>
+  </div>
+</div>
+</section>
+
+<section id="places">
+<h2><span class="part-tag">§ 4.11</span>Places Nearby</h2>
+
+<p>Tool: <code>google_places</code>. Google Places Nearby Search + ratings + open/closed status.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Find a cafe within walking distance<span class="tag">places</span></span>
+    <span class="say">Best Thai food nearby<span class="tag">places</span></span>
+    <span class="say">Where's the closest pharmacy?<span class="tag">places</span></span>
+  </div>
+  <div>
+    <span class="say">Gas stations on my route<span class="tag">places</span></span>
+    <span class="say">Is the library still open?<span class="tag">places</span></span>
+    <span class="say">Dog parks near me<span class="tag">places</span></span>
+  </div>
+</div>
+</section>
+
+<section id="calendar">
+<h2><span class="part-tag">§ 4.12</span>Calendar</h2>
+
+<p>Tool: <code>google_calendar</code>. Read and write with OAuth; read-only with an API key + Calendar ID.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">What's my next meeting?<span class="tag">calendar</span></span>
+    <span class="say">What's on my schedule today?<span class="tag">calendar</span></span>
+    <span class="say">Am I free at 3pm?<span class="tag">calendar</span></span>
+  </div>
+  <div>
+    <span class="say">What do I have tomorrow?<span class="tag">calendar</span></span>
+    <span class="say">Schedule a dentist at 2 next Tuesday<span class="tag">calendar</span></span>
+    <span class="say">What's left in my day?<span class="tag">calendar</span></span>
+  </div>
+</div>
+</section>
+
+<section id="tasks">
+<h2><span class="part-tag">§ 4.13</span>Tasks &amp; Reminders</h2>
+
+<p>Tool: <code>google_tasks</code>. Needs Google OAuth with Tasks scope. Also drives the Tasks widget on the HUD.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">What's on my to-do list?<span class="tag">tasks</span></span>
+    <span class="say">Add "buy milk" to my list<span class="tag">tasks</span></span>
+  </div>
+  <div>
+    <span class="say">Mark buy milk as done<span class="tag">tasks</span></span>
+    <span class="say">Remind me to call mom tomorrow<span class="tag">tasks</span></span>
+  </div>
+</div>
+</section>
+
+<section id="keep">
+<h2><span class="part-tag">§ 4.14</span>Notes (Google Keep)</h2>
+
+<p>Tool: <code>google_keep</code>. Quick-capture notes that sync to Keep on your phone.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Save a note — the recipe was great, add more paprika<span class="tag">keep</span></span>
+    <span class="say">Note to self: park in lot C<span class="tag">keep</span></span>
+  </div>
+  <div>
+    <span class="say">Read my latest note<span class="tag">keep</span></span>
+    <span class="say">Save a note about this podcast<span class="tag">keep</span></span>
+  </div>
+</div>
+</section>
+
+<section id="contacts">
+<h2><span class="part-tag">§ 4.15</span>Contacts Lookup</h2>
+
+<p>Tool: <code>google_contacts</code>. Use it to retrieve saved phone numbers and email addresses from your Google contacts. TapInsight does not place calls or send texts directly.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">What's John's number?<span class="tag">contacts</span></span>
+    <span class="say">What's Sarah's email?<span class="tag">contacts</span></span>
+  </div>
+  <div>
+    <span class="say">Look up Jane Doe's email<span class="tag">contacts</span></span>
+    <span class="say">Find Alex in my contacts<span class="tag">contacts</span></span>
+  </div>
+</div>
+</section>
+
+<section id="spotify">
+<h2><span class="part-tag">§ 4.16</span>Spotify</h2>
+
+<p>Tool: <code>spotify_player</code>. Two actions: <code>search</code> (fact lookups — who sings, what album, when released) and <code>play</code> (streaming via Spotify Connect).</p>
+
+<p>Premium gets full tracks; free tier gets 30-second previews. The Spotify app must be running on your phone — if the phone isn't listed as a Connect device, open Spotify, play any track for a second, and retry on the glasses.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Play Fleetwood Mac<span class="tag">spotify</span></span>
+    <span class="say">Skip this<span class="tag">spotify</span></span>
+    <span class="say">What's playing?<span class="tag">spotify</span></span>
+    <span class="say">Play my Discover Weekly<span class="tag">spotify</span></span>
+  </div>
+  <div>
+    <span class="say">Who sings this?<span class="tag">spotify</span></span>
+    <span class="say">What album is this on?<span class="tag">spotify</span></span>
+    <span class="say">Play something mellow<span class="tag">spotify</span></span>
+    <span class="say">Volume up<span class="tag">spotify</span></span>
+  </div>
+</div>
+</section>
+
+<section id="sonos">
+<h2><span class="part-tag">§ 4.17</span>Sonos</h2>
+
+<p>Tool: <code>sonos_control</code>. If you have Sonos speakers on the same network, voice commands can target them instead of the phone.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Play Fleetwood Mac on Sonos<span class="tag">sonos</span></span>
+    <span class="say">Play on the kitchen speaker<span class="tag">sonos</span></span>
+  </div>
+  <div>
+    <span class="say">Group the living room and kitchen<span class="tag">sonos</span></span>
+    <span class="say">Pause Sonos<span class="tag">sonos</span></span>
+  </div>
+</div>
+</section>
+
+<section id="weather">
+<h2><span class="part-tag">§ 4.18</span>Weather &amp; Air Quality</h2>
+
+<p>Weather is rolled into the Daily Briefing tool and answered via Google Search grounding. Air quality is a dedicated tool: <code>google_air_quality</code>.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">What's the weather today?<span class="tag">weather</span></span>
+    <span class="say">Will it rain this afternoon?<span class="tag">weather</span></span>
+  </div>
+  <div>
+    <span class="say">What's the AQI?<span class="tag">air quality</span></span>
+    <span class="say">Is the air safe for running outside?<span class="tag">air quality</span></span>
+  </div>
+</div>
+</section>
+
+<section id="news">
+<h2><span class="part-tag">§ 4.19</span>News Headlines</h2>
+
+<p>Tool: <code>google_news</code>. Uses the public Google News RSS feed — no API key needed.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">What's in the news?<span class="tag">news</span></span>
+    <span class="say">Tech headlines<span class="tag">news</span></span>
+  </div>
+  <div>
+    <span class="say">Read me the top three<span class="tag">news</span></span>
+    <span class="say">Headlines about the election<span class="tag">news</span></span>
+  </div>
+</div>
+</section>
+
+<section id="briefing">
+<h2><span class="part-tag">§ 4.20</span>Daily Briefing</h2>
+
+<p>Tool: <code>daily_briefing</code>. One call, many tools — calendar + weather + traffic + air quality + proximity + parking + public events, rolled into a two-minute morning rundown.</p>
+
+<div class="sayrow">
+  <div><span class="say">Give me my morning briefing<span class="tag">briefing</span></span></div>
+  <div><span class="say">What's my day look like?<span class="tag">briefing</span></span></div>
+</div>
+
+<p>Combine with a <a href="#quick-actions">quick action macro</a> named "good morning" so a single trigger phrase runs the whole thing plus your music.</p>
+</section>
+
+<section id="camera">
+<h2><span class="part-tag">§ 4.21</span>Camera Actions</h2>
+
+<p>Tool: <code>camera_action</code>. Save photos, read QR codes, start/stop audio recording. Camera frames are also used by:</p>
+<ul>
+  <li>Live sessions in <em>Camera + Audio</em> mode — streaming visual context to Gemini.</li>
+  <li>Ask Maps landmark ID.</li>
+  <li>Translate's <code>camera</code> source for reading signs and menus.</li>
+  <li>The OpenClaw Vision Relay — the remote agent gets the latest still frame.</li>
+</ul>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Save this photo<span class="tag">camera</span></span>
+    <span class="say">Read this QR code<span class="tag">camera</span></span>
+  </div>
+  <div>
+    <span class="say">Start recording audio<span class="tag">camera</span></span>
+    <span class="say">Stop recording<span class="tag">camera</span></span>
+  </div>
+</div>
+</section>
+
+<section id="translation">
+<h2><span class="part-tag">§ 4.22</span>Translation</h2>
+
+<p>Tool: <code>translate_text</code>. Works on speech <em>and</em> camera-visible text (signs, menus, documents). 40+ languages.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Translate this sign to English<span class="tag">translate + camera</span></span>
+    <span class="say">Say "where is the bathroom" in Japanese<span class="tag">translate</span></span>
+    <span class="say">Translate to Spanish<span class="tag">translate</span></span>
+  </div>
+  <div>
+    <span class="say">Turn on auto-translate<span class="tag">translate</span></span>
+    <span class="say">What does this menu say?<span class="tag">translate + camera</span></span>
+    <span class="say">Stop translating<span class="tag">translate</span></span>
+  </div>
+</div>
+
+<div class="callout">
+  <div class="title">Auto-Translate mode</div>
+  <p>Enable in Step 8f. When on, any visible text through the camera is continuously translated to your default target language. Useful abroad; burns extra battery because the camera stays active.</p>
+</div>
+</section>
+
+<section id="battery">
+<h2><span class="part-tag">§ 4.23</span>Battery Saver</h2>
+
+<p>Tool: <code>battery_saver</code>. Cuts HUD refresh, pauses camera analysis, switches to voice-only mode, and defers non-essential network calls. Auto-enables under the threshold you set in Step 8g (default 20%, set to 0 for manual-only).</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Save battery<span class="tag">battery</span></span>
+    <span class="say">Enable battery saver<span class="tag">battery</span></span>
+  </div>
+  <div>
+    <span class="say">What's my battery?<span class="tag">battery</span></span>
+    <span class="say">Turn off battery saver<span class="tag">battery</span></span>
+  </div>
+</div>
+</section>
+
+<section id="quick-actions">
+<h2><span class="part-tag">§ 4.24</span>Quick Actions / Voice Macros</h2>
+
+<p>Tool: <code>quick_action</code>. A macro is a chain of tool calls triggered by a phrase. TapInsight ships four pre-built ones — <em>good morning</em>, <em>leaving work</em>, <em>heading home</em>, <em>meeting mode</em> — and lets you define your own via JSON in Step 8h.</p>
+
+<h3>Custom action JSON</h3>
+<pre><code>[
+  {
+    "name": "gym time",
+    "description": "Directions to gym + a hype playlist",
+    "steps": [
+      { "tool": "google_routes",   "args": { "destination": "Planet Fitness" } },
+      { "tool": "spotify_player",  "args": { "action": "play", "query": "workout mix" } }
+    ]
+  }
+]</code></pre>
+
+<div class="sayrow">
+  <div>
+    <span class="say">Good morning<span class="tag">macro</span></span>
+    <span class="say">Leaving work<span class="tag">macro</span></span>
+  </div>
+  <div>
+    <span class="say">Gym time<span class="tag">custom</span></span>
+    <span class="say">List quick actions<span class="tag">macro</span></span>
+  </div>
+</div>
+</section>
+
+<section id="tapclaw">
+<h2><span class="part-tag">§ 4.25</span>TapClaw / OpenClaw — Your Remote Agent</h2>
+
+<p>TapClaw is an agent that runs on a computer <em>outside</em> the glasses — your laptop, a home server, a cloud VM — and has access to your files, emails, and whatever else you plug into it. When you prefix a request with <strong>tapclaw</strong>, TapInsight bundles the request (plus the latest camera frame if relevant) and sends it to the agent. The agent does the work and streams results back to your HUD.</p>
+
+<div class="diagram">
+  <div class="node">You speak "tapclaw …"<small>on the glasses</small></div>
+  <div class="arrow">→</div>
+  <div class="node">Gateway<small>ws / wss</small></div>
+  <div class="arrow">→</div>
+  <div class="node">OpenClaw agent<small>desk / server</small></div>
+  <div class="arrow">→</div>
+  <div class="node">Your tools<small>email, files, smart home, code</small></div>
+</div>
+
+<h3>Why it matters — real-life use cases</h3>
+
+<div class="callout example">
+  <div class="title">Homework (with camera)</div>
+  <p>Point the glasses at a calculus problem. Say <em>"tapclaw walk me through this problem — don't just give me the answer."</em> The remote agent sees the still frame via the Vision Relay, works through it step-by-step, and streams the explanation to your HUD as it goes. You can stop it mid-way with <em>"tapclaw, pause, I want to try step three myself."</em></p>
+</div>
+
+<div class="callout example">
+  <div class="title">Planning a week</div>
+  <p><em>"tapclaw plan my week around these three appointments, my workout schedule, and this grocery list. Block time for the project proposal, schedule Friday as admin day, and add 30-minute walks after lunch."</em> The agent pulls your calendar, creates events, adjusts existing ones, and emails you a summary. All you see on the HUD is progress notes.</p>
+</div>
+
+<div class="callout example">
+  <div class="title">Skill-building over 30 days</div>
+  <p><em>"tapclaw, I want to learn Python in 30 days. Build me a daily plan, schedule reminders, and every morning give me that day's task at 8am."</em> The agent builds the curriculum once, schedules reminders, and each morning sends your task of the day to the glasses. You can check progress with <em>"tapclaw how am I doing?"</em></p>
+</div>
+
+<div class="callout example">
+  <div class="title">Knowledge — your own files</div>
+  <p><em>"tapclaw what did I write about retrieval-augmented generation in my notes last month?"</em> The agent searches your Obsidian vault, your Drive folder, your commit messages — whatever you've pointed it at — and reads back what it finds. Unlike the hosted model, your data never leaves your machine.</p>
+</div>
+
+<div class="callout example">
+  <div class="title">Smart home</div>
+  <p>Wire OpenClaw to your Home Assistant instance. <em>"tapclaw dim the living room to 30 and put on the jazz scene."</em> The agent issues the HA API calls and reports back.</p>
+</div>
+
+<div class="callout example">
+  <div class="title">Email triage on the go</div>
+  <p><em>"tapclaw check my emails and tell me what's urgent."</em> Unlike a generic AI, the agent has access to your inbox, filters by your own rules, and summarizes only what matters. Reply directly: <em>"tapclaw reply to the second one saying yes, I'll be there."</em></p>
+</div>
+
+<h3>Pairing the agent</h3>
+
+<div class="steps">
+  <div class="step">
+    <h4>Start OpenClaw on your machine</h4>
+    <p>Install OpenClaw (instructions at the OpenClaw project repo). Start it — it exposes a WebSocket gateway on port <strong>18789</strong> and a Vision Relay on port <strong>18790</strong>.</p>
+  </div>
+  <div class="step">
+    <h4>Scan the QR or paste the URL</h4>
+    <p>Run <code>openclaw qr</code> on the host to print a QR code. Open the <a href="#openclaw-tab">OpenClaw tab</a> in the companion app and scan. Fields populate automatically.</p>
+  </div>
+  <div class="step">
+    <h4>Test the connection</h4>
+    <p>Hit <strong>Test TapClaw Connection</strong>. A green check means you're paired.</p>
+  </div>
+  <div class="step">
+    <h4>Go remote (optional)</h4>
+    <p>For access outside your LAN, use a Cloudflare Tunnel (<code>cloudflared tunnel create tapclaw</code>) or Tailscale. The OpenClaw tab has a wizard for both. Gateway URL becomes <code>wss://tapclaw.yourdomain.com</code>.</p>
+    <div class="callout warning" style="margin-top:8px">
+      <div class="title">⚠ Two processes are required for remote access</div>
+      <p><strong>Cloudflared and the image relay are two separate services.</strong> The tunnel only forwards traffic from <code>relay.yourdomain.com</code> down to <code>http://127.0.0.1:18790</code> on your Mac mini — it does <em>not</em> start the relay itself. If the relay isn't running, every remote request returns "Unable to reach the origin service: connection refused" even though the tunnel is connected.</p>
+      <p>You need <strong>both</strong> running simultaneously when you're outside the LAN:</p>
+      <ol>
+        <li><code>python3 tools/image_relay.py</code> &mdash; starts the local HTTP server on <code>127.0.0.1:18790</code> (the actual file/image server).</li>
+        <li><code>cloudflared tunnel run tapclaw</code> &mdash; bridges Cloudflare's edge to your Mac's localhost.</li>
+      </ol>
+      <p><strong>Recommended:</strong> install both as auto-start services so you never forget one of them:</p>
+      <pre><code>bash tools/install-relay.sh           # adds com.tapinsight.image-relay launchd plist
+brew services start cloudflared       # tunnel auto-starts on login</code></pre>
+      <p><strong>Sanity check before you leave the house:</strong></p>
+      <pre><code>curl http://127.0.0.1:18790/status    # local: should return {"ok":true,...}
+curl https://relay.yourdomain.com/status   # remote: should return the same JSON</code></pre>
+      <p>If the local <code>curl</code> works but the remote one returns a Cloudflare 502 / 503, the tunnel is down. If the local <code>curl</code> fails too, the relay is down.</p>
+    </div>
+  </div>
+</div>
+
+<h3>Magentic project UI on the OpenClaw host</h3>
+<p>If your OpenClaw setup also uses the Magentic project for browser/agent orchestration, launch it on the <em>same host machine</em> before pairing TapInsight. This gives you the Magentic web UI for inspecting runs, browser state, and agent activity while TapInsight talks to the OpenClaw gateway.</p>
+
+<div class="callout tip">
+  <div class="title">What the commands do</div>
+  <p><code>source .venv/bin/activate</code> activates the Magentic Python virtual environment, and <code>magentic-ui --config ./config.yaml --run-without-docker --port 8081</code> starts the Magentic UI directly on the host using your local <code>config.yaml</code> instead of Docker. Port <code>8081</code> is the web dashboard you open in your browser to monitor and troubleshoot the agent host.</p>
+</div>
+
+<pre><code>source .venv/bin/activate
+magentic-ui --config ./config.yaml --run-without-docker --port 8081</code></pre>
+
+<p>Purpose in the TapInsight workflow:</p>
+<ul>
+  <li>OpenClaw remains the gateway TapInsight connects to on port <code>18789</code>.</li>
+  <li>Magentic UI is the host-side control/inspection panel on port <code>8081</code>.</li>
+  <li>Use it when you want to watch jobs live, inspect browser automation, confirm configuration, or debug why the remote agent did something unexpected.</li>
+</ul>
+
+<p>If you are using Cloudflare Tunnel for remote access, tunnel the OpenClaw gateway itself for TapInsight, and optionally expose the Magentic UI separately only if you intentionally want remote browser access to that admin screen.</p>
+
+<h3 id="openclaw-media-files">Media &amp; Files</h3>
+<p>OpenClaw can display images, videos, web pages, and text on your glasses using TapBrowser. You can ask for it directly by voice, or the agent can return an <code>open_taplink</code> instruction when it needs to show something visual.</p>
+
+<div class="sayrow">
+  <div>
+    <span class="say">tapclaw show me the camera image<span class="tag">image</span></span>
+    <span class="say">tapclaw open https://example.com<span class="tag">browser</span></span>
+  </div>
+  <div>
+    <span class="say">tapclaw show my saved images<span class="tag">gallery</span></span>
+    <span class="say">open hacker news<span class="tag">direct</span></span>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card"><h4>Images</h4><p>JPEG, PNG, GIF, camera frames, screenshots, diagrams, and saved relay photos.</p></div>
+  <div class="card"><h4>Videos</h4><p>YouTube links and direct video URLs open in TapBrowser with the media controls enabled.</p></div>
+  <div class="card"><h4>Web Pages</h4><p>Any URL reachable from the glasses can be shown in the AR browser.</p></div>
+  <div class="card"><h4>Text Files</h4><p>Plain text, markdown, logs, and readable files render in TapBrowser for reading or read-aloud.</p></div>
+</div>
+
+<p>When OpenClaw returns visual media, TapInsight routes it through Gemini's <code>open_taplink</code> tool so it appears on the glasses rather than only on the host computer. Camera frames captured by the Vision Relay are stored in <code>~/.openclaw/workspace/</code> on your OpenClaw host, with archived frames under <code>saved_photos/</code> by date.</p>
+
+<h3 id="openclaw-cdp-mac">Chrome CDP on Mac — HOWTO</h3>
+<p>This setup attaches OpenClaw to your <em>existing</em> logged-in Chrome session through Chrome DevTools Protocol (CDP), so browser automation can reuse your cookies, sessions, and extensions instead of launching a clean sandbox profile.</p>
+
+<div class="callout tip">
+  <div class="title">One-line summary</div>
+  <p>Upgrade to OpenClaw <code>2026.4.15+</code>, launch Chrome with <code>--remote-debugging-port=9222</code>, configure <code>browser.defaultProfile</code> as <code>remote</code> with <code>attachOnly: true</code> and <code>cdpUrl: "http://localhost:9222"</code>, restart the gateway, then verify with <code>openclaw browser status</code>.</p>
+</div>
+
+<div class="steps">
+  <div class="step">
+    <h4>Upgrade OpenClaw first</h4>
+    <p>Run <code>openclaw update</code>, then <code>openclaw --version</code>. Confirm <code>2026.4.15</code> or newer. OpenClaw <code>2026.4.11</code> had a broken remote-CDP attach path.</p>
+  </div>
+  <div class="step">
+    <h4>Quit existing Chrome</h4>
+    <p>Run <code>pkill -9 "Google Chrome"</code>, or use the Chrome Dock icon menu and choose <strong>Quit</strong>.</p>
+  </div>
+  <div class="step">
+    <h4>Launch Chrome with remote debugging</h4>
+    <p>Start Chrome from Terminal and keep that Terminal window open:</p>
+    <pre><code>"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222</code></pre>
+    <p>Click the Chrome icon in the Dock to bring it forward. Chrome is now serving CDP on <code>localhost:9222</code>.</p>
+  </div>
+  <div class="step">
+    <h4>Verify Chrome is serving CDP</h4>
+    <p>Run:</p>
+    <pre><code>curl -sf http://localhost:9222/json/version | python3 -m json.tool</code></pre>
+    <p>Expected output includes <code>Protocol-Version</code> and a <code>webSocketDebuggerUrl</code> like <code>ws://localhost:9222/devtools/browser/&lt;uuid&gt;</code>. If this fails, Chrome is not running with the debugging port.</p>
+  </div>
+  <div class="step">
+    <h4>Configure OpenClaw's browser profile</h4>
+    <p>Edit <code>~/.openclaw/openclaw.json</code> and create or update the browser profile:</p>
+    <pre><code>"browser": {
+  "defaultProfile": "remote",
+  "profiles": {
+    "remote": {
+      "driver": "openclaw",
+      "attachOnly": true,
+      "cdpUrl": "http://localhost:9222"
+    }
+  }
+}</code></pre>
+    <p><code>driver: "openclaw"</code> uses OpenClaw's built-in CDP driver. <code>attachOnly: true</code> tells OpenClaw not to launch Chrome. <code>cdpUrl</code> must be the HTTP endpoint, not the WebSocket URL.</p>
+  </div>
+  <div class="step">
+    <h4>Restart the gateway</h4>
+    <p>Run <code>openclaw gateway restart</code>, then wait about ten seconds for the gateway to reload the profile.</p>
+  </div>
+  <div class="step">
+    <h4>Verify the attach</h4>
+    <p>Run <code>openclaw browser status</code>. Success looks like <code>running: true</code>, <code>cdpReady: true</code>, <code>cdpHttp: true</code>, <code>cdpPort: 9222</code>, and <code>attachOnly: true</code>.</p>
+  </div>
+  <div class="step">
+    <h4>Test with a real page</h4>
+    <p>Run <code>openclaw browser tabs</code>, <code>openclaw browser open https://www.google.com</code>, and <code>openclaw browser snapshot --limit 40</code>. If all three succeed, CDP attach is working.</p>
+  </div>
+</div>
+
+<details>
+  <summary>Chrome CDP stumbling blocks</summary>
+  <table>
+    <thead><tr><th>Symptom</th><th>Likely Cause</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td><code>Chrome CDP websocket ... not reachable after start</code></td><td>Chrome is not on port 9222, or OpenClaw is too old.</td><td>Launch Chrome with <code>--remote-debugging-port=9222</code> and upgrade to <code>2026.4.15+</code>.</td></tr>
+      <tr><td><code>attachOnly is enabled and profile "remote" is not running</code></td><td>Chrome was not started before OpenClaw checked.</td><td>Start Chrome first, then let OpenClaw attach.</td></tr>
+      <tr><td>OpenClaw keeps spawning new Chrome windows.</td><td>The active profile owns its own Chrome process.</td><td>Use the <code>remote</code> profile with <code>attachOnly: true</code>.</td></tr>
+      <tr><td><code>Navigation blocked: strict browser SSRF policy requires an IP-literal URL</code></td><td>The CDP URL used the wrong host form.</td><td>Use <code>http://localhost:9222</code> for this profile.</td></tr>
+      <tr><td><code>browser.request cannot mutate persistent browser profiles</code></td><td>A persistent profile was changed at runtime.</td><td>Edit <code>openclaw.json</code>, then restart the gateway.</td></tr>
+      <tr><td><code>PortInUseError: Port 18800 is already in use</code></td><td>Another OpenClaw/browser-control process is already bound.</td><td>Stop the other process or configure a different port.</td></tr>
+    </tbody>
+  </table>
+</details>
+
+<div class="callout">
+  <div class="title">Why CDP attach works</div>
+  <p>OpenClaw's browser control service connects to Chrome's DevTools Protocol endpoint and sends automation commands over that WebSocket bridge. The <code>remote</code> profile plus <code>attachOnly: true</code> tells OpenClaw to reuse the Chrome already running on port <code>9222</code>, preserving your logged-in state and extensions.</p>
+</div>
+
+<h3>Vision Relay</h3>
+<p>A tiny HTTP service on port 18790 that receives live camera stills from the glasses. On macOS: <code>bash tools/install-relay.sh</code>. On Linux or Windows: <code>python3 tools/image_relay.py</code>. The relay rotates the frame 90° clockwise and saves it to <code>~/.openclaw/workspace/camera_frame.jpg</code>, archiving each frame under <code>saved_photos/YYYY-MM-DD/</code>. The agent can read the latest frame via <code>GET /latest</code>.</p>
+
+<h3>TapClaw voice commands</h3>
+<div class="sayrow">
+  <div>
+    <span class="say">tapclaw what do you see<span class="tag">vision</span></span>
+    <span class="say">tapclaw check my emails<span class="tag">email</span></span>
+    <span class="say">tapclaw show the saved images<span class="tag">media</span></span>
+  </div>
+  <div>
+    <span class="say">tapclaw control smart lights<span class="tag">home</span></span>
+    <span class="say">tapclaw summarize today's meetings<span class="tag">notes</span></span>
+    <span class="say">tapclaw open that URL<span class="tag">routing</span></span>
+  </div>
+</div>
+
+<div class="callout warn">
+  <div class="title">One agent at a time</div>
+  <p>When you say "tapclaw," Gemini routes the <em>entire</em> request to the agent and doesn't call any other tool in the same turn. That's intentional — it keeps results coherent. If you want both (say, "tapclaw check emails" <em>and</em> "what's the weather"), run them as two separate turns.</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PART V — REFERENCE
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="part"><span class="label">Part V — Reference</span></div>
+
+<section id="voice-cheatsheet">
+<h2><span class="part-tag">§ 5.1</span>Voice Command Cheat Sheet</h2>
+
+<p>Every trigger phrase that has a dedicated routing rule. Gemini matches loosely — phrasing variations of these all work.</p>
+
+<table>
+  <thead><tr><th>Category</th><th>Say something like…</th><th>Triggers</th></tr></thead>
+  <tbody>
+    <tr><td>TapClaw</td><td>"tapclaw&nbsp;…"</td><td>Remote agent (exclusive turn)</td></tr>
+    <tr><td>Research</td><td>"research&nbsp;X" / "deep dive into&nbsp;X"</td><td>research_topic, verbatim read</td></tr>
+    <tr><td>LearnLM</td><td>"learnlm&nbsp;…"</td><td>learn_topic tutor model</td></tr>
+    <tr><td>Translate</td><td>"translate&nbsp;…" / "say X in Y"</td><td>translate_text (speech or camera)</td></tr>
+    <tr><td>Battery</td><td>"save battery" / "check battery"</td><td>battery_saver</td></tr>
+    <tr><td>Calendar</td><td>"what's next" / "schedule" / "am I free"</td><td>google_calendar</td></tr>
+    <tr><td>Tasks</td><td>"to-do list" / "add task" / "mark done"</td><td>google_tasks</td></tr>
+    <tr><td>Notes</td><td>"save a note" / "note to self"</td><td>google_keep</td></tr>
+    <tr><td>Routes</td><td>"directions to" / "how long to" / "ETA"</td><td>google_routes (origin='current')</td></tr>
+    <tr><td>Places</td><td>"find a X near me" / "closest X"</td><td>google_places</td></tr>
+    <tr><td>Maps</td><td>"show me 3D map" / "what's around"</td><td>ask_maps</td></tr>
+    <tr><td>Weather</td><td>"weather" / "will it rain"</td><td>Google Search grounding</td></tr>
+    <tr><td>Air Quality</td><td>"AQI" / "is the air safe"</td><td>google_air_quality</td></tr>
+    <tr><td>News</td><td>"what's in the news" / "headlines"</td><td>google_news</td></tr>
+    <tr><td>Briefing</td><td>"morning briefing" / "what's my day"</td><td>daily_briefing</td></tr>
+    <tr><td>Spotify search</td><td>"who sings" / "what album"</td><td>spotify_player (search)</td></tr>
+    <tr><td>Spotify play</td><td>"play&nbsp;X"</td><td>spotify_player (play)</td></tr>
+    <tr><td>Sonos</td><td>"play on Sonos" / "kitchen speaker"</td><td>sonos_control</td></tr>
+    <tr><td>Radio</td><td>"play X radio" / "find a station"</td><td>tapradio</td></tr>
+    <tr><td>Podcasts</td><td>any sentence with "podcast"</td><td>tapradio (highest priority)</td></tr>
+    <tr><td>YouTube</td><td>"play on YouTube" / "watch X" / "send list"</td><td>Gemini Phase A/B flow</td></tr>
+    <tr><td>Camera</td><td>"save photo" / "read QR" / "record audio"</td><td>camera_action</td></tr>
+    <tr><td>Contacts</td><td>"look up X's number"</td><td>google_contacts</td></tr>
+    <tr><td>Quick actions</td><td>"good morning" / "leaving work" / custom</td><td>quick_action</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="tool-reference">
+<h2><span class="part-tag">§ 5.2</span>Every Native Tool</h2>
+
+<p>Under the hood, Gemini sees these tools by name. Useful if you're editing the routing rules or building custom quick actions.</p>
+
+<div class="tool"><div class="name">google_calendar</div><div class="body"><p>Read and write Google Calendar events. Needs OAuth for writes.</p><p class="ex">"What's my next meeting?" · "Schedule dentist 3pm Tuesday"</p></div></div>
+<div class="tool"><div class="name">google_tasks</div><div class="body"><p>Google Tasks CRUD. Drives the Tasks HUD widget.</p><p class="ex">"Add 'pay rent' to my list" · "Mark 'buy milk' done"</p></div></div>
+<div class="tool"><div class="name">google_keep</div><div class="body"><p>Save and read Google Keep notes.</p><p class="ex">"Save a note: remember to update driver license"</p></div></div>
+<div class="tool"><div class="name">google_contacts</div><div class="body"><p>Contact lookup.</p><p class="ex">"What's mom's phone number?"</p></div></div>
+<div class="tool"><div class="name">google_routes</div><div class="body"><p>Directions, traffic, ETA. Origin = current by default.</p><p class="ex">"How long to the airport?" · "Traffic to work?"</p></div></div>
+<div class="tool"><div class="name">google_places</div><div class="body"><p>Nearby search with ratings and open/closed.</p><p class="ex">"Closest pharmacy" · "Best ramen nearby"</p></div></div>
+<div class="tool"><div class="name">google_air_quality</div><div class="body"><p>AQI + pollutant breakdown.</p><p class="ex">"What's the air quality today?"</p></div></div>
+<div class="tool"><div class="name">google_news</div><div class="body"><p>Top headlines via public Google News RSS (no key).</p><p class="ex">"What's in the news?"</p></div></div>
+<div class="tool"><div class="name">ask_maps</div><div class="body"><p>3D photorealistic map + landmark recognition.</p><p class="ex">"Show me Tokyo in 3D" · "What am I looking at?"</p></div></div>
+<div class="tool"><div class="name">daily_briefing</div><div class="body"><p>Multi-source morning briefing.</p><p class="ex">"Give me my morning briefing"</p></div></div>
+<div class="tool"><div class="name">spotify_player</div><div class="body"><p>Search and play via Spotify Connect.</p><p class="ex">"Play Fleetwood Mac" · "Who sings this?"</p></div></div>
+<div class="tool"><div class="name">sonos_control</div><div class="body"><p>Sonos speaker playback + grouping.</p><p class="ex">"Play on the kitchen Sonos"</p></div></div>
+<div class="tool"><div class="name">tapradio</div><div class="body"><p>Internet radio + podcasts (30k+ stations).</p><p class="ex">"Play BBC Radio 6" · "Top philosophy podcasts"</p></div></div>
+<div class="tool"><div class="name">camera_action</div><div class="body"><p>Save photo, QR read, audio record.</p><p class="ex">"Save this photo" · "Read this QR"</p></div></div>
+<div class="tool"><div class="name">open_taplink</div><div class="body"><p>Display images, videos, web pages, text files on the glasses via TapBrowser.</p><p class="ex">Invoked by Gemini, rarely by you directly.</p></div></div>
+<div class="tool"><div class="name">send_video_list</div><div class="body"><p>Renders a tappable picker of YouTube suggestions (Phase A of the YouTube flow).</p><p class="ex">"Send a list to my glasses" after a video query.</p></div></div>
+<div class="tool"><div class="name">research_topic</div><div class="body"><p>Long-form search-grounded brief, read verbatim.</p><p class="ex">"Research mRNA vaccines"</p></div></div>
+<div class="tool"><div class="name">learn_topic</div><div class="body"><p>LearnLM tutoring — explains, quizzes, remembers.</p><p class="ex">"learnlm teach me matrices"</p></div></div>
+<div class="tool"><div class="name">translate_text</div><div class="body"><p>Speech and camera-text translation, 40+ languages.</p><p class="ex">"Translate this sign" · "Say X in Japanese"</p></div></div>
+<div class="tool"><div class="name">battery_saver</div><div class="body"><p>Toggle power-saving mode.</p><p class="ex">"Save battery"</p></div></div>
+<div class="tool"><div class="name">quick_action</div><div class="body"><p>Pre-built and custom JSON macros.</p><p class="ex">"Leaving work" · "Gym time"</p></div></div>
+<div class="tool"><div class="name">tapclaw_agent</div><div class="body"><p>Routes to your remote OpenClaw agent with optional camera frame.</p><p class="ex">"tapclaw what do you see"</p></div></div>
+<div class="tool"><div class="name">get_context</div><div class="body"><p>Recall from the recent-cards context cache.</p><p class="ex">Used internally by Gemini for follow-ups.</p></div></div>
+</section>
+
+<section id="trackpad">
+<h2><span class="part-tag">§ 5.3</span>Trackpad &amp; Gestures</h2>
+
+<p>The glasses have a touchpad on the right temple. Gestures:</p>
+
+<table>
+  <tbody>
+    <tr><td><strong>Single tap</strong></td><td>Select, click links, focus inputs.</td></tr>
+    <tr><td><strong>Double tap</strong></td><td>Start a voice session / swap mode / end session. Also: go back in the browser (context-dependent).</td></tr>
+    <tr><td><strong>Swipe left / right</strong></td><td>Scroll horizontally, switch tabs or panels.</td></tr>
+    <tr><td><strong>Swipe up / down</strong></td><td>Scroll content. In the settings panel, moves between fields.</td></tr>
+    <tr><td><strong>Hold</strong></td><td>Raise soft keyboard for text entry in focused inputs.</td></tr>
+    <tr><td><strong>Head yaw</strong></td><td>Subtle UI pan — gentle left/right head turn shifts panels within a comfortable ±34° range.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="troubleshooting">
+<h2><span class="part-tag">§ 5.4</span>Troubleshooting</h2>
+
+<h3>Gemini doesn't respond</h3>
+<ul>
+  <li>Check the Gemini key in Step 2. Hit <strong>Test</strong> in API Verification.</li>
+  <li>Check connectivity — Wi-Fi or USB-tether, whichever the glasses use.</li>
+  <li>Check <strong>Gemini Live Idle Timeout</strong> — if zero, a very brief pause can end the session.</li>
+</ul>
+
+<h3>"Spotify not available" when trying to play</h3>
+<ul>
+  <li>Open the Spotify app on your phone and play any track for ~1 second. That registers the phone as a Spotify Connect target.</li>
+  <li>Retry on the glasses.</li>
+</ul>
+
+<h3>Companion page won't load</h3>
+<ul>
+  <li>If over USB: re-run <code>adb forward tcp:19110 tcp:19110</code>. Then try <code>https://localhost:19110</code> first and accept the certificate warning. Check <code>adb devices</code> shows the glasses.</li>
+  <li>If over Wi-Fi: verify the IP still matches (DHCP may have changed it).</li>
+</ul>
+
+<h3>TapClaw connection fails</h3>
+<ul>
+  <li>Check the gateway token in the OpenClaw tab. Copy it fresh from <code>openclaw config get gateway.auth.token</code>.</li>
+  <li>If using a Cloudflare Tunnel, verify <code>cloudflared tunnel list</code> shows it as connected.</li>
+  <li>Try the <strong>Test TapClaw Connection</strong> button.</li>
+</ul>
+
+<h3>HUD widgets show "—"</h3>
+<ul>
+  <li>Calendar / Tasks: OAuth expired. Re-authorize in Step 3.</li>
+  <li>Traffic: Maps API key missing or quota exceeded.</li>
+  <li>News: Network down (uses public RSS, no auth).</li>
+</ul>
+
+<h3>Gemini opens YouTube when you just wanted info</h3>
+<ul>
+  <li>Default routing uses Phase A (describe + send list). If it jumps straight to playing, check Step 7 → URL Rules — make sure you haven't overridden the default.</li>
+</ul>
+
+<h3>Display too bright / too dim</h3>
+<ul>
+  <li>Accessibility → Display Brightness slider. Default 100%; lower for indoor comfort. Use <strong>Reset to default</strong> to snap back.</li>
+</ul>
+</section>
+
+<footer>
+  TapInsight User Guide · built from the v1.1.2 source · designed to work even when the wifi doesn't.
+</footer>
+
+</main>
+</div>
+
+<script>
+// ── Active-section TOC highlighting ───────────────────────────────────
+(function () {
+  'use strict';
+  const links = Array.from(document.querySelectorAll('aside.toc a'));
+  const targets = links
+    .map(a => document.getElementById(a.getAttribute('href').slice(1)))
+    .filter(Boolean);
+
+  function setActive(id) {
+    links.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+    });
+  }
+
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(entries => {
+      // Find the topmost intersecting section
+      const visible = entries
+        .filter(e => e.isIntersecting)
+        .sort((a, b) => a.target.offsetTop - b.target.offsetTop);
+      if (visible.length) setActive(visible[0].target.id);
+    }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+    targets.forEach(t => io.observe(t));
+  }
+
+  // Smooth scroll + close-then-scroll on mobile
+  links.forEach(a => {
+    a.addEventListener('click', (e) => {
+      const target = document.getElementById(a.getAttribute('href').slice(1));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        history.replaceState(null, '', a.getAttribute('href'));
+        setActive(target.id);
+      }
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

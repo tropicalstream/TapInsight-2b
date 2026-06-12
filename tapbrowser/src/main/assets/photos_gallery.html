@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Photos — TapInsight</title>
+<style>
+/* ─── Tokens ──────────────────────────────────────────────────────── */
+:root {
+  --bg:           #0a0c10;
+  --bg-2:         #14171d;
+  --tile:         #1a1e26;
+  --tile-hover:   #232833;
+  --border:       rgba(255,255,255,0.06);
+  --text:         #e6edf3;
+  --text-dim:     #8b949e;
+  --accent:       #00e5ff;
+  --accent-glow:  rgba(0,229,255,0.35);
+  --danger:       #ff5b5b;
+  --shadow-card:  0 2px 8px rgba(0,0,0,0.4);
+  --shadow-lift:  0 8px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,229,255,0.18);
+}
+
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html,body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
+
+/* ─── Header ─────────────────────────────────────────────────────── */
+.header {
+  position: fixed; inset: 0 0 auto 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, rgba(10,12,16,0.96) 0%, rgba(10,12,16,0.6) 90%, transparent 100%);
+  z-index: 10;
+}
+.header h1 {
+  font-size: 18px; font-weight: 600; letter-spacing: 0.2px;
+  display: flex; align-items: center; gap: 8px;
+}
+.header h1 .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+}
+.header .meta {
+  margin-left: auto; font-size: 12px; color: var(--text-dim);
+}
+/* Always-visible status pill in the header showing whether device-
+   photo access is currently granted. Replaces the previous "hidden
+   until missing" UX, which left users stranded if they couldn't tell
+   whether they had permission or not. Pill stays small to fit the
+   narrow glasses display. */
+.access-pill {
+  margin-left: 12px; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.2px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: filter 0.15s, background 0.15s;
+}
+.access-pill .ap-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.access-pill.granted {
+  background: rgba(126, 236, 170, 0.12);
+  border-color: rgba(126, 236, 170, 0.4);
+  color: #c8efd5;
+}
+.access-pill.granted .ap-dot { background: #7eecaa; }
+.access-pill.missing {
+  background: var(--accent);
+  color: #001;
+  box-shadow: 0 0 10px var(--accent-glow);
+  font-weight: 700;
+}
+.access-pill.missing .ap-dot {
+  background: #b71c1c;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.access-pill:hover, .access-pill:active { filter: brightness(1.15); }
+
+/* Grant-permission banner — full-width card pinned to the top of
+   the grid scroll surface. Sits in parallel with the header pill;
+   the pill is the persistent affordance, the banner is the
+   one-time "you have library photos but not device photos" nudge. */
+.grant-banner {
+  display: none;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(0,229,255,0.10), rgba(0,229,255,0.03));
+  border: 1px solid rgba(0,229,255,0.32);
+  align-items: center;
+  gap: 12px;
+}
+.grant-banner.visible { display: flex; }
+.grant-banner .gb-text { flex: 1; font-size: 12.5px; line-height: 1.5; }
+.grant-banner .gb-title { color: var(--text); font-weight: 600; margin-bottom: 2px; }
+.grant-banner .gb-sub { color: var(--text-dim); font-size: 11.5px; }
+.grant-banner .gb-btn {
+  background: var(--accent); color: #001; border: 0;
+  padding: 9px 14px; border-radius: 8px;
+  font-weight: 700; font-size: 12px;
+  cursor: pointer; flex-shrink: 0;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+.grant-banner .gb-btn:hover, .grant-banner .gb-btn:active {
+  filter: brightness(1.15);
+}
+
+/* ─── Grid ───────────────────────────────────────────────────────── */
+.grid {
+  position: fixed; inset: 56px 0 0 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 12px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+.grid-inner {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+.tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--tile);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.tile:hover, .tile:active {
+  background: var(--tile-hover);
+  transform: scale(1.02);
+  box-shadow: var(--shadow-lift);
+}
+.tile img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+/* Video thumbnail placeholder. We can't render an MP4 in <img>
+   (the WebView shows the broken-image icon), and a <video> poster
+   would block the grid while it decodes a frame. A plain styled
+   div with the ▶ pill on top is reliable and instant. */
+.tile .vid-thumb {
+  width: 100%; height: 100%;
+  display: block;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255,255,255,0.06), transparent 60%),
+    linear-gradient(135deg, #2a3140 0%, #16191f 100%);
+  position: relative;
+}
+.tile .vid-thumb::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(0deg,  rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 14px 14px;
+  pointer-events: none;
+}
+.tile .label {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 18px 8px 6px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.92);
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.7));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+/* ▶ play overlay on video tiles. Positioned in the centre, large
+   enough to read at a glance but not so big it hides the thumbnail
+   underneath. pointer-events: none so the parent tile still gets
+   the click. */
+.tile .video-badge {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.tile .video-badge .pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 10px 6px 8px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  color: #fff;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.tile .video-badge .pill::before {
+  content: '▶'; font-size: 11px;
+}
+.empty {
+  padding: 80px 24px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.empty .big { font-size: 18px; color: var(--text); margin-bottom: 6px; }
+
+/* ─── Lightbox ────────────────────────────────────────────────────── */
+.lightbox {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.98);
+  display: none;
+  z-index: 100;
+  touch-action: pan-y;
+}
+.lightbox.open { display: flex; flex-direction: column; }
+
+.lightbox .top {
+  display: flex; align-items: center;
+  padding: 14px 18px;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.85), transparent);
+}
+.lightbox .top .filename {
+  font-size: 13px; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1;
+}
+.lightbox .top .index {
+  font-size: 13px; color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.lightbox .top button {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text);
+  font-size: 18px;
+}
+.lightbox .top button:hover, .lightbox .top button:active {
+  background: rgba(255,255,255,0.08);
+}
+
+.lightbox .stage {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.lightbox .stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.lightbox .nav {
+  position: absolute;
+  top: 50%; transform: translateY(-50%);
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.45);
+  color: var(--text);
+  font-size: 24px;
+  transition: background 0.15s;
+}
+.lightbox .nav:hover, .lightbox .nav:active { background: rgba(0,0,0,0.75); }
+.lightbox .nav.prev { left: 12px; }
+.lightbox .nav.next { right: 12px; }
+.lightbox .nav.disabled { opacity: 0.25; pointer-events: none; }
+
+/* Zoom control cluster — standard lightbox pattern: a vertical
+   [+ / % / −] stack pinned to the stage's bottom-right corner (same
+   visual language as the prev/next pucks). The % chip doubles as the
+   reset-to-fit button. */
+.lightbox .zoomctl {
+  position: absolute;
+  right: 12px; bottom: 12px;
+  display: flex; flex-direction: column;
+  gap: 6px;
+  z-index: 3;
+}
+.lightbox .zoomctl button {
+  width: 44px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: var(--text);
+  font-size: 20px;
+  transition: background 0.15s;
+}
+.lightbox .zoomctl button:hover, .lightbox .zoomctl button:active {
+  background: rgba(0,0,0,0.8);
+}
+.lightbox .zoomctl button.pct { font-size: 11px; letter-spacing: 0.02em; }
+.lightbox .zoomctl button.disabled { opacity: 0.3; pointer-events: none; }
+/* While zoomed, the image is draggable to pan; suppress the snap
+   transition during an active drag so panning tracks 1:1. */
+.lightbox .stage img.dragging { transition: none; cursor: grabbing; }
+.lightbox .stage img.zoomed { cursor: grab; }
+
+.lightbox .toolbar {
+  display: flex; justify-content: center; align-items: center;
+  gap: 12px;
+  padding: 14px 18px 20px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85), transparent);
+}
+.lightbox .toolbar button {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--text);
+  background: rgba(255,255,255,0.06);
+  transition: background 0.15s;
+  min-width: 64px;
+}
+.lightbox .toolbar button:hover, .lightbox .toolbar button:active {
+  background: rgba(255,255,255,0.14);
+}
+.lightbox .toolbar button .icon { font-size: 18px; line-height: 1; }
+.lightbox .toolbar button.danger:hover, .lightbox .toolbar button.danger:active {
+  background: rgba(255, 91, 91, 0.18);
+}
+
+.toast {
+  position: fixed; left: 50%; bottom: 90px;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  background: rgba(20, 24, 30, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  font-size: 13px;
+  color: var(--text);
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span class="dot"></span>Photos</h1>
+  <div class="meta" id="meta">Loading…</div>
+  <button id="scanBtn" title="Re-scan device storage for DCIM photos"
+          style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);
+                 color:var(--text);font-size:11.5px;font-weight:600;line-height:1;
+                 padding:0 10px;height:30px;border-radius:15px;cursor:pointer;
+                 display:inline-flex;align-items:center;justify-content:center;gap:4px;
+                 margin-left:6px;flex-shrink:0;transition:filter 0.15s">🔍 Scan</button>
+  <button id="refreshBtn" title="Reload the gallery"
+          style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);
+                 color:var(--text);font-size:14px;line-height:1;
+                 width:30px;height:30px;border-radius:50%;cursor:pointer;
+                 display:inline-flex;align-items:center;justify-content:center;
+                 margin-left:6px;flex-shrink:0;transition:filter 0.15s">↻</button>
+  <button id="accessPill" class="access-pill missing" title="Manage device-photo access">
+    <span class="ap-dot"></span>
+    <span id="accessPillLabel">…</span>
+  </button>
+</div>
+
+<div class="grid" id="grid">
+  <!-- Permission banner — full-width, sits above the thumbnail grid.
+       Only TapInsight's own saves show without permission; this
+       banner offers to add RayNeo Camera photos to the gallery
+       when the user grants READ_MEDIA_IMAGES. -->
+  <div class="grant-banner" id="grantBanner">
+    <div class="gb-text">
+      <div class="gb-title">Also show RayNeo Camera photos?</div>
+      <div class="gb-sub">Your TapInsight saves are already showing below. Grant permission to also include photos from the device's native Camera app.</div>
+    </div>
+    <button class="gb-btn" id="grantBtn">Grant</button>
+  </div>
+  <div class="grid-inner" id="gridInner"></div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true">
+  <div class="top">
+    <button id="closeBtn" aria-label="Close">✕</button>
+    <div class="filename" id="lbFilename"></div>
+    <div class="index" id="lbIndex"></div>
+  </div>
+  <div class="stage">
+    <button class="nav prev" id="prevBtn" aria-label="Previous">‹</button>
+    <img id="lbImage" alt="">
+    <button class="nav next" id="nextBtn" aria-label="Next">›</button>
+    <div class="zoomctl" id="zoomCtl">
+      <button id="zoomInBtn" aria-label="Zoom in" title="Zoom in">＋</button>
+      <button class="pct" id="zoomPctBtn" aria-label="Reset zoom" title="Reset to fit">100%</button>
+      <button id="zoomOutBtn" aria-label="Zoom out" title="Zoom out">−</button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button id="rotLeftBtn" title="Rotate 90° counter-clockwise">
+      <span class="icon">↺</span><span>Rotate</span>
+    </button>
+    <button id="rotRightBtn" title="Rotate 90° clockwise">
+      <span class="icon">↻</span><span>Rotate</span>
+    </button>
+    <button id="infoBtn" title="Show photo details">
+      <span class="icon">ⓘ</span><span>Info</span>
+    </button>
+    <button id="shareBtn" title="Copy image URL to clipboard">
+      <span class="icon">🔗</span><span>Copy URL</span>
+    </button>
+    <button class="danger" id="deleteBtn" title="Delete">
+      <span class="icon">🗑</span><span>Delete</span>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/**
+ * TapInsight photos gallery.
+ *
+ * Data source: the on-glasses WebView attaches a TapMedia
+ * JavascriptInterface (see MediaLibraryBridge). We call:
+ *   window.TapMedia.listFolder("Photos")   → JSON of entries
+ *   window.TapMedia.deleteFile(path)       → boolean
+ *
+ * Image bytes are served by the asset host at:
+ *   https://appassets.androidplatform.net/media/Photos/<filename>
+ *
+ * URL params:
+ *   ?focus=Photos/<filename>   open the lightbox on that photo on load
+ */
+
+const MEDIA_BASE = 'https://appassets.androidplatform.net/media/';
+const PHOTOS_FOLDER = 'Photos';
+
+const els = {
+  meta: document.getElementById('meta'),
+  gridInner: document.getElementById('gridInner'),
+  grid: document.getElementById('grid'),
+  lightbox: document.getElementById('lightbox'),
+  lbImage: document.getElementById('lbImage'),
+  lbFilename: document.getElementById('lbFilename'),
+  lbIndex: document.getElementById('lbIndex'),
+  closeBtn: document.getElementById('closeBtn'),
+  prevBtn: document.getElementById('prevBtn'),
+  nextBtn: document.getElementById('nextBtn'),
+  rotLeftBtn: document.getElementById('rotLeftBtn'),
+  rotRightBtn: document.getElementById('rotRightBtn'),
+  zoomInBtn: document.getElementById('zoomInBtn'),
+  zoomOutBtn: document.getElementById('zoomOutBtn'),
+  zoomPctBtn: document.getElementById('zoomPctBtn'),
+  infoBtn: document.getElementById('infoBtn'),
+  shareBtn: document.getElementById('shareBtn'),
+  deleteBtn: document.getElementById('deleteBtn'),
+  grantBanner: document.getElementById('grantBanner'),
+  grantBtn: document.getElementById('grantBtn'),
+  accessPill: document.getElementById('accessPill'),
+  accessPillLabel: document.getElementById('accessPillLabel'),
+  refreshBtn: document.getElementById('refreshBtn'),
+  scanBtn: document.getElementById('scanBtn'),
+  toast: document.getElementById('toast'),
+};
+
+/** @type {Array<{name:string, relativePath:string, sizeBytes:number, lastModifiedMs:number}>} */
+let photos = [];
+let lightboxIndex = -1;
+let rotation = 0;  // accumulated degrees in lightbox (view-only this commit)
+
+// ─── Lightbox zoom & pan state ─────────────────────────────────────
+// Standard stepped zoom: ×1.25 per click, clamped to fit…8×. At 1× the
+// image is object-fit:contain ("fit"); panning is only active while
+// zoomed. All three (zoom, panX, panY) reset on photo change / close.
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 8;
+const ZOOM_STEP = 1.25;
+let zoom = 1;
+let panX = 0;
+let panY = 0;
+
+function applyImageTransform() {
+  els.lbImage.style.transform =
+    `translate(${panX}px, ${panY}px) rotate(${rotation}deg) scale(${zoom})`;
+  els.lbImage.classList.toggle('zoomed', zoom > 1);
+}
+
+function updateZoomCtl() {
+  els.zoomPctBtn.textContent = Math.round(zoom * 100) + '%';
+  els.zoomInBtn.classList.toggle('disabled', zoom >= ZOOM_MAX - 0.001);
+  els.zoomOutBtn.classList.toggle('disabled', zoom <= ZOOM_MIN + 0.001);
+}
+
+/** Keep the pan offset inside the visible overflow so the image can
+ *  never be dragged fully off-stage. */
+function clampPan() {
+  const maxX = Math.max(0, (els.lbImage.clientWidth * zoom - els.lbImage.clientWidth) / 2);
+  const maxY = Math.max(0, (els.lbImage.clientHeight * zoom - els.lbImage.clientHeight) / 2);
+  panX = Math.min(maxX, Math.max(-maxX, panX));
+  panY = Math.min(maxY, Math.max(-maxY, panY));
+}
+
+function setZoom(z) {
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+  if (zoom <= ZOOM_MIN + 0.001) { zoom = 1; panX = 0; panY = 0; }
+  clampPan();
+  applyImageTransform();
+  updateZoomCtl();
+}
+
+function zoomIn() { setZoom(zoom * ZOOM_STEP); }
+function zoomOut() { setZoom(zoom / ZOOM_STEP); }
+function resetZoom() { setZoom(ZOOM_MIN); }
+
+function toast(msg) {
+  els.toast.textContent = msg;
+  els.toast.classList.add('show');
+  setTimeout(() => els.toast.classList.remove('show'), 2200);
+}
+
+function mediaUrl(relativePath) {
+  if (!relativePath) return '';
+  return MEDIA_BASE + relativePath.split('/').map(encodeURIComponent).join('/');
+}
+
+/**
+ * Resolve the WebView-loadable URL for any photo entry, library or
+ * DCIM. The bridge already supplies `fullUrl` (and `thumbnailUrl`)
+ * for both sources — library uses /media/<rel>, DCIM uses
+ * /dcim/<kind>/<id> — so prefer those when present, falling back to
+ * the relativePath path for older bridge builds. Returning '' for an
+ * entry with neither lets the caller skip / show a placeholder.
+ */
+function entryUrl(p) {
+  if (!p) return '';
+  if (p.fullUrl) return p.fullUrl;
+  if (p.relativePath) return mediaUrl(p.relativePath);
+  return '';
+}
+
+function formatDate(ms) {
+  if (!ms) return '';
+  try {
+    const d = new Date(ms);
+    return d.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit'
+    });
+  } catch { return ''; }
+}
+
+async function loadPhotos() {
+  if (!window.TapMedia) {
+    els.meta.textContent = 'TapMedia bridge not available';
+    els.gridInner.innerHTML =
+      '<div class="empty"><div class="big">Photo library not available</div>' +
+      '<div>This page must be opened from the TapInsight glasses.</div></div>';
+    return;
+  }
+  // Prefer listAllPhotos() (merged library + DCIM) when available;
+  // fall back to listFolder("Photos") on older builds where only
+  // the library scope exists.
+  let json;
+  try {
+    if (typeof window.TapMedia.listAllPhotos === 'function') {
+      json = JSON.parse(window.TapMedia.listAllPhotos());
+    } else if (typeof window.TapMedia.listFolder === 'function') {
+      const folder = JSON.parse(window.TapMedia.listFolder(PHOTOS_FOLDER));
+      json = { entries: folder.entries || [], hasMediaPermission: true };
+    } else {
+      throw new Error('No listing method on TapMedia');
+    }
+  } catch (e) {
+    els.meta.textContent = 'Bridge error';
+    els.gridInner.innerHTML =
+      '<div class="empty"><div class="big">Could not read Photos</div><div>' +
+      String(e) + '</div></div>';
+    return;
+  }
+  if (json.error) {
+    els.gridInner.innerHTML =
+      '<div class="empty"><div class="big">' + json.error + '</div></div>';
+    return;
+  }
+
+  const imageKinds = new Set(['IMAGE', 'VIDEO']);
+  photos = (json.entries || [])
+    .filter(e => imageKinds.has(e.kind))
+    .sort((a, b) => (b.lastModifiedMs || 0) - (a.lastModifiedMs || 0));
+
+  const accessMissing = json.hasMediaPermission === false;
+  if (!photos.length) {
+    els.meta.textContent = '0 photos';
+    // The new flow: TapInsight saves go to DCIM/TapInsight via MediaStore
+    // and DON'T need permission to read back. So an empty gallery means
+    // the user hasn't actually saved any photos yet. The "Grant access"
+    // banner above the (currently empty) grid handles the optional add-
+    // device-photos path.
+    if (accessMissing) {
+      els.grantBanner.classList.add('visible');
+    }
+    els.gridInner.innerHTML =
+      '<div class="empty"><div class="big">No photos yet</div>' +
+      '<div>Say <i>"save this photo"</i> to TapInsight while the AR camera is active.</div>' +
+      '</div>';
+    return;
+  }
+  // Tally TapInsight saves (library OR dcim_own) vs device photos
+  // (dcim/local from other apps or system services). After the
+  // MediaStore switch, "own" entries live in either source — saves
+  // now go to DCIM/TapInsight via MediaStore (source=dcim_own), with
+  // app-private Media/Photos (source=library) preserved for legacy.
+  // `local` source covers files on disk that MediaStore wouldn't
+  // register (RayNeo's monocular camera output, mostly).
+  const ownCount = photos.filter(p =>
+    p.source === 'library' || p.source === 'dcim_own'
+  ).length;
+  const otherCount = photos.length - ownCount;
+  let metaParts = [photos.length + (photos.length === 1 ? ' photo' : ' photos')];
+  if (otherCount > 0) {
+    metaParts.push(ownCount + ' TapInsight · ' + otherCount + ' device');
+  } else if (accessMissing) {
+    metaParts.push('device photos hidden');
+  }
+  els.meta.textContent = metaParts.join(' · ');
+  // Always-visible header pill reflects current access state.
+  updateAccessPill(accessMissing);
+  // Show the "+ device photos" banner above the grid whenever the
+  // user hasn't granted permission — even if they already have
+  // library photos. The banner is purely additive now ("also show
+  // RayNeo Camera photos"), so it doesn't block the gallery.
+  if (accessMissing) {
+    els.grantBanner.classList.add('visible');
+  } else {
+    els.grantBanner.classList.remove('visible');
+  }
+  renderGrid();
+  maybeFocusFromQuery();
+}
+
+/**
+ * Update the always-visible header pill to reflect current state.
+ * Two states:
+ *   missing → cyan pill, pulsing red dot, "Grant device photos"
+ *   granted → green pill, green dot, "Device photos: ON"
+ * Tap on missing fires the system permission dialog. Tap on granted
+ * surfaces a toast about how to revoke (which can only be done via
+ * adb/Files on Android since the OS doesn't let an app revoke its
+ * own grant).
+ */
+function updateAccessPill(accessMissing) {
+  if (accessMissing) {
+    els.accessPill.classList.add('missing');
+    els.accessPill.classList.remove('granted');
+    els.accessPillLabel.textContent = 'Grant device photos';
+  } else {
+    els.accessPill.classList.remove('missing');
+    els.accessPill.classList.add('granted');
+    els.accessPillLabel.textContent = 'Device photos: ON';
+  }
+}
+
+// renderAccessBanner was a dynamically-inserted node that competed
+// with the static .grant-banner above; the static one is the source
+// of truth now and is toggled visible/hidden in loadPhotos.
+
+function requestMediaAccess() {
+  if (!window.TapMedia || typeof window.TapMedia.requestMediaPermission !== 'function') {
+    toast('Permission request not supported in this build.');
+    return;
+  }
+  let respRaw, resp;
+  try {
+    respRaw = window.TapMedia.requestMediaPermission();
+    resp = JSON.parse(respRaw);
+  } catch (e) {
+    toast('Permission call failed: ' + String(e));
+    return;
+  }
+  // The bridge returns one of three statuses. Surface each clearly so
+  // the user knows whether to wait for the system dialog, whether the
+  // grant was already in place (in which case we just reload), or
+  // whether something stopped the request from firing.
+  if (resp && resp.status === 'alreadyGranted') {
+    toast('Already granted — reloading to pick up photos…');
+    setTimeout(() => location.reload(), 400);
+  } else if (resp && resp.status === 'requested') {
+    toast('System dialog opened. Tap Allow on the glasses.');
+  } else if (resp && resp.error) {
+    toast('Could not open dialog: ' + resp.error);
+  } else {
+    toast('Permission request response: ' + (respRaw || '(empty)'));
+  }
+}
+
+function renderGrid() {
+  const frag = document.createDocumentFragment();
+  photos.forEach((p, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.addEventListener('click', () => openEntry(i));
+
+    if (p.kind === 'VIDEO') {
+      // Try the bridge's thumbnailUrl first (MediaMetadataRetriever
+      // pulls the real first frame on Kotlin side). If it 404s or
+      // fails to decode (e.g. broken file), swap in the styled
+      // placeholder so the tile isn't empty.
+      const thumbUrl = p.thumbnailUrl;
+      if (thumbUrl && thumbUrl !== entryUrl(p)) {
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = thumbUrl;
+        img.alt = p.name;
+        img.addEventListener('error', () => {
+          if (img.parentNode === tile) {
+            const fallback = document.createElement('div');
+            fallback.className = 'vid-thumb';
+            tile.replaceChild(fallback, img);
+          }
+        });
+        tile.appendChild(img);
+      } else {
+        const thumb = document.createElement('div');
+        thumb.className = 'vid-thumb';
+        tile.appendChild(thumb);
+      }
+      const badge = document.createElement('div');
+      badge.className = 'video-badge';
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      const ms = p.durationMs;
+      pill.textContent = (typeof ms === 'number' && ms > 0)
+        ? humanDuration(ms)
+        : 'video';
+      badge.appendChild(pill);
+      tile.appendChild(badge);
+    } else {
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.src = entryUrl(p);
+      img.alt = p.name;
+      tile.appendChild(img);
+    }
+
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = formatDate(p.lastModifiedMs);
+    tile.appendChild(label);
+
+    frag.appendChild(tile);
+  });
+  els.gridInner.replaceChildren(frag);
+}
+
+function humanDuration(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return m + ':' + (rem < 10 ? '0' : '') + rem;
+}
+
+function needsNativeVideoPlayback(p) {
+  const codec = String(p && p.videoCodecMime || '').toLowerCase();
+  const rel = String(p && p.relativeDisplayPath || '').replace(/\\/g, '/').toLowerCase();
+  const source = String(p && p.source || '').toLowerCase();
+  const hasNativeUri = !!(p && (p.nativeVideoUri || p.dcimUri));
+  return codec.indexOf('hevc') !== -1 ||
+         codec.indexOf('h265') !== -1 ||
+         (hasNativeUri && source.indexOf('dcim') === 0 && rel.indexOf('dcim/camera/') === 0);
+}
+
+function tryOpenNativeVideo(p) {
+  if (!needsNativeVideoPlayback(p)) return false;
+  if (!window.TapMedia || typeof TapMedia.openNativeVideo !== 'function') return false;
+  const nativeUri = p.nativeVideoUri || p.dcimUri || '';
+  if (!nativeUri) return false;
+  try {
+    console.log('[NativeVideo] routing', p.name || 'Video', p.videoCodecMime || '', nativeUri);
+    const raw = TapMedia.openNativeVideo(nativeUri, p.mimeType || 'video/mp4', p.name || 'Video');
+    const resp = raw ? JSON.parse(raw) : {};
+    if (resp && resp.status === 'opened') return true;
+    if (resp && resp.error) toast(resp.error);
+  } catch (e) {
+    console.warn('Native video handoff failed', e);
+  }
+  return false;
+}
+
+/**
+ * Entry-point dispatcher for grid clicks. Photos open the lightbox;
+ * videos hand off to media_player.html (same player audio/video
+ * elsewhere in the app uses, with playback controls, captions, queue
+ * support, etc.). The dual path keeps the lightbox simple and lets
+ * the existing player do the work for time-based media.
+ */
+function openEntry(idx) {
+  const p = photos[idx];
+  if (!p) return;
+  if (p.kind === 'VIDEO') {
+    if (tryOpenNativeVideo(p)) return;
+    const url = entryUrl(p);
+    if (!url) { toast('Cannot play this video'); return; }
+    const qp = '?type=video' +
+               '&url=' + encodeURIComponent(url) +
+               '&title=' + encodeURIComponent(p.name || 'Video');
+    window.location.href =
+      'https://appassets.androidplatform.net/assets/media_player.html' + qp;
+    return;
+  }
+  openLightbox(idx);
+}
+
+function maybeFocusFromQuery() {
+  const m = location.search.match(/[?&]focus=([^&]+)/);
+  if (!m) return;
+  const focus = decodeURIComponent(m[1]);
+  // Three focus identifier shapes are supported, in order:
+  //   "dcim:<id>"          — MediaStore-backed save from CameraTool
+  //                          (the new default after the DCIM switch)
+  //   "Photos/<filename>"  — legacy library save (Media/Photos folder)
+  //   anything else        — string-equal match against relativePath
+  //                          for compatibility with older save paths
+  let idx = -1;
+  if (focus.startsWith('dcim:')) {
+    const id = focus.slice(5);
+    idx = photos.findIndex(p => p.source && p.source.indexOf('dcim') === 0 &&
+                                 String(p.dcimId) === id);
+  }
+  if (idx < 0) {
+    idx = photos.findIndex(p => p.relativePath === focus);
+  }
+  // The gallery collection only covers Photos + DCIM, but the library
+  // routes EVERY image tap here — including images that live outside
+  // the collection (e.g. Music/<album>/cover.jpg). Synthesize an entry
+  // for an out-of-collection library-relative path so the lightbox can
+  // still open on it immediately: it joins the front of the grid for
+  // this visit only, resolves through the same entryUrl() machinery
+  // (library-relative → /media/<rel>), and is view-only for rotation
+  // (source 'focus' is refused by rotateBy like the other foreign
+  // sources). dcim: ids never synthesize — a miss there means the
+  // MediaStore row is gone.
+  if (idx < 0 && !focus.startsWith('dcim:') &&
+      /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(focus)) {
+    photos.unshift({
+      name: focus.split('/').pop(),
+      relativePath: focus,
+      kind: 'IMAGE',
+      source: 'focus',
+      sizeBytes: 0,
+      lastModifiedMs: 0
+    });
+    renderGrid();
+    idx = 0;
+  }
+  if (idx >= 0) openLightbox(idx);
+}
+
+function openLightbox(idx) {
+  if (idx < 0 || idx >= photos.length) return;
+  lightboxIndex = idx;
+  rotation = 0;
+  zoom = 1; panX = 0; panY = 0;
+  renderLightbox();
+  els.lightbox.classList.add('open');
+}
+
+function closeLightbox() {
+  els.lightbox.classList.remove('open');
+  lightboxIndex = -1;
+  rotation = 0;
+  zoom = 1; panX = 0; panY = 0;
+}
+
+function renderLightbox() {
+  const p = photos[lightboxIndex];
+  if (!p) return closeLightbox();
+  els.lbImage.src = entryUrl(p);
+  applyImageTransform();
+  updateZoomCtl();
+  els.lbFilename.textContent = p.name;
+  els.lbIndex.textContent = (lightboxIndex + 1) + ' / ' + photos.length;
+  els.prevBtn.classList.toggle('disabled', lightboxIndex === 0);
+  els.nextBtn.classList.toggle('disabled', lightboxIndex === photos.length - 1);
+}
+
+function nav(delta) {
+  const newIdx = lightboxIndex + delta;
+  if (newIdx < 0 || newIdx >= photos.length) return;
+  lightboxIndex = newIdx;
+  rotation = 0;
+  zoom = 1; panX = 0; panY = 0;
+  renderLightbox();
+}
+
+async function rotateBy(deg) {
+  const p = photos[lightboxIndex];
+  if (!p) return;
+  // dcim_own (TapInsight's own MediaStore saves) and dcim (other apps')
+  // both lack a Media/Photos relativePath, which is what
+  // bridge.rotateImage operates on. Since the bridge can't take a
+  // MediaStore id yet, both are view-only here. Rotation for own
+  // DCIM saves is doable in a future bridge change (open the URI,
+  // re-encode, update via resolver), but not today.
+  if (p.source === 'dcim' || p.source === 'dcim_own' || p.source === 'local' ||
+      p.source === 'focus') {
+    toast(p.source === 'local'
+      ? 'Direct-filesystem photos are view-only'
+      : p.source === 'dcim_own'
+        ? 'Rotating MediaStore-backed photos is not yet supported'
+        : p.source === 'focus'
+          ? 'Images outside the photo library are view-only here'
+          : 'Device-camera photos are view-only here');
+    return;
+  }
+
+  // Optimistic view-rotate while the disk write runs.
+  rotation = (rotation + deg + 360) % 360;
+  applyImageTransform();
+
+  if (!window.TapMedia || typeof window.TapMedia.rotateImage !== 'function') {
+    toast('Rotation not persisted (bridge missing)');
+    return;
+  }
+  let resp;
+  try {
+    resp = JSON.parse(window.TapMedia.rotateImage(p.relativePath, deg));
+  } catch (e) {
+    toast('Rotation failed: ' + String(e));
+    return;
+  }
+  if (resp && resp.error) {
+    toast(resp.error);
+    return;
+  }
+  // After a successful disk write, reset the on-screen transform and
+  // bust the image cache so the rotated bytes load fresh.
+  rotation = 0;
+  applyImageTransform();
+  const fresh = entryUrl(p) + '?t=' + Date.now();
+  els.lbImage.src = fresh;
+  // Also invalidate the corresponding tile thumb in the grid.
+  const tileImg = els.gridInner.querySelectorAll('.tile img')[lightboxIndex];
+  if (tileImg) tileImg.src = fresh;
+  toast('Rotated');
+}
+
+async function deletePhoto() {
+  const p = photos[lightboxIndex];
+  if (!p) return;
+  if (p.source === 'dcim_own') {
+    toast('Delete TapInsight photos via Files / Photos app (MediaStore delete not yet wired in bridge)');
+    return;
+  }
+  if (p.source === 'dcim') {
+    toast('Delete device-camera photos from the RayNeo Camera app');
+    return;
+  }
+  if (p.source === 'local') {
+    toast('Delete direct-filesystem photos via ADB or a file manager on the glasses');
+    return;
+  }
+  if (!window.TapMedia || typeof window.TapMedia.deleteEntry !== 'function') {
+    return toast('Delete not available in this view');
+  }
+  if (!confirm(`Delete ${p.name}?`)) return;
+  let resp = null;
+  try { resp = JSON.parse(window.TapMedia.deleteEntry(p.relativePath)); }
+  catch (e) { /* swallow */ }
+  const ok = resp && resp.status === 'deleted';
+  if (!ok) return toast('Delete failed');
+  photos.splice(lightboxIndex, 1);
+  if (!photos.length) {
+    closeLightbox();
+    renderGrid();
+    els.meta.textContent = '0 photos';
+    els.gridInner.innerHTML =
+      '<div class="empty"><div class="big">No photos yet</div></div>';
+    return;
+  }
+  if (lightboxIndex >= photos.length) lightboxIndex = photos.length - 1;
+  renderGrid();
+  renderLightbox();
+  els.meta.textContent = photos.length + ' photos';
+  toast('Deleted');
+}
+
+function copyShareUrl() {
+  const p = photos[lightboxIndex];
+  if (!p) return;
+  const url = entryUrl(p);
+  if (!url) return toast('Nothing to share');
+  try {
+    navigator.clipboard.writeText(url).then(
+      () => toast('URL copied'),
+      () => fallbackCopy(url)
+    );
+  } catch { fallbackCopy(url); }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('URL copied'); }
+  catch { toast('Copy failed — URL: ' + text); }
+  finally { document.body.removeChild(ta); }
+}
+
+/**
+ * "Info" button — shows file metadata in a toast. The previous Download
+ * button created an <a download> that pointed at the same-origin asset
+ * URL; on the glasses there's no Downloads folder UX, so it just sat
+ * there doing nothing useful. Replacing it with an info readout gives
+ * the user something to read about the photo (source, dimensions, size,
+ * date) without sending them elsewhere. For real cross-device transfers
+ * the user can use the companion app's Library tab.
+ */
+function showInfo() {
+  const p = photos[lightboxIndex];
+  if (!p) return;
+  const parts = [];
+  const sourceLabel = p.source === 'dcim'      ? 'RayNeo Camera'
+                    : p.source === 'dcim_own'  ? 'TapInsight (DCIM)'
+                    : p.source === 'library'   ? 'TapInsight (legacy)'
+                    : p.source === 'local'     ? 'Device storage (' + (p.relativeDisplayPath || 'DCIM') + ')'
+                    : 'TapInsight';
+  parts.push(sourceLabel);
+  if (p.width && p.height) parts.push(p.width + '×' + p.height);
+  if (p.sizeBytes) {
+    const kb = p.sizeBytes / 1024;
+    parts.push(kb < 1024 ? Math.round(kb) + ' KB' : (kb / 1024).toFixed(1) + ' MB');
+  }
+  if (p.lastModifiedMs) parts.push(formatDate(p.lastModifiedMs));
+  toast(parts.join(' · '));
+}
+
+// ─── Event wiring ───────────────────────────────────────────────
+els.closeBtn.addEventListener('click', closeLightbox);
+els.prevBtn.addEventListener('click', () => nav(-1));
+els.nextBtn.addEventListener('click', () => nav(1));
+els.rotLeftBtn.addEventListener('click', () => rotateBy(-90));
+els.rotRightBtn.addEventListener('click', () => rotateBy(90));
+
+// ── Zoom controls ────────────────────────────────────────────────
+els.zoomInBtn.addEventListener('click', zoomIn);
+els.zoomOutBtn.addEventListener('click', zoomOut);
+els.zoomPctBtn.addEventListener('click', resetZoom);
+// Double-click/tap on the photo toggles fit ↔ 2× (the standard
+// quick-zoom gesture in lightbox viewers).
+els.lbImage.addEventListener('dblclick', () => {
+  if (zoom > 1) resetZoom(); else setZoom(2);
+});
+// Drag-to-pan while zoomed (pointer events cover mouse + touch).
+// The 'dragging' class kills the transform transition so the photo
+// tracks the pointer 1:1 instead of lagging behind it.
+(function wirePanDrag(){
+  let dragging = false, startX = 0, startY = 0, basePanX = 0, basePanY = 0;
+  els.lbImage.addEventListener('pointerdown', (e) => {
+    if (zoom <= 1) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    basePanX = panX; basePanY = panY;
+    els.lbImage.classList.add('dragging');
+    try { els.lbImage.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  els.lbImage.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    panX = basePanX + (e.clientX - startX);
+    panY = basePanY + (e.clientY - startY);
+    clampPan();
+    applyImageTransform();
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    els.lbImage.classList.remove('dragging');
+    try { els.lbImage.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+  els.lbImage.addEventListener('pointerup', endDrag);
+  els.lbImage.addEventListener('pointercancel', endDrag);
+})();
+els.shareBtn.addEventListener('click', copyShareUrl);
+els.infoBtn.addEventListener('click', showInfo);
+els.deleteBtn.addEventListener('click', deletePhoto);
+els.grantBtn.addEventListener('click', requestMediaAccess);
+els.accessPill.addEventListener('click', () => {
+  if (els.accessPill.classList.contains('granted')) {
+    toast('Device photos already granted. Revoke via adb if needed.');
+  } else {
+    requestMediaAccess();
+  }
+});
+
+// Manual refresh button — useful when the user took a photo with the
+// RayNeo Camera app and wants it to appear without leaving and
+// re-entering the gallery.
+els.refreshBtn.addEventListener('click', () => {
+  toast('Refreshing…');
+  loadPhotos();
+});
+
+// "Scan" button — kicks off MediaScannerConnection on the DCIM tree
+// for cases where files were written to disk by services that
+// bypassed MediaStore (e.g. RayNeo's monocular camera capture). After
+// the scan completes, reload to surface anything newly registered.
+els.scanBtn.addEventListener('click', async () => {
+  if (!window.TapMedia || typeof window.TapMedia.scanDcim !== 'function') {
+    toast('Scan not supported in this build');
+    return;
+  }
+  els.scanBtn.disabled = true;
+  els.scanBtn.style.opacity = '0.6';
+  toast('Scanning device storage…');
+  let resp;
+  try {
+    resp = JSON.parse(window.TapMedia.scanDcim());
+  } catch (e) {
+    toast('Scan failed: ' + String(e));
+    els.scanBtn.disabled = false;
+    els.scanBtn.style.opacity = '1';
+    return;
+  }
+  els.scanBtn.disabled = false;
+  els.scanBtn.style.opacity = '1';
+  if (resp.error) {
+    toast(resp.error);
+    return;
+  }
+  // Diagnostic-rich message. The four numbers tell us exactly where
+  // the pipeline is breaking on the user's device:
+  //   filesFoundOnDisk → did File.walk see the DCIM tree?
+  //   filesScanned     → did MediaScanner accept the paths?
+  //   imagesTotal      → how many images does MediaStore know about
+  //                      (any folder, sanity check that the query
+  //                      itself works)?
+  //   imageCount       → how many images match our DCIM filter
+  //                      (what the gallery actually shows).
+  const diag = [
+    'disk: ' + (resp.filesFoundOnDisk || 0) + ' files (readable=' + !!resp.dcimReadable + ')',
+    'scan: ' + (resp.filesScanned || 0) + ' accepted',
+    'MediaStore total: ' + (resp.imagesTotal === -1 ? '?' : (resp.imagesTotal || 0)) +
+      ' images, ' + (resp.videosTotal === -1 ? '?' : (resp.videosTotal || 0)) + ' videos',
+    'DCIM filter: ' + (resp.imageCount || 0) + ' images, ' + (resp.videoCount || 0) + ' videos'
+  ].join('\n');
+  // The toast widget shows one line, so log the full diagnostic and
+  // toast a compact summary. Long-press / inspect via webview console
+  // for the full breakdown.
+  console.log('[scanDcim diag]\n' + diag);
+  console.log('[scanDcim raw]', resp);
+  toast('Scan: disk=' + (resp.filesFoundOnDisk || 0) +
+        ' · MediaStore=' + (resp.imageCount || 0) + 'img/' + (resp.videoCount || 0) + 'vid');
+  loadPhotos();
+});
+
+// Auto-reload when the page becomes visible again after being hidden
+// (e.g. user opened the RayNeo Camera app, took a photo, then came
+// back). Cheap to do — the bridge listing is fast and the WebView's
+// image cache absorbs the duplicate <img src> on photos that didn't
+// change.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    loadPhotos();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!els.lightbox.classList.contains('open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  else if (e.key === 'ArrowLeft') nav(-1);
+  else if (e.key === 'ArrowRight') nav(1);
+});
+
+// Swipe nav inside the lightbox.
+(function attachSwipe() {
+  let startX = null, startY = null;
+  els.lightbox.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  els.lightbox.addEventListener('touchend', (e) => {
+    if (startX === null) return;
+    const dx = (e.changedTouches[0].clientX - startX);
+    const dy = (e.changedTouches[0].clientY - startY);
+    startX = startY = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+      nav(dx < 0 ? 1 : -1);
+    } else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
+      closeLightbox();
+    }
+  });
+})();
+
+loadPhotos();
+</script>
+</body>
+</html>

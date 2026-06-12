@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.rayneo.visionclaw.ui.BinocularSbsLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    tools:context=".MainActivity">
+
+    <!-- Logical viewport rendered once, then mirrored to right eye. -->
+    <FrameLayout
+        android:id="@+id/logical_viewport"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/view_pager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal" />
+
+        <ProgressBar
+            android:id="@+id/hold_progress"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="200dp"
+            android:layout_height="4dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="32dp"
+            android:max="100"
+            android:progress="0"
+            android:progressDrawable="@android:drawable/progress_horizontal"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/hud_notification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginHorizontal="24dp"
+            android:background="@drawable/bg_hud_notice"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="5"
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="12dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="14sp"
+            android:visibility="gone"
+            tools:text="API Key Required" />
+
+        <FrameLayout
+            android:id="@+id/listening_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/listening_transcript"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginHorizontal="20dp"
+                android:layout_marginBottom="28dp"
+                android:maxWidth="320dp"
+                android:minWidth="180dp"
+                android:background="@drawable/bg_hud_notice"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:maxLines="3"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="10dp"
+                android:textAlignment="center"
+                android:text="Listening..."
+                android:textColor="#FFFFFFFF"
+                android:textSize="14sp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <com.rayneo.visionclaw.ui.CustomKeyboardView
+            android:id="@+id/custom_keyboard_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:visibility="gone" />
+
+        <com.rayneo.visionclaw.ui.VoiceOscilloscopeView
+            android:id="@+id/voice_oscilloscope"
+            android:layout_width="92dp"
+            android:layout_height="92dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="18dp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+</com.rayneo.visionclaw.ui.BinocularSbsLayout>

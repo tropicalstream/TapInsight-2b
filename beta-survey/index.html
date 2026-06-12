@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TapInsight v1.2 — Public Beta Feature Survey</title>
+<style>
+  :root { --bg: #0a0e1a; --card: #131826; --accent: #00e5ff; --accent2: #7c4dff; --text: #e0e0e0; --muted: #8892a4; --border: #1e2640; --success: #00e676; --warn: #ffab40; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 0; }
+  .hero { background: linear-gradient(135deg, #0d1b3e 0%, #1a0a2e 50%, #0a1628 100%); padding: 60px 20px 40px; text-align: center; border-bottom: 1px solid var(--border); }
+  .hero h1 { font-size: 2.2em; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  .hero .subtitle { color: var(--muted); font-size: 1.05em; margin-bottom: 20px; }
+  .hero .badge { display: inline-block; background: rgba(0,229,255,0.12); color: var(--accent); padding: 4px 14px; border-radius: 20px; font-size: 0.82em; font-weight: 600; letter-spacing: 0.5px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 30px 20px 60px; }
+  .intro { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 32px; line-height: 1.7; }
+  .intro p { margin-bottom: 12px; }
+  .intro strong { color: var(--accent); }
+  .section-title { font-size: 1.3em; font-weight: 700; margin: 32px 0 16px; color: #fff; display: flex; align-items: center; gap: 10px; }
+  .section-title .icon { width: 28px; height: 28px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .feature-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; transition: all 0.2s; cursor: pointer; position: relative; }
+  .feature-card:hover { border-color: rgba(0,229,255,0.3); transform: translateY(-1px); }
+  .feature-card.selected { border-color: var(--accent); background: rgba(0,229,255,0.04); }
+  .feature-card .header { display: flex; align-items: flex-start; gap: 14px; }
+  .feature-card .check { width: 22px; height: 22px; border: 2px solid var(--border); border-radius: 6px; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .feature-card.selected .check { background: var(--accent); border-color: var(--accent); }
+  .feature-card.selected .check::after { content: '✓'; color: #000; font-size: 14px; font-weight: 700; }
+  .feature-card .title { font-weight: 600; font-size: 1.05em; color: #fff; margin-bottom: 4px; }
+  .feature-card .desc { color: var(--muted); font-size: 0.92em; line-height: 1.6; }
+  .feature-card .demand { position: absolute; top: 16px; right: 16px; font-size: 0.72em; padding: 3px 10px; border-radius: 12px; font-weight: 600; letter-spacing: 0.3px; }
+  .demand.high { background: rgba(0,230,118,0.12); color: var(--success); }
+  .demand.med { background: rgba(255,171,64,0.12); color: var(--warn); }
+  .demand.very-high { background: rgba(0,229,255,0.12); color: var(--accent); }
+  .priority-section { margin-top: 40px; }
+  .priority-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+  .priority-row .num { width: 28px; height: 28px; background: linear-gradient(135deg, var(--accent2), var(--accent)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85em; color: #000; flex-shrink: 0; }
+  .priority-row select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 0.92em; }
+  .priority-row select:focus { outline: none; border-color: var(--accent); }
+  textarea { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 14px; font-family: inherit; font-size: 0.95em; resize: vertical; min-height: 100px; margin-top: 8px; }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .rating-group { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .rating-btn { padding: 8px 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--muted); cursor: pointer; transition: all 0.2s; font-size: 0.9em; }
+  .rating-btn:hover { border-color: var(--accent); color: var(--text); }
+  .rating-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  .submit-section { text-align: center; margin-top: 48px; }
+  .submit-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #000; border: none; padding: 14px 48px; border-radius: 10px; font-size: 1.1em; font-weight: 700; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; }
+  .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,229,255,0.25); }
+  .results-panel { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-top: 24px; }
+  .results-panel h3 { color: var(--accent); margin-bottom: 16px; }
+  .result-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .result-bar .label { width: 200px; font-size: 0.88em; color: var(--muted); flex-shrink: 0; }
+  .result-bar .bar-bg { flex: 1; height: 24px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+  .result-bar .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 6px; transition: width 0.8s ease; display: flex; align-items: center; padding-left: 8px; font-size: 0.78em; font-weight: 600; color: #000; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+  .stat-card { background: var(--bg); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-card .stat-num { font-size: 1.8em; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .stat-card .stat-label { font-size: 0.8em; color: var(--muted); margin-top: 4px; }
+  label { display: block; color: var(--muted); font-size: 0.92em; margin-top: 16px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="badge">INTERNAL BETA TEST — v1.2.0-beta</div>
+  <h1>TapInsight Feature Survey</h1>
+  <p class="subtitle">Help us shape the future of AI-powered AR glasses for RayNeo X3 Pro</p>
+</div>
+
+<div class="container">
+  <div class="intro">
+    <p>Welcome to the <strong>TapInsight v1.2 Public Beta</strong> feature survey. We've researched what AR glasses users want most and compiled the top feature candidates below.</p>
+    <p>Select the features you'd find most valuable, rank your top 3, and share any additional ideas. Your feedback directly shapes our development roadmap.</p>
+  </div>
+
+  <!-- SECTION 1: Feature Selection -->
+  <div class="section-title"><div class="icon">1</div> Select Features You Want Most</div>
+  <p style="color:var(--muted); font-size:0.9em; margin-bottom:16px;">Click any card to select it. Choose as many as you'd like.</p>
+
+  <div id="features">
+    <div class="feature-card" data-feature="translation" onclick="toggleCard(this)">
+      <span class="demand very-high">VERY HIGH DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">🌐 Real-Time Translation</div>
+        <div class="desc">Live translation of speech and text seen through the camera. Support for 40+ languages with on-screen subtitle overlay. Say "translate" to activate, or enable always-on mode for travel.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="fitness" onclick="toggleCard(this)">
+      <span class="demand high">HIGH DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">💪 Fitness & Health Dashboard</div>
+        <div class="desc">Google Fit integration showing steps, heart rate, calories, and workout stats on the HUD. Voice commands like "how many steps today" or "start a workout". Posture reminders and hydration alerts.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="notifications" onclick="toggleCard(this)">
+      <span class="demand very-high">VERY HIGH DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">🔔 Smart Notification Filtering</div>
+        <div class="desc">Intelligent notification triage — choose which apps show on the HUD. Priority modes: "Focus" (only urgent), "Social" (messages + calls), "All". AI summarization of long notifications. Quick reply via voice.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="battery" onclick="toggleCard(this)">
+      <span class="demand very-high">VERY HIGH DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">🔋 Battery Saver Mode</div>
+        <div class="desc">Extend battery life by 40-60%. Reduces HUD refresh rate, pauses background polling, dims display, and switches to lightweight voice-only mode. Auto-activates below configurable threshold (e.g. 20%).</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="shortcuts" onclick="toggleCard(this)">
+      <span class="demand high">HIGH DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">⚡ Quick Actions & Voice Macros</div>
+        <div class="desc">Custom voice-triggered shortcuts. Define phrases like "good morning" to trigger daily briefing + weather + calendar. "Leaving work" to get traffic + ETA home. "Meeting mode" to enable DND + auto-notes.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="memory" onclick="toggleCard(this)">
+      <span class="demand high">HIGH DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">🧠 Persistent AI Memory</div>
+        <div class="desc">AI that remembers your preferences, past conversations, and context across sessions. "Remember I'm allergic to peanuts" persists permanently. Builds a personal knowledge graph over time.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="proactive" onclick="toggleCard(this)">
+      <span class="demand high">HIGH DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">🔮 Proactive AI Suggestions</div>
+        <div class="desc">Context-aware nudges without being asked. Approaching a restaurant? Get ratings. Running late for a meeting? Traffic alert. At a store? Price comparison. Weather changing? Heads up before you leave.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="screen-share" onclick="toggleCard(this)">
+      <span class="demand med">MEDIUM DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">📱 Phone Screen Mirroring</div>
+        <div class="desc">Mirror your phone's screen to the AR display. Read texts, check maps, or follow recipes hands-free. Supports gesture and voice control for basic navigation.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="social" onclick="toggleCard(this)">
+      <span class="demand med">MEDIUM DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">👥 Social & Contacts HUD</div>
+        <div class="desc">See caller ID, recent messages, and social media mentions on the HUD. AI-powered "who's that?" face recognition (opt-in) for events. Contact card overlay during calls.</div></div>
+      </div>
+    </div>
+
+    <div class="feature-card" data-feature="document" onclick="toggleCard(this)">
+      <span class="demand med">MEDIUM DEMAND</span>
+      <div class="header">
+        <div class="check"></div>
+        <div><div class="title">📄 Document & QR Scanner Pro</div>
+        <div class="desc">Enhanced document scanning with OCR, auto-crop, and save-to-cloud. QR codes auto-scan and execute (open URLs, add contacts, join Wi-Fi). Business card scanner with contact import.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: Priority Ranking -->
+  <div class="section-title"><div class="icon">2</div> Rank Your Top 3 Priorities</div>
+  <p style="color:var(--muted); font-size:0.9em; margin-bottom:16px;">Which features should we build first?</p>
+
+  <div class="priority-section">
+    <div class="priority-row"><div class="num">1</div>
+      <select id="pri1"><option value="">— Select #1 priority —</option></select>
+    </div>
+    <div class="priority-row"><div class="num">2</div>
+      <select id="pri2"><option value="">— Select #2 priority —</option></select>
+    </div>
+    <div class="priority-row"><div class="num">3</div>
+      <select id="pri3"><option value="">— Select #3 priority —</option></select>
+    </div>
+  </div>
+
+  <!-- SECTION 3: Current Experience -->
+  <div class="section-title"><div class="icon">3</div> Rate Current Experience</div>
+
+  <label>How satisfied are you with TapInsight's current AI assistant?</label>
+  <div class="rating-group" id="rating-ai">
+    <div class="rating-btn" onclick="setRating('rating-ai', this)">1 — Poor</div>
+    <div class="rating-btn" onclick="setRating('rating-ai', this)">2 — Fair</div>
+    <div class="rating-btn" onclick="setRating('rating-ai', this)">3 — Good</div>
+    <div class="rating-btn" onclick="setRating('rating-ai', this)">4 — Great</div>
+    <div class="rating-btn" onclick="setRating('rating-ai', this)">5 — Excellent</div>
+  </div>
+
+  <label>How important is battery life to your daily use?</label>
+  <div class="rating-group" id="rating-battery">
+    <div class="rating-btn" onclick="setRating('rating-battery', this)">Not important</div>
+    <div class="rating-btn" onclick="setRating('rating-battery', this)">Somewhat</div>
+    <div class="rating-btn" onclick="setRating('rating-battery', this)">Important</div>
+    <div class="rating-btn" onclick="setRating('rating-battery', this)">Very important</div>
+    <div class="rating-btn" onclick="setRating('rating-battery', this)">Critical</div>
+  </div>
+
+  <label>Primary use case for your X3 Pro?</label>
+  <div class="rating-group" id="rating-usecase">
+    <div class="rating-btn" onclick="setRating('rating-usecase', this)">Productivity</div>
+    <div class="rating-btn" onclick="setRating('rating-usecase', this)">Navigation</div>
+    <div class="rating-btn" onclick="setRating('rating-usecase', this)">Fitness</div>
+    <div class="rating-btn" onclick="setRating('rating-usecase', this)">Social</div>
+    <div class="rating-btn" onclick="setRating('rating-usecase', this)">Travel</div>
+  </div>
+
+  <!-- SECTION 4: Open Feedback -->
+  <div class="section-title"><div class="icon">4</div> Open Feedback</div>
+  <label>What's the #1 thing that would make you use TapInsight every day?</label>
+  <textarea id="feedback1" placeholder="Type your answer..."></textarea>
+
+  <label>Any features you'd like that aren't listed above?</label>
+  <textarea id="feedback2" placeholder="Tell us your ideas..."></textarea>
+
+  <!-- Submit -->
+  <div class="submit-section">
+    <button class="submit-btn" onclick="submitSurvey()">Submit Survey & View Results</button>
+  </div>
+
+  <!-- Simulated Results -->
+  <div class="results-panel" id="results">
+    <h3>📊 Simulated Beta Test Results (247 Responses)</h3>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num">247</div><div class="stat-label">Total Responses</div></div>
+      <div class="stat-card"><div class="stat-num">4.2</div><div class="stat-label">Avg AI Rating</div></div>
+      <div class="stat-card"><div class="stat-num">89%</div><div class="stat-label">Battery Critical</div></div>
+      <div class="stat-card"><div class="stat-num">73%</div><div class="stat-label">Daily Users</div></div>
+    </div>
+
+    <h3 style="margin-top:24px;">Feature Demand Ranking</h3>
+    <div id="result-bars"></div>
+
+    <h3 style="margin-top:24px;">Top Feedback Themes</h3>
+    <div style="margin-top:12px; line-height:1.8; color:var(--muted); font-size:0.92em;">
+      <strong style="color:var(--text);">"Battery life is make or break"</strong> — 67% of respondents cited battery as blocking daily use<br>
+      <strong style="color:var(--text);">"Translate everything I see"</strong> — Translation was the #1 most-requested new feature<br>
+      <strong style="color:var(--text);">"Only show me what matters"</strong> — Smart notification filtering with AI summarization highly valued<br>
+      <strong style="color:var(--text);">"Anticipate my needs"</strong> — Proactive suggestions ranked as the most exciting AI capability<br>
+      <strong style="color:var(--text);">"Custom voice shortcuts"</strong> — Power users want programmable voice macros for daily routines
+    </div>
+
+    <h3 style="margin-top:24px; color:var(--success);">🚀 Implementation Roadmap</h3>
+    <div style="margin-top:12px; line-height:2; font-size:0.92em;">
+      <strong style="color:var(--accent);">Sprint 1 (v1.2.0):</strong> Real-Time Translation, Battery Saver Mode, Smart Notification Filtering<br>
+      <strong style="color:var(--accent2);">Sprint 2 (v1.2.1):</strong> Quick Actions & Voice Macros, Proactive AI Suggestions<br>
+      <strong style="color:var(--muted);">Sprint 3 (v1.3.0):</strong> Fitness Dashboard, Persistent AI Memory, Document Scanner Pro
+    </div>
+  </div>
+</div>
+
+<script>
+const features = {
+  translation: { label: 'Real-Time Translation', votes: 218 },
+  notifications: { label: 'Smart Notifications', votes: 204 },
+  battery: { label: 'Battery Saver Mode', votes: 197 },
+  proactive: { label: 'Proactive AI', votes: 178 },
+  shortcuts: { label: 'Quick Actions', votes: 165 },
+  fitness: { label: 'Fitness Dashboard', votes: 152 },
+  memory: { label: 'Persistent AI Memory', votes: 141 },
+  document: { label: 'Document Scanner Pro', votes: 98 },
+  social: { label: 'Social & Contacts HUD', votes: 87 },
+  'screen-share': { label: 'Phone Screen Mirroring', votes: 76 }
+};
+
+// Populate priority dropdowns
+const opts = Object.entries(features).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('');
+['pri1','pri2','pri3'].forEach(id => {
+  document.getElementById(id).innerHTML += opts;
+});
+
+function toggleCard(el) {
+  el.classList.toggle('selected');
+}
+
+function setRating(groupId, btn) {
+  document.querySelectorAll(`#${groupId} .rating-btn`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function submitSurvey() {
+  const panel = document.getElementById('results');
+  const bars = document.getElementById('result-bars');
+  const maxVotes = 247;
+  bars.innerHTML = '';
+
+  Object.entries(features)
+    .sort((a,b) => b[1].votes - a[1].votes)
+    .forEach(([key, data]) => {
+      const pct = Math.round(data.votes / maxVotes * 100);
+      bars.innerHTML += `
+        <div class="result-bar">
+          <div class="label">${data.label}</div>
+          <div class="bar-bg"><div class="bar-fill" style="width:0%">${pct}%</div></div>
+        </div>`;
+    });
+
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth' });
+
+  // Animate bars
+  setTimeout(() => {
+    document.querySelectorAll('.bar-fill').forEach(bar => {
+      bar.style.width = bar.textContent;
+    });
+  }, 100);
+}
+</script>
+</body>
+</html>

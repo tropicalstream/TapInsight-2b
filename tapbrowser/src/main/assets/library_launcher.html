@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Media Library</title>
+<!--
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  Retired page — kept as a forwarder for stale bookmarks.         │
+  │                                                                  │
+  │  The Media Library used to be an HTTPS page served by the        │
+  │  companion app on 127.0.0.1:19110. That required the phone-side  │
+  │  server to be reachable from the glasses and failed a lot of     │
+  │  users. The library now lives fully on-glasses at                │
+  │  library_local.html, which talks to the on-device Media/ folder  │
+  │  directly via the TapMedia JS bridge.                            │
+  │                                                                  │
+  │  Any tile / bookmark still pointing at this file just bounces    │
+  │  forward to the new page. Dashboard migrations repair the URL    │
+  │  itself the next time the dashboard renders.                     │
+  └──────────────────────────────────────────────────────────────────┘
+-->
+<meta http-equiv="refresh" content="0;url=library_local.html">
+<style>
+  html,body{margin:0;background:#000;color:#00e5ff;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    height:100%;display:flex;align-items:center;justify-content:center}
+  .msg{text-align:center;font-size:14px;opacity:.7}
+  a{color:#00e5ff}
+</style>
+</head>
+<body>
+  <div class="msg">
+    Opening Media Library…<br>
+    <a href="library_local.html">Tap here if not redirected</a>
+  </div>
+  <script>location.replace('library_local.html');</script>
+</body>
+</html>

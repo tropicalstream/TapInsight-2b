@@ -1,0 +1,657 @@
+<com.TapLink.app.BinocularSbsLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Single logical viewport – BinocularSbsLayout draws it twice (L+R). -->
+    <FrameLayout
+        android:id="@+id/mainContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000">
+
+        <!-- Z-LAYER 0: the WebView. Bottom of the stack. Always
+             visible and always interactive (after Phase 2 touch
+             routing) for browser scrolling / link tapping. -->
+        <com.TapLinkX3.app.DualWebViewGroup
+            android:id="@+id/dualWebViewGroup"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="0dp"
+            android:layout_margin="0dp"
+            android:fitsSystemWindows="true"
+            android:background="#000000" />
+
+        <!-- Z-LAYER 1: the unipanel chat-panel overlay. Hosts the
+             migrated visionclaw chat ViewPager + HUD + camera
+             preview as children. The container stays transparent +
+             clickable=false so empty regions pass touches through
+             to the WebView underneath; individual widgets consume
+             their own taps via clickable=true (routed through the
+             cursor-tap pipeline by dispatchUnipanelOverlayTouchIfHit).
+
+             Step 2c.1: HUD strip at the top showing the current
+             time. Step 2c.2: a stack of compact mini chat cards
+             sits beneath the HUD strip. Both are read-only;
+             live data wiring comes in Step 2c.3. -->
+        <FrameLayout
+            android:id="@+id/unipanelOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="visible">
+
+            <!-- Step 2c.1 HUD strip. Semi-transparent dark
+                 background so it stays readable over any browser
+                 page; pinned to the top so it doesn't cover
+                 article content the user is reading. Width matches
+                 the mini-card stack so moving the pointer into the
+                 HUD lane and tapping is enough to toggle voice. -->
+            <!-- Phase 4j — single vertical HUD column anchored top|start.
+                 Children stack in flow order: (1) the clock / status
+                 strip, (2) the Hermes heartbeat ticker DIRECTLY under
+                 the clock, (3) the popup Gemini chat card. Because all
+                 three live in one vertical LinearLayout, the heartbeat
+                 can never overlap the chat card and the card always
+                 sits below the ticker — regardless of which elements
+                 are currently visible (each is gone-when-empty). -->
+            <LinearLayout
+                android:id="@+id/unipanelTopHudColumn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_marginTop="2dp"
+                android:orientation="vertical"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:clickable="false"
+                android:focusable="false">
+
+            <LinearLayout
+                android:id="@+id/unipanelTopHudRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="10dp"
+                android:gravity="top"
+                android:orientation="horizontal"
+                android:elevation="8dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:clickable="false"
+                android:focusable="false">
+
+            <LinearLayout
+                android:id="@+id/unipanelHudStrip"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingStart="6dp"
+                android:paddingEnd="8dp"
+                android:background="#B3000000"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/unipanelHudTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="--:--"
+                    android:textColor="#FFE0F4FF"
+                    android:textSize="13sp"
+                    android:letterSpacing="0.06"
+                    tools:ignore="UnusedAttribute" />
+
+                <!-- Date + day-of-week. Updated on the same 30s tick
+                     as the clock. Format: "Mon · May 19". Compact so
+                     the HUD strip stays narrow. -->
+                <TextView
+                    android:id="@+id/unipanelHudDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:fontFamily="sans-serif"
+                    android:text="—"
+                    android:textColor="#FFB7CEDE"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.04"
+                    tools:ignore="UnusedAttribute" />
+
+                <!-- Notification bell + unread badge (R3/R5/R6). Sits
+                     right of the date. Click toggles the roll-down
+                     notification list; the badge shows unreadCount and
+                     resets when the list opens. Restored from the
+                     22:35 APK layout after the rebuild lost it. -->
+                <FrameLayout
+                    android:id="@+id/unipanelHudBellContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingEnd="5dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:contentDescription="Notifications">
+
+                    <ImageView
+                        android:id="@+id/unipanelHudBellIcon"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:layout_gravity="start|bottom"
+                        android:src="@drawable/ic_unipanel_bell"
+                        android:tint="#CCFFFFFF"
+                        android:contentDescription="@null"
+                        tools:ignore="UseAppTint" />
+
+                    <TextView
+                        android:id="@+id/unipanelHudBellBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end|top"
+                        android:minWidth="13dp"
+                        android:background="@drawable/bg_unipanel_bell_badge"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="2dp"
+                        android:paddingVertical="1dp"
+                        android:text="0"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="8sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        tools:ignore="UnusedAttribute" />
+                </FrameLayout>
+
+                <!-- Battery %. Updated on ACTION_BATTERY_CHANGED
+                     broadcasts (sticky intent on Android, so we get
+                     the current value at registration time too). -->
+                <FrameLayout
+                    android:id="@+id/unipanelHudBatteryContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp">
+
+                    <ImageView
+                        android:id="@+id/unipanelHudBatteryIcon"
+                        android:layout_width="34dp"
+                        android:layout_height="17dp"
+                        android:layout_gravity="center_vertical"
+                        android:src="@drawable/ic_unipanel_battery"
+                        android:tint="#FF9FE6B0"
+                        android:contentDescription="Battery"
+                        tools:ignore="UseAppTint" />
+
+                    <!-- Percentage INSIDE the glyph (R6), centered with a
+                         4px optical nudge (R10); end-pad keeps the digits
+                         clear of the battery cap. -->
+                    <TextView
+                        android:id="@+id/unipanelHudBattery"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:translationY="4px"
+                        android:paddingEnd="5dp"
+                        android:includeFontPadding="false"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="—"
+                        android:textColor="#FF9FE6B0"
+                        android:textSize="8sp"
+                        android:textStyle="bold"
+                        tools:ignore="UnusedAttribute,RtlSymmetry" />
+                </FrameLayout>
+
+                <!-- Phase 4h — Hermes HUD fields, compressed into the
+                     unipanel strip. Ported from the hermes branch's
+                     fragment_chat_panel hudContainer block. The
+                     visionclaw API clients that drove live AQI /
+                     calendar / Hermes status used to fire on a
+                     periodic refresh from the Activity; in unipanel
+                     mode they're not yet wired (Application-scope
+                     viewModel exists but nothing polls). Until the
+                     polling is wired in a follow-up these show
+                     placeholder values, but the slots are present so
+                     the HUD visually matches the Hermes layout. -->
+
+                <!-- Phase 4k.3 — OpenClaw (TapClaw) status badge. Moved
+                     into the old G position so it is not adjacent to the
+                     avatar tap target. Driven by HudStateBridge.openClawStatus
+                     (Service-side OpenClaw health ping). Hidden when the
+                     OpenClaw integration is switched off. -->
+                <TextView
+                    android:id="@+id/unipanelHudOpenClawBadge"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="O"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/bg_unipanel_voice_pill"
+                    android:visibility="gone"
+                    tools:ignore="UnusedAttribute" />
+
+                <!-- AQI text — placeholder until a follow-up wires
+                     viewModel.airQualityClient polling. The literal
+                     value shown by default is in android:text below. -->
+                <!-- AQI hidden by default (user R6); shown only when
+                     the companion toggle hud_show_aqi is on. Plumbing
+                     stays intact either way. -->
+                <TextView
+                    android:id="@+id/unipanelHudAqi"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="AQI --"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.04"
+                    android:visibility="gone"
+                    tools:ignore="UnusedAttribute" />
+
+                <!-- Phase 4k — the standalone Hermes status dot was
+                     removed (user: "remove the green dot next to the
+                     Hermes H"). The "H" badge below already carries the
+                     reachable/unreachable colour, so the extra dot was
+                     redundant. -->
+
+                <TextView
+                    android:id="@+id/unipanelHudHermesBadge"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:gravity="center"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="H"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/bg_unipanel_voice_pill"
+                    android:visibility="gone"
+                    tools:ignore="UnusedAttribute" />
+
+                <!-- AI status badge "G" — moved into the old O slot so
+                     OpenClaw is no longer next to the avatar. Tinted from
+                     HudStateBridge connection status. Green when Gemini
+                     connected, amber while connecting, red on error/idle. -->
+                <TextView
+                    android:id="@+id/unipanelHudAiBadge"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:gravity="center"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="G"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/bg_unipanel_voice_pill"
+                    tools:ignore="UnusedAttribute" />
+
+                <!-- Phase 4k (user revision) — the "MIC" text pill is
+                     replaced by the Hermes-branch avatar orb. Tapping
+                     the orb does exactly what tapping MIC did: toggle a
+                     Gemini Live voice session via the bound
+                     GeminiVoiceService. The avatar is a circular
+                     ImageView (the user's custom orb if uploaded, else
+                     the default earth orb) sitting in front of a glow
+                     halo. The halo is hidden when idle and lights up —
+                     red while the user speaks, blue while Gemini speaks
+                     — with its alpha driven by the oscilloscope level,
+                     mirroring ChatPanelFragment.pushVoiceOscilloscope.
+                     Same generous fallback: the whole HUD strip is also
+                     clickable so a tap near the clock still toggles. -->
+                <FrameLayout
+                    android:id="@+id/unipanelVoiceOrb"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginTop="4dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Toggle Gemini voice"
+                    tools:ignore="UnusedAttribute">
+
+                    <View
+                        android:id="@+id/unipanelVoiceOrbGlow"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:alpha="0.55"
+                        android:background="@drawable/bg_unipanel_orb_ring_idle"
+                        android:contentDescription="@null" />
+
+                    <ImageView
+                        android:id="@+id/unipanelVoiceOrbImage"
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_gravity="center"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_unipanel_earth_orb"
+                        android:contentDescription="Voice activity orb" />
+
+                </FrameLayout>
+
+                <!-- Phase 4d (user revision) — manual CAM toggle
+                     removed. Vision is now voice-triggered: when the
+                     user says "look at this" / "what does this say" /
+                     etc., the pipeline fires browser_vision against
+                     the WebView screenshot AND auto-starts CameraX
+                     for the rest of the voice session so Gemini has
+                     real-world visual context. The red dot below
+                     replaces the CAM button — it lights up while
+                     vision is active and turns off otherwise.
+
+                     Phase 4k (user): the old 8dp red dot is now a red
+                     camera glyph so the "camera is watching" state is
+                     unmistakable. Visible only when CameraX is active. -->
+                <ImageView
+                    android:id="@+id/unipanelVisionDot"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="10dp"
+                    android:src="@drawable/ic_unipanel_camera_red"
+                    android:contentDescription="Camera active"
+                    android:visibility="gone"
+                    tools:ignore="UnusedAttribute" />
+
+            </LinearLayout>
+
+            <!-- Events / Tasks / News now start on the top HUD row,
+                 immediately to the right of the avatar/status strip. -->
+            <LinearLayout
+                android:id="@+id/unipanelHudTierPanel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:elevation="8dp"
+                android:clickable="false"
+                android:focusable="false">
+
+                <TextView
+                    android:id="@+id/unipanelHudTier0"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="2dp"
+                    android:background="#B3000000"
+                    android:gravity="start"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:fontFamily="sans-serif"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textColor="#FFE0F4FF"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="0dp"
+                    android:visibility="gone"
+                    tools:ignore="UnusedAttribute" />
+
+                <TextView
+                    android:id="@+id/unipanelHudTier1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="2dp"
+                    android:background="#B3000000"
+                    android:gravity="start"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:fontFamily="sans-serif"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textColor="#FFE0F4FF"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="0dp"
+                    android:visibility="gone"
+                    tools:ignore="UnusedAttribute" />
+
+                <TextView
+                    android:id="@+id/unipanelHudTier2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#B3000000"
+                    android:gravity="start"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:fontFamily="sans-serif"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textColor="#FFE0F4FF"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="0dp"
+                    android:visibility="gone"
+                    tools:ignore="UnusedAttribute" />
+
+            </LinearLayout>
+
+            <!-- Transparent filler keeps the rest of the top row tappable
+                 for voice without drawing over browser content. -->
+            <LinearLayout
+                android:id="@+id/unipanelHudFeedStrip"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@android:color/transparent"
+                android:clickable="false"
+                android:focusable="false" />
+
+            </LinearLayout>
+            <!-- /unipanelTopHudRow -->
+
+            <!-- Phase 4j — Hermes heartbeat ticker, parked DIRECTLY
+                 under the clock strip (user: "the heartbeat ticker
+                 should be underneath the clock"). Own dark bar so it
+                 reads over any browser page. Fixed width so long
+                 messages marquee-scroll once via
+                 startUnipanelHeartbeatScroll (a wrap_content width
+                 would never overflow and so would never scroll).
+                 GONE when empty; renderUnipanelHeartbeat toggles it. -->
+            <TextView
+                android:id="@+id/unipanelHudHeartbeatText"
+                android:layout_width="248dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="4dp"
+                android:background="#B3000000"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
+                android:elevation="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:textColor="#FFFF5252"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:ignore="UnusedAttribute" />
+
+            <!-- Step 2c.2 mini chat-card stack. Three compact rows
+                 stacked vertically directly under the HUD strip.
+                 Alternates assistant / user tinting so the layout
+                 reads as a real conversation at a glance. The
+                 outer LinearLayout is clickable=false: empty space
+                 between cards still falls through to the browser
+                 (taps on the cards themselves do nothing yet —
+                 these are read-only placeholders; Step 2c.3 wires
+                 them to MainViewModel chat events and adds focus +
+                 voice routing). Width capped at 340dp so even on a
+                 single eye of the binocular display, the cards
+                 don't span edge-to-edge. -->
+            </LinearLayout>
+            <!-- /unipanelTopHudColumn -->
+
+            <!-- Gemini reply card. Runtime positioning keeps this box in
+                 the lane the glasses actually need: just to the right of
+                 the camera preview and just to the left of the tiered HUD
+                 text. The XML values are only pre-layout fallbacks; see
+                 repositionUnipanelAssistantCard(). Text scrolls inside
+                 the height-capped box and the whole card sits on top of
+                 the WebView. -->
+                        <!-- Roll-down notification list (R3/R5/R7): opens under
+                 the clock on bell tap / temple long-tap, auto-rolls-up
+                 after 10s, rows are tappable (expanded card + readout).
+                 Restored from the 22:35 APK layout. -->
+            <LinearLayout
+                android:id="@+id/unipanelNotifPanel"
+                android:layout_width="300dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start|top"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="40dp"
+                android:background="#E6000000"
+                android:elevation="14dp"
+                android:orientation="vertical"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="6dp"
+                android:visibility="gone"
+                tools:ignore="UnusedAttribute">
+
+                <TextView
+                    android:id="@+id/unipanelNotifPanelTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:text="NOTIFICATIONS"
+                    android:textColor="#FFFFC857"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/unipanelNotifRows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+<ScrollView
+                android:id="@+id/unipanelMiniCardScroll"
+                android:layout_width="260dp"
+                android:layout_height="76dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="118dp"
+                android:layout_marginTop="70dp"
+                android:background="@drawable/bg_unipanel_mini_card_assistant"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp"
+                android:scrollbars="none"
+                android:fadeScrollbars="false"
+                android:elevation="10dp"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="gone"
+                tools:ignore="UnusedAttribute">
+
+                <TextView
+                    android:id="@+id/unipanelMiniCard1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Gemini reply — tap to search the web"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="1dp"
+                    android:text="" />
+
+            </ScrollView>
+
+            <!-- Phase 4g/4j — Hermes-style camera preview frame. 96dp ×
+                 72dp burgundy-stroked container holding a PreviewView
+                 fed by the Service-side CameraX pipeline. Lives in the
+                 LEFT gutter so it never sits behind the centered chat
+                 card. Visible only while CameraX is streaming
+                 (CameraStateBridge publishes true). Phase 4j: the
+                 marginTop below is just a sane pre-layout default — at
+                 runtime repositionUnipanelCameraPreview() drops the
+                 frame to just under the live HUD column (heartbeat row
+                 if visible, else the clock strip) so the magic 60dp no
+                 longer collides with the heartbeat ticker. -->
+            <FrameLayout
+                android:id="@+id/unipanelCameraPreviewFrame"
+                android:layout_width="96dp"
+                android:layout_height="72dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="14dp"
+                android:layout_marginTop="50dp"
+                android:background="@drawable/bg_unipanel_camera_preview"
+                android:padding="4dp"
+                android:elevation="10dp"
+                android:visibility="gone"
+                android:clickable="false"
+                android:focusable="false">
+
+                <androidx.camera.view.PreviewView
+                    android:id="@+id/unipanelCameraPreviewView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+            </FrameLayout>
+
+            <!-- Phase 4f (user revision) — legacy top-right CAM chip
+                 deleted. The unipanelVisionDot inside the HUD strip
+                 (added Phase 4e) is now the sole vision-active
+                 indicator. Two dots firing off the same
+                 CameraStateBridge publish read as a bug; one is
+                 enough. -->
+
+        </FrameLayout>
+
+        <!-- Phase 4z — minimal status indicators. Shown ONLY when the full
+             HUD/chat overlay above is hidden (rolled up / dim). A red dot
+             means a Gemini session is active; a tiny red camera next to it
+             means the camera is streaming. Sibling of unipanelOverlay so it
+             survives the HUD roll-up. -->
+        <LinearLayout
+            android:id="@+id/unipanelMinIndicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:elevation="12dp"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone">
+
+            <View
+                android:id="@+id/unipanelMinGeminiDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/bg_unipanel_min_red_dot"
+                android:visibility="gone"
+                tools:ignore="UnusedAttribute" />
+
+            <ImageView
+                android:id="@+id/unipanelMinCameraIcon"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="6dp"
+                android:src="@drawable/ic_unipanel_camera_red"
+                android:contentDescription="Camera active"
+                android:visibility="gone"
+                tools:ignore="UnusedAttribute" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</com.TapLink.app.BinocularSbsLayout>

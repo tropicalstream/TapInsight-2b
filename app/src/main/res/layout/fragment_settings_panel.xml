@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settingsRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_panel">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Gemini API Key"
+            android:textColor="@color/text_primary" />
+
+        <EditText
+            android:id="@+id/geminiKeyInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textPassword"
+            android:textColor="@color/text_primary"
+            android:textColorHint="#AAFFFFFF" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Calendar API Key"
+            android:textColor="@color/text_primary" />
+
+        <EditText
+            android:id="@+id/calendarKeyInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textPassword"
+            android:textColor="@color/text_primary"
+            android:textColorHint="#AAFFFFFF" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Calendar ID"
+            android:textColor="@color/text_primary" />
+
+        <EditText
+            android:id="@+id/calendarIdInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textEmailAddress"
+            android:textColor="@color/text_primary"
+            android:textColorHint="#AAFFFFFF" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="TapClaw Endpoint"
+            android:textColor="@color/text_primary" />
+
+        <EditText
+            android:id="@+id/openClawInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint=""
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textUri"
+            android:textColor="@color/text_primary"
+            android:textColorHint="#AAFFFFFF" />
+
+        <Button
+            android:id="@+id/saveSettingsButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_save" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Bookmarks"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/bookmarkTitleInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Title"
+            android:imeOptions="flagNoExtractUi"
+            android:textColor="@color/text_primary"
+            android:textColorHint="#AAFFFFFF" />
+
+        <EditText
+            android:id="@+id/bookmarkUrlInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="https://example.com"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textUri"
+            android:textColor="@color/text_primary"
+            android:textColorHint="#AAFFFFFF" />
+
+        <Button
+            android:id="@+id/addBookmarkButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_add_bookmark" />
+
+        <LinearLayout
+            android:id="@+id/bookmarksContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Music Volume"
+            android:textColor="@color/text_primary" />
+
+        <SeekBar
+            android:id="@+id/musicVolumeSeek"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <Switch
+            android:id="@+id/musicMuteSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mute Music"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="TTS Volume"
+            android:textColor="@color/text_primary" />
+
+        <SeekBar
+            android:id="@+id/ttsVolumeSeek"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100" />
+
+        <Switch
+            android:id="@+id/ttsMuteSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mute TTS"
+            android:textColor="@color/text_primary" />
+    </LinearLayout>
+
+</ScrollView>

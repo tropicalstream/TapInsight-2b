@@ -1,0 +1,46 @@
+# Android Build Files
+.gradle/
+build/
+**/build/
+*.iml
+local.properties
+
+# IDE
+.idea/
+.gradle-local/
+.kotlin/
+*.ipr
+*.iws
+
+# Native/NDK outputs
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Android artifacts
+*.apk
+*.ap_
+*.aab
+*.ab
+*.dex
+*.class
+
+# Signing / secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+google-services.json
+
+# Claude/dev artifacts
+.claude/
+__pycache__/
+*.pyc
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+TapInsight.apk
+.backup-tapinsight-unified/
+_backup-tapinsight-unified/
+_decompile/

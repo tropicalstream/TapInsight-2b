@@ -1,0 +1,1919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>TapRadio</title>
+<style>
+:root {
+  --bg: #000; --card: #0a0a0a; --accent: #00e5ff; --text: #f5f5f5;
+  --muted: #777; --border: rgba(255,255,255,.08); --glow: rgba(0,229,255,.15);
+  --fav: #ff6d00;
+  --kb-offset: 0px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:system-ui,'Segoe UI',Roboto,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;max-width:960px;max-height:480px;margin:0 auto}
+
+.topbar{display:flex;align-items:center;gap:8px;padding:6px 10px;
+  background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);flex-shrink:0}
+.topbar h1{font-size:14px;letter-spacing:.5px;color:var(--accent);flex-shrink:0}
+.topbar .now{flex:1;text-align:center;font-size:11px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .now .station-part{color:var(--text);font-weight:600}
+.topbar .now .track-part{color:#d7edf2}
+.topbar .now .sep{color:var(--muted);padding:0 4px}
+.topbar .controls{display:flex;gap:6px;flex-shrink:0}
+.ctrl{width:32px;height:32px;border:none;border-radius:50%;
+  background:rgba(255,255,255,.08);color:var(--text);font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.ctrl:active{background:var(--accent);color:#000}
+.ctrl.playing{background:var(--accent);color:#000;box-shadow:0 0 12px var(--glow)}
+/* Save (+) button: semi-transparent + = current item NOT saved yet;
+   bold, accent-tinted + = already saved (replaces the old ✓ state). */
+.ctrl.add-current{border-radius:10px;font-size:18px;font-weight:400;opacity:.45}
+.ctrl.add-current.added{background:rgba(0,229,255,.18);color:var(--accent);border:1px solid rgba(0,229,255,.45);font-weight:700;opacity:1}
+.ctrl.add-current.saving{opacity:.7;pointer-events:none}
+
+.genres{display:grid;grid-auto-flow:column;grid-template-rows:repeat(2, auto);gap:0 4px;
+  padding:2px 8px 4px;flex-shrink:0;overflow-x:auto;overflow-y:hidden;
+  border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch;align-items:end}
+.genres::-webkit-scrollbar{display:none}
+.genre{padding:7px 12px;font-size:11px;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;white-space:nowrap;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.genre.active{color:var(--accent);border-bottom-color:var(--accent)}
+.genre.fav{color:var(--accent);font-weight:500}
+.genre.fav.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.stations{flex:1;overflow-y:auto;padding:6px 8px;scroll-behavior:smooth;
+  -webkit-overflow-scrolling:touch}
+.stations::-webkit-scrollbar{width:3px}
+.stations::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:4px}
+
+.station{display:flex;align-items:center;gap:10px;padding:8px 10px;
+  border-radius:10px;border:1px solid transparent;cursor:pointer;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.station:active{background:rgba(255,255,255,.05)}
+.station.active{background:rgba(0,229,255,.06);border-color:rgba(0,229,255,.2)}
+.station .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  background:var(--muted);transition:all .3s}
+.station.active .dot{background:var(--accent);box-shadow:0 0 8px var(--glow)}
+.station.active .dot.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 4px var(--glow)}50%{box-shadow:0 0 14px var(--accent)}}
+.station .info{flex:1;min-width:0}
+.station .name{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.station .desc{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.station .genre-tag{font-size:10px;color:var(--muted);flex-shrink:0}
+.fav-btn{width:28px;height:28px;border:none;background:none;cursor:pointer;
+  font-size:16px;flex-shrink:0;opacity:.4;transition:all .15s;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.fav-btn.on{opacity:1;color:var(--fav)}
+.fav-btn:active{transform:scale(1.3)}
+
+
+.vol-wrap{display:flex;align-items:center;gap:6px;padding:6px 14px;
+  border-top:1px solid var(--border);flex-shrink:0}
+.vol-wrap label{font-size:10px;color:var(--muted);flex-shrink:0}
+.vol-wrap input[type=range]{flex:1;height:4px;-webkit-appearance:none;
+  background:rgba(255,255,255,.15);border-radius:4px;outline:none}
+.vol-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+  width:1px;height:16px;border-radius:0;background:transparent;
+  border:none;cursor:pointer;box-shadow:none;opacity:0}
+.vol-pct{font-size:10px;color:var(--muted);min-width:28px;text-align:right}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;
+  align-items:flex-start;justify-content:center;z-index:50;
+  padding:14px;padding-top:24px;overflow-y:auto}
+.overlay.show{display:flex}
+/* When keyboard is open, shrink the modal and add bottom padding so
+   the overlay scrolls to keep focused input visible. */
+body.keyboard-open .overlay{padding-bottom:calc(var(--kb-offset, 0px) + 14px)}
+.modal{background:#111;border:1px solid #333;border-radius:12px;padding:16px;
+  width:min(400px,90vw);max-height:none;flex-shrink:0}
+.modal h2{font-size:14px;color:var(--accent);margin-bottom:12px}
+.modal .field{margin-bottom:10px}
+.modal .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
+.modal .field input{width:100%;padding:8px;
+  background:#0a0a0a;border:1px solid #333;border-radius:6px;color:#fff;font-size:13px}
+.modal .field input:focus{border-color:var(--accent);outline:none}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.mbtn{padding:6px 14px;border:1px solid #333;border-radius:6px;
+  background:#1a1a1a;color:#e0e0e0;cursor:pointer;font-size:12px;font-weight:600}
+.mbtn.primary{background:var(--accent);color:#000;border-color:var(--accent)}
+.mbtn.danger{border-color:#e53935;color:#ef5350}
+.empty{text-align:center;padding:24px;color:var(--muted);font-size:12px}
+/* Podcast favorite-heart on list rows: dim outline = not favorited,
+   warm red filled = favorited (shows under the Favorites tab). */
+.pod-heart{background:none;border:none;font-size:15px;color:#666;cursor:pointer;flex-shrink:0;padding:4px 6px}
+.pod-heart.on{color:#ff4d6d}
+/* Podcaster-name link inside a saved "Podcaster: Title" row — tapping
+   it opens that podcaster's episode list in the podcasts browser. */
+.pod-show-link{color:var(--accent);text-decoration:underline;cursor:pointer}
+body.keyboard-open .overlay{align-items:flex-start;padding-top:12px;padding-bottom:calc(var(--kb-offset) + 12px)}
+body.keyboard-open .modal{margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>&#128225; TapRadio</h1>
+  <div class="now" id="nowPlaying">Select a station</div>
+  <div class="controls">
+    <button class="ctrl" id="btnPrev" title="Previous / Rewind 20s" onclick="handlePrev()">&#9664;</button>
+    <button class="ctrl" id="btnPlay" title="Play/Pause" onclick="togglePlay()">&#9654;</button>
+    <button class="ctrl" id="btnNext" title="Next / Skip 20s" onclick="handleNext()">&#9654;&#9654;</button>
+    <button class="ctrl add-current" id="btnAddCurrent" title="Add current station or save current file" onclick="handleAddCurrent()">＋</button>
+  </div>
+</div>
+
+
+<div class="genres" id="genreTabs"></div>
+<div class="stations" id="stationList"></div>
+
+<div class="vol-wrap">
+  <label>VOL</label>
+  <input type="range" min="0" max="100" value="70" id="volSlider" oninput="setVolume(this.value)">
+  <span class="vol-pct" id="volPct">70%</span>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Station</h2>
+    <div class="field"><label>Station Name</label>
+      <input id="editName" placeholder="My Radio Station"></div>
+    <div class="field"><label>Stream URL (mp3/aac/ogg)</label>
+      <input id="editUrl" placeholder="https://stream.example.com/radio.mp3"></div>
+    <div class="field"><label>Genre</label>
+      <input id="editGenre" placeholder="Rock / Jazz / Ambient / News"></div>
+    <div class="field"><label>Description (optional)</label>
+      <input id="editDesc" placeholder="Lo-fi beats from Seattle"></div>
+    <div class="modal-btns">
+      <button class="mbtn danger" id="btnDelete" onclick="deleteStation()" style="display:none">Delete</button>
+      <span style="flex:1"></span>
+      <button class="mbtn" onclick="hideModal()">Cancel</button>
+      <button class="mbtn primary" onclick="saveStation()">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<audio id="audioEl" preload="none"></audio>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// TapRadio — IP Radio player for RayNeo X3 Pro
+// Shared storage key so the Companion App can sync stations.
+// ═══════════════════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'tapradio_stations';
+const SPOTIFY_QUEUE_KEY = 'tapradio_spotify_queue';
+// Saved podcast links (the ♥ in the toolbar while a podcast plays).
+// Shared localStorage origin with podcasts.html / media_player.html, so
+// anything hearted during playback shows up under the PodCasts tab here.
+const SAVED_PODCASTS_KEY = 'tapinsight_saved_podcasts';
+const audio = document.getElementById('audioEl');
+let stations = [];
+let currentIdx = -1;
+let editIdx = -1;
+let activeGenre = 'All';
+let adHocStream = null;  // { name, genre, url } — for podcast/ad-hoc streams not in station list
+
+// Spotify queue state. When non-empty, handlePrev / handleNext step
+// through `spotifyQueue` instead of changing stations or seeking 20s.
+// Persisted in localStorage so it survives navigating away from
+// radio.html and coming back while the native ExoPlayer is still alive.
+let spotifyQueue = [];      // [{ title, artist, album, previewUrl, openUrl, albumArtUrl, durationMs, trackUri }, ...]
+let spotifyQueueIndex = -1;
+let spotifyAutoAdvanceGuardMs = 0;  // debounces STATE_ENDED auto-advance
+let streamQueue = [];       // [{ title, url, kind }] for ad-hoc M3U/audio queues
+let streamQueueIndex = -1;
+let streamQueueName = '';
+let streamQueueAdvanceGuardMs = 0;
+let streamQueueFailureCount = 0;
+let streamQueueSkipPending = false;
+let mediaSaveCache = {};    // url -> { saved:boolean, path?:string }
+let externalPlaybackState = { playing: false, stationName: '', genre: '', updatedAt: 0 };
+let nativePlaybackState = {
+  available: false,
+  playing: false,
+  preparing: false,
+  buffering: false,
+  stationName: '',
+  track: '',
+  trackArtist: '',
+  trackTitle: '',
+  trackUpdatedAt: 0,
+  genre: '',
+  url: '',
+  kind: 'radio',
+  positionMs: 0,
+  durationMs: 0,
+  error: '',
+  updatedAt: 0
+};
+
+function hasNativeRadioBridge() {
+  return typeof AndroidInterface !== 'undefined' && typeof AndroidInterface.playNativeRadioStream === 'function';
+}
+
+function applyNativeRadioState(rawState) {
+  try {
+    const parsed = typeof rawState === 'string' ? JSON.parse(rawState) : (rawState || {});
+    nativePlaybackState = Object.assign({
+      available: hasNativeRadioBridge(),
+      playing: false,
+      preparing: false,
+      buffering: false,
+      stationName: '',
+      track: '',
+      trackArtist: '',
+      trackTitle: '',
+      trackUpdatedAt: 0,
+      genre: '',
+      url: '',
+      kind: 'radio',
+      positionMs: 0,
+      durationMs: 0,
+      error: '',
+      updatedAt: Date.now()
+    }, parsed || {});
+    if (nativePlaybackState.stationName) {
+      const matchedIdx = stations.findIndex(s => s.name === nativePlaybackState.stationName);
+      if (matchedIdx >= 0) {
+        currentIdx = matchedIdx;
+        adHocStream = null;
+      } else {
+        currentIdx = -1;
+        adHocStream = {
+          name: nativePlaybackState.stationName || 'Podcast',
+          genre: normalizeGenre(nativePlaybackState.genre || ''),
+          subtitle: '',
+          artist: '',
+          url: nativePlaybackState.url || '',
+          kind: nativePlaybackState.kind || 'radio'
+        };
+      }
+    } else if (nativePlaybackState.url && nativePlaybackState.kind === 'podcast') {
+      currentIdx = -1;
+      adHocStream = {
+        name: adHocStream && adHocStream.name ? adHocStream.name : 'Podcast',
+        genre: normalizeGenre(nativePlaybackState.genre || ''),
+        subtitle: adHocStream && adHocStream.subtitle ? adHocStream.subtitle : '',
+        artist: adHocStream && adHocStream.artist ? adHocStream.artist : '',
+        showId: adHocStream && adHocStream.showId ? adHocStream.showId : '',
+        url: nativePlaybackState.url,
+        kind: nativePlaybackState.kind || 'podcast'
+      };
+    } else if (!(nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering)) {
+      if (currentIdx < 0) adHocStream = null;
+    }
+    try {
+      if (window.MediaInterface && window.MediaInterface.onMediaStateChanged) {
+        window.MediaInterface.onMediaStateChanged(!!(nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering));
+      }
+    } catch (e) {}
+  } catch (e) {
+    console.warn('applyNativeRadioState failed:', e);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+  });
+}
+
+function currentTrackLabel() {
+  const state = nativePlaybackState || {};
+  const artist = String(state.trackArtist || '').trim();
+  const title = String(state.trackTitle || '').trim();
+  const raw = String(state.track || '').trim();
+  if (artist && title) return artist + ' - ' + title;
+  if (title) return title;
+  return raw;
+}
+
+function setNowPlayingLine(prefix, stationName, trackText) {
+  const now = document.getElementById('nowPlaying');
+  if (!now) return;
+  const cleanStation = String(stationName || '').trim();
+  const cleanTrack = String(trackText || '').trim();
+  if (cleanStation && cleanTrack) {
+    now.innerHTML = escapeHtml(prefix) +
+      '<span class="station-part">' + escapeHtml(cleanStation) + '</span>' +
+      '<span class="sep">·</span>' +
+      '<span class="track-part">' + escapeHtml(cleanTrack) + '</span>';
+  } else if (cleanStation) {
+    now.innerHTML = escapeHtml(prefix) +
+      '<span class="station-part">' + escapeHtml(cleanStation) + '</span>';
+  } else {
+    now.textContent = prefix + 'Select a station';
+  }
+}
+
+function syncNativeRadioState() {
+  if (!hasNativeRadioBridge()) return;
+  nativePlaybackState.available = true;
+  try {
+    const raw = AndroidInterface.getNativeRadioPlaybackState();
+    if (raw) applyNativeRadioState(raw);
+  } catch (e) {
+    console.warn('getNativeRadioPlaybackState failed:', e);
+  }
+}
+
+window.tapRadioNativePlaybackUpdate = function(state) {
+  applyNativeRadioState(state);
+  maybeAdvanceSpotifyQueue();
+  maybeAdvanceStreamQueue();
+  updateUI();
+};
+
+// ── Spotify queue helpers ──────────────────────────────────────────
+// The Spotify queue is a list of preview-url-backed track objects
+// handed to us by SpotifyTool via URL parameters. We persist it in
+// localStorage under SPOTIFY_QUEUE_KEY so prev/next, auto-advance,
+// and metadata display all survive navigating away from radio.html
+// and returning while the native ExoPlayer is still playing.
+
+function loadSpotifyQueueFromStorage() {
+  try {
+    const raw = localStorage.getItem(SPOTIFY_QUEUE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.queue)) {
+      spotifyQueue = parsed.queue;
+      const idx = parseInt(parsed.index, 10);
+      spotifyQueueIndex = isFinite(idx) ? idx : -1;
+    }
+  } catch (e) {
+    console.warn('loadSpotifyQueueFromStorage failed:', e);
+  }
+}
+
+function saveSpotifyQueueToStorage() {
+  try {
+    if (!spotifyQueue || !spotifyQueue.length) {
+      localStorage.removeItem(SPOTIFY_QUEUE_KEY);
+      return;
+    }
+    localStorage.setItem(SPOTIFY_QUEUE_KEY,
+      JSON.stringify({ queue: spotifyQueue, index: spotifyQueueIndex }));
+  } catch (e) { console.warn('saveSpotifyQueueToStorage failed:', e); }
+}
+
+function clearSpotifyQueue() {
+  spotifyQueue = [];
+  spotifyQueueIndex = -1;
+  try { localStorage.removeItem(SPOTIFY_QUEUE_KEY); } catch(e) {}
+}
+
+function clearStreamQueue() {
+  streamQueue = [];
+  streamQueueIndex = -1;
+  streamQueueName = '';
+  streamQueueFailureCount = 0;
+  streamQueueSkipPending = false;
+}
+
+function isSpotifyMode() {
+  // Prefer the authoritative native state (survives navigation); fall
+  // back to "we have a queue loaded" otherwise.
+  if (nativePlaybackState && nativePlaybackState.kind === 'spotify') return true;
+  return spotifyQueue && spotifyQueue.length > 0;
+}
+
+function isStreamQueueMode() {
+  return streamQueue && streamQueue.length > 0;
+}
+
+function cleanUrlPath(url) {
+  return String(url || '').split('?')[0].split('#')[0].toLowerCase();
+}
+
+function isPlaylistUrl(url) {
+  var path = cleanUrlPath(url);
+  return path.endsWith('.m3u') || path.endsWith('.m3u8');
+}
+
+function isAudioFileUrl(url) {
+  var path = cleanUrlPath(url);
+  return /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|weba)$/i.test(path);
+}
+
+function isMediaSaveTarget(item) {
+  if (!item || !item.url) return false;
+  var kind = String(item.kind || '').toLowerCase();
+  if (kind === 'audio' || kind === 'playlist' || kind === 'media' || kind === 'file') return true;
+  if (kind === 'radio' || kind === 'podcast' || kind === 'spotify') return false;
+  return isAudioFileUrl(item.url) || isPlaylistUrl(item.url);
+}
+
+function normalizeUrlForCompare(url) {
+  return String(url || '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function spotifyTrackDisplayName(track) {
+  if (!track) return 'Spotify';
+  var name = track.title || 'Spotify track';
+  if (track.artist) name += ' \u2014 ' + track.artist;
+  return name;
+}
+
+function playSpotifyQueueItem(idx) {
+  if (!spotifyQueue || !spotifyQueue.length) return;
+  if (idx < 0) idx = 0;
+  if (idx >= spotifyQueue.length) idx = spotifyQueue.length - 1;
+  var track = spotifyQueue[idx];
+  if (!track || !track.previewUrl) {
+    console.warn('Spotify track at idx', idx, 'has no preview URL — skipping');
+    // Try to advance past the hole if moving forward.
+    if (idx > spotifyQueueIndex && idx + 1 < spotifyQueue.length) {
+      playSpotifyQueueItem(idx + 1);
+    } else if (idx < spotifyQueueIndex && idx - 1 >= 0) {
+      playSpotifyQueueItem(idx - 1);
+    }
+    return;
+  }
+  spotifyQueueIndex = idx;
+  saveSpotifyQueueToStorage();
+  currentIdx = -1;
+  clearStreamQueue();
+  adHocStream = {
+    name: spotifyTrackDisplayName(track),
+    genre: 'Spotify',
+    subtitle: track.artist || '',
+    artist: track.artist || '',
+    url: track.previewUrl,
+    kind: 'spotify'
+  };
+  if (hasNativeRadioBridge()) {
+    try {
+      var stateResult;
+      if (typeof AndroidInterface.playNativeRadioStreamEx === 'function') {
+        stateResult = AndroidInterface.playNativeRadioStreamEx(
+          track.previewUrl, spotifyTrackDisplayName(track), 'Spotify', 'spotify');
+      } else {
+        stateResult = AndroidInterface.playNativeRadioStream(
+          track.previewUrl, spotifyTrackDisplayName(track), 'Spotify');
+      }
+      applyNativeRadioState(stateResult);
+    } catch (e) {
+      console.warn('Spotify queue playback failed:', e);
+    }
+  } else {
+    audio.src = track.previewUrl;
+    audio.load();
+    audio.play().catch(function(e) { console.warn('Spotify queue <audio> play failed:', e); });
+  }
+  // Reset the auto-advance guard so end-of-track auto-advance can fire.
+  spotifyAutoAdvanceGuardMs = Date.now();
+  updateUI();
+}
+
+function spotifyQueueNext() {
+  if (!spotifyQueue || !spotifyQueue.length) return;
+  if (spotifyQueueIndex + 1 < spotifyQueue.length) {
+    playSpotifyQueueItem(spotifyQueueIndex + 1);
+  } else {
+    // End of queue — wrap or just stop. Wrap feels more musical.
+    playSpotifyQueueItem(0);
+  }
+}
+
+function spotifyQueuePrev() {
+  if (!spotifyQueue || !spotifyQueue.length) return;
+  if (spotifyQueueIndex - 1 >= 0) {
+    playSpotifyQueueItem(spotifyQueueIndex - 1);
+  } else {
+    playSpotifyQueueItem(spotifyQueue.length - 1);
+  }
+}
+
+function streamEntryDisplayName(entry) {
+  if (!entry) return streamQueueName || 'Playlist';
+  return entry.title || entry.url.split('/').pop() || streamQueueName || 'Audio';
+}
+
+function playStreamQueueItem(idx) {
+  if (!streamQueue || !streamQueue.length) return;
+  if (idx < 0) idx = 0;
+  if (idx >= streamQueue.length) idx = streamQueue.length - 1;
+  var entry = streamQueue[idx];
+  if (!entry || !entry.url) return;
+  streamQueueSkipPending = false;
+  streamQueueIndex = idx;
+  currentIdx = -1;
+  clearSpotifyQueue();
+  var displayName = streamEntryDisplayName(entry);
+  adHocStream = {
+    name: displayName,
+    genre: streamQueueName || 'Playlist',
+    subtitle: streamQueueName || '',
+    artist: '',
+    url: entry.url,
+    kind: entry.kind || 'audio'
+  };
+  if (hasNativeRadioBridge()) {
+    try {
+      var stateResult;
+      if (typeof AndroidInterface.playNativeRadioStreamEx === 'function') {
+        stateResult = AndroidInterface.playNativeRadioStreamEx(
+          entry.url, displayName, streamQueueName || 'Playlist', entry.kind || 'audio');
+      } else {
+        stateResult = AndroidInterface.playNativeRadioStream(
+          entry.url, displayName, streamQueueName || 'Playlist');
+      }
+      applyNativeRadioState(stateResult);
+    } catch (e) {
+      console.warn('Stream queue playback failed:', e);
+    }
+  } else {
+    audio.src = entry.url;
+    audio.load();
+    audio.play().catch(function(e) { console.warn('Stream queue <audio> play failed:', e); });
+  }
+  streamQueueAdvanceGuardMs = Date.now();
+  updateUI();
+}
+
+function streamQueueNext() {
+  if (!streamQueue || !streamQueue.length) return;
+  playStreamQueueItem((streamQueueIndex + 1) % streamQueue.length);
+}
+
+function streamQueuePrev() {
+  if (!streamQueue || !streamQueue.length) return;
+  playStreamQueueItem((streamQueueIndex - 1 + streamQueue.length) % streamQueue.length);
+}
+
+function parseM3u(text, baseUrl) {
+  var entries = [];
+  var pendingTitle = '';
+  String(text || '').split(/\r?\n/).forEach(function(raw) {
+    var line = raw.trim();
+    if (!line) return;
+    if (line.charAt(0) === '#') {
+      if (line.toUpperCase().indexOf('#EXTINF:') === 0) {
+        pendingTitle = line.substring(line.indexOf(',') + 1).trim();
+      }
+      return;
+    }
+    var resolved = line;
+    try { resolved = new URL(line, baseUrl).href; } catch(e) {}
+    entries.push({
+      title: pendingTitle || decodeURIComponent(line.substring(line.lastIndexOf('/') + 1)) || 'Track',
+      url: resolved,
+      kind: isPlaylistUrl(resolved) ? 'playlist' : 'audio'
+    });
+    pendingTitle = '';
+  });
+  return entries;
+}
+
+async function fetchTextForPlaylist(url) {
+  try {
+    var response = await fetch(url, { cache: 'no-store' });
+    if (response.ok) return await response.text();
+  } catch (e) {
+    console.warn('M3U fetch failed, trying native bridge:', e);
+  }
+  if (typeof AndroidInterface !== 'undefined' && typeof AndroidInterface.fetchUrlText === 'function') {
+    try {
+      var raw = AndroidInterface.fetchUrlText(url);
+      var parsed = JSON.parse(raw || '{}');
+      if (parsed.text) return parsed.text;
+      if (parsed.error) throw new Error(parsed.error);
+    } catch (e2) {
+      console.warn('Native M3U fetch failed:', e2);
+    }
+  }
+  throw new Error('Could not read playlist');
+}
+
+async function loadAndPlayM3u(playUrl, playName, playGenre, startIndex) {
+  var text = await fetchTextForPlaylist(playUrl);
+  var entries = parseM3u(text, playUrl).filter(function(e) { return !!e.url; });
+  if (!entries.length) throw new Error('Playlist is empty');
+  streamQueue = entries;
+  streamQueueIndex = -1;
+  streamQueueName = playName || playGenre || 'M3U Playlist';
+  streamQueueFailureCount = 0;
+  streamQueueSkipPending = false;
+  var idx = parseInt(startIndex || 0, 10);
+  if (!isFinite(idx) || idx < 0) idx = 0;
+  if (idx >= streamQueue.length) idx = 0;
+  playStreamQueueItem(idx);
+}
+
+// Auto-advance when the native ExoPlayer has reported STATE_ENDED on a
+// Spotify track. We detect this by looking for: spotify kind + not
+// playing/preparing/buffering + a positive duration with position at or
+// near the end. The ~800 ms slack avoids false positives on preview
+// clips that Spotify truncates ~2 ms early.
+function maybeAdvanceSpotifyQueue() {
+  if (!nativePlaybackState || nativePlaybackState.kind !== 'spotify') return;
+  if (!spotifyQueue || !spotifyQueue.length) return;
+  var active = nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering;
+  if (active) return;
+  var dur = nativePlaybackState.durationMs || 0;
+  var pos = nativePlaybackState.positionMs || 0;
+  if (dur <= 0) return;  // no duration yet — probably still setting up
+  if (pos < dur - 1500) return;  // user paused mid-track
+  // Debounce: only one auto-advance per track playback.
+  var now = Date.now();
+  if (now - spotifyAutoAdvanceGuardMs < 1200) return;
+  spotifyAutoAdvanceGuardMs = now;
+  console.log('Spotify queue auto-advance at idx', spotifyQueueIndex);
+  spotifyQueueNext();
+}
+
+function maybeAdvanceStreamQueue() {
+  if (!nativePlaybackState || !isStreamQueueMode()) return;
+  if (nativePlaybackState.kind !== 'audio' && nativePlaybackState.kind !== 'playlist') return;
+  var active = nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering;
+  if (active) {
+    if (nativePlaybackState.playing) {
+      streamQueueFailureCount = 0;
+      streamQueueSkipPending = false;
+    }
+    return;
+  }
+  if (nativePlaybackState.error) {
+    if (streamQueueSkipPending) return;
+    streamQueueFailureCount += 1;
+    if (streamQueueFailureCount >= streamQueue.length) {
+      document.getElementById('nowPlaying').textContent =
+        '\u26A0 No playable streams in ' + (streamQueueName || 'playlist');
+      return;
+    }
+    streamQueueSkipPending = true;
+    document.getElementById('nowPlaying').textContent =
+      '\u26A0 Stream unavailable \u2014 trying next...';
+    setTimeout(function() { streamQueueNext(); }, 600);
+    return;
+  }
+  var dur = nativePlaybackState.durationMs || 0;
+  var pos = nativePlaybackState.positionMs || 0;
+  if (dur <= 0 || pos < dur - 1500) return;
+  var now = Date.now();
+  if (now - streamQueueAdvanceGuardMs < 1200) return;
+  streamQueueAdvanceGuardMs = now;
+  streamQueueNext();
+}
+
+window.tapBrowserSetKeyboardState = function(isVisible, keyboardHeight) {
+  var visible = !!isVisible;
+  var px = Math.max(0, parseInt(keyboardHeight, 10) || 0);
+  document.documentElement.style.setProperty('--kb-offset', px + 'px');
+  document.body.classList.toggle('keyboard-open', visible);
+};
+
+const DEFAULT_STATIONS = [
+  { name: 'SomaFM Groove Salad', url: 'https://ice1.somafm.com/groovesalad-256-mp3', genre: 'Chill', desc: 'Ambient/downtempo for your day', fav: true },
+  { name: 'SomaFM Drone Zone', url: 'https://ice1.somafm.com/dronezone-256-mp3', genre: 'Ambient', desc: 'Atmospheric textures & drones', fav: false },
+  { name: 'SomaFM Space Station', url: 'https://ice1.somafm.com/spacestation-128-mp3', genre: 'Ambient', desc: 'Spaced-out ambient & experimental', fav: false },
+  { name: 'SomaFM DEF CON Radio', url: 'https://ice1.somafm.com/defcon-256-mp3', genre: 'Electronic', desc: 'DEF CON hacker conference radio', fav: false },
+  { name: 'SomaFM Lush', url: 'https://ice1.somafm.com/lush-128-mp3', genre: 'Chill', desc: 'Sensuous female-vocal electronic', fav: false },
+  { name: 'Radio Paradise Main', url: 'https://stream.radioparadise.com/mp3-192', genre: 'Eclectic', desc: 'Eclectic mix, ad-free since 2000', fav: true },
+  { name: 'Radio Paradise Mellow', url: 'https://stream.radioparadise.com/mellow-192', genre: 'Chill', desc: 'Mellow mix from Radio Paradise', fav: false },
+  { name: 'SomaFM Indie Pop Rocks', url: 'https://ice1.somafm.com/indiepop-128-mp3', genre: 'Rock', desc: 'Indie pop, dream pop, shoegaze', fav: false },
+  { name: 'SomaFM Underground 80s', url: 'https://ice1.somafm.com/u80s-256-mp3', genre: 'Rock', desc: 'Early 80s UK post-punk & new wave', fav: false },
+  { name: 'SomaFM Secret Agent', url: 'https://ice1.somafm.com/secretagent-256-mp3', genre: 'Jazz', desc: 'Spy-fi, lounge, bossa, & jazz', fav: true },
+  { name: 'KCSM Jazz', url: 'https://ice7.securenetsystems.net/KCSM2', genre: 'Jazz', desc: 'Bay Area jazz radio', fav: false },
+  { name: 'SomaFM Beat Blender', url: 'https://ice1.somafm.com/beatblender-128-mp3', genre: 'Electronic', desc: 'Deep house & downtempo', fav: false },
+  { name: 'SomaFM Fluid', url: 'https://ice1.somafm.com/fluid-128-mp3', genre: 'Electronic', desc: 'Instrumental hip-hop & future soul', fav: false },
+  { name: 'SomaFM ThistleRadio', url: 'https://ice1.somafm.com/thistle-128-mp3', genre: 'Folk', desc: 'Celtic, Americana, & roots', fav: false },
+  { name: 'KUSC Classical', url: 'https://kusc.streamguys1.com/kusc-128k', genre: 'Classical', desc: 'Southern California classical', fav: false },
+  { name: 'NPR Program Stream', url: 'https://npr-ice.streamguys1.com/live.mp3', genre: 'News', desc: 'NPR news & programs 24/7', fav: false },
+  { name: 'BBC World Service', url: 'https://stream.live.vc.bbcmedia.co.uk/bbc_world_service', genre: 'News', desc: 'Global news from BBC', fav: false },
+  { name: 'NASA Third Rock Radio', url: 'https://rfcmedia.streamguys1.com/thirdrock.mp3', genre: 'Rock', desc: 'Alt-rock from NASA', fav: false },
+];
+
+// ── Init ──────────────────────────────────────────────────────────
+async function init() {
+  await loadStations();
+  loadSpotifyQueueFromStorage();
+  syncPlaybackUiFromExternalState();
+  syncNativeRadioState();
+  renderGenres();
+  renderStations();
+  audio.volume = 0.7;
+  updateUI();
+  // Mirror the initial activeGenre to native SharedPreferences so the
+  // dim-mode fallback HUD has something to read on first launch even
+  // before the user taps a genre tab.
+  try {
+    if (typeof AndroidInterface !== 'undefined' && AndroidInterface.saveRadioActiveGenre) {
+      AndroidInterface.saveRadioActiveGenre(String(activeGenre || ''));
+    }
+  } catch(e) {}
+
+  // ── Auto-play via URL parameters ──────────────────────────────
+  // Supports: ?playUrl=<stream>&playName=<name>&playGenre=<genre>
+  // Optional metadata: &playSubtitle=<subtitle>&playArtist=<artist>&playKind=<kind>
+  // Used by TapRadioTool (Gemini voice commands) to route playback
+  // through the native ExoPlayer instead of the generic browser player.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const shouldOpenAdd = params.get('openAdd') === '1';
+    const playUrl = params.get('playUrl');
+    if (playUrl) {
+      const playName = params.get('playName') || 'Stream';
+      const playGenre = params.get('playGenre') || 'Mix';
+      const playSubtitle = params.get('playSubtitle') || '';
+      const playShowId = params.get('playShowId') || '';
+      const playArtist = params.get('playArtist') || '';
+      const playStart = parseInt(params.get('playStart') || '0', 10);
+      let playKind = params.get('playKind') || (isPlaylistUrl(playUrl) ? 'playlist' : 'radio');
+      // Spotify tool passes a full queue + starting index. Populate our
+      // queue state before kicking off the first track so auto-advance
+      // and FF/Rewind-as-queue-nav work from the moment playback starts.
+      const spotifyQueueParam = params.get('spotifyQueue');
+      const spotifyIndexParam = parseInt(params.get('spotifyIndex') || '0', 10);
+      if (playKind === 'spotify' && spotifyQueueParam) {
+        try {
+          const parsed = JSON.parse(spotifyQueueParam);
+          if (Array.isArray(parsed) && parsed.length) {
+            spotifyQueue = parsed;
+            spotifyQueueIndex = isFinite(spotifyIndexParam)
+              ? Math.max(0, Math.min(spotifyIndexParam, parsed.length - 1))
+              : 0;
+            saveSpotifyQueueToStorage();
+          }
+        } catch (e) {
+          console.warn('Failed to parse spotifyQueue URL param:', e);
+          clearSpotifyQueue();
+        }
+      } else if (playKind !== 'spotify') {
+        // Switched to radio/podcast playback — clear any stale Spotify queue.
+        clearSpotifyQueue();
+      }
+      const effectiveDisplayName = playSubtitle ? (playName + ': ' + playSubtitle) : playName;
+
+      // ── STOP any currently playing stream ──
+      // The Kotlin onNewIntent() already releases the old ExoPlayer before
+      // loading this page, but we also stop here as a safety net in case
+      // the page was loaded directly (not via onNewIntent).
+      if (hasNativeRadioBridge()) {
+        try { AndroidInterface.stopNativeRadioStream(); } catch(e) {
+          console.warn('stopNativeRadioStream safety-net failed (expected if already stopped):', e);
+        }
+      }
+      if (!audio.paused) { audio.pause(); audio.src = ''; }
+
+      if (playKind === 'playlist' || isPlaylistUrl(playUrl)) {
+        try {
+          await loadAndPlayM3u(
+            playUrl,
+            effectiveDisplayName,
+            normalizeGenre(playGenre),
+            isFinite(playStart) ? playStart : 0
+          );
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+          setTimeout(function() { syncNativeRadioState(); updateUI(); }, 1500);
+          setTimeout(function() { syncNativeRadioState(); updateUI(); }, 3500);
+          return;
+        } catch (e) {
+          console.warn('M3U playlist load failed; falling back to direct native playback:', e);
+          playKind = 'playlist';
+        }
+      } else {
+        clearStreamQueue();
+      }
+
+      // Check if this URL matches a saved station — use that index if so
+      const matchIdx = stations.findIndex(s =>
+        s.url === playUrl || s.name.toLowerCase() === playName.toLowerCase()
+      );
+      if (matchIdx >= 0) {
+        adHocStream = null;
+        playStation(matchIdx);
+      } else {
+        // Ad-hoc stream (podcast episode, etc.) — play via native bridge
+        // Store as ad-hoc state so UI can reflect the playing podcast
+        currentIdx = -1;
+        adHocStream = {
+          name: effectiveDisplayName,
+          genre: normalizeGenre(playGenre),
+          subtitle: playSubtitle,
+          artist: playArtist,
+          url: playUrl,
+          kind: playKind,
+          // iTunes collectionId of the SHOW — lets a saved episode link
+          // back to the podcaster's episode list (openPodcast deep link).
+          showId: playShowId
+        };
+        if (hasNativeRadioBridge()) {
+          // Use the extended play method to pass the kind ('podcast'/'radio')
+          // so the native layer tracks whether seek is available.
+          var stateResult;
+          if (typeof AndroidInterface.playNativeRadioStreamEx === 'function') {
+            stateResult = AndroidInterface.playNativeRadioStreamEx(
+              playUrl, effectiveDisplayName, normalizeGenre(playGenre), playKind);
+          } else {
+            stateResult = AndroidInterface.playNativeRadioStream(
+              playUrl, effectiveDisplayName, normalizeGenre(playGenre));
+          }
+          applyNativeRadioState(stateResult);
+        } else {
+          audio.src = playUrl;
+          audio.load();
+          audio.play().catch(e => console.warn('Auto-play failed:', e));
+        }
+        updateUI();
+      }
+      // Clean URL so refresh doesn't re-trigger auto-play
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+
+      // ── Delayed state sync ──
+      // ExoPlayer state transitions (preparing → buffering → playing) fire
+      // via notifyNativeRadioStateChanged() which evaluates JS on this page.
+      // If those callbacks arrive before init() finishes, they're lost.
+      // Re-sync state after a delay to catch up with the actual ExoPlayer state.
+      setTimeout(function() {
+        syncNativeRadioState();
+        updateUI();
+      }, 1500);
+      setTimeout(function() {
+        syncNativeRadioState();
+        updateUI();
+      }, 3500);
+    }
+
+    if (shouldOpenAdd) {
+      setTimeout(showAddModal, 60);
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  } catch(e) { console.warn('Auto-play param parsing failed:', e); }
+}
+
+async function loadStations() {
+  let data = null;
+
+  // 1) Try AndroidInterface bridge (reads SharedPreferences — same store companion app writes to)
+  try {
+    if (typeof AndroidInterface !== 'undefined' && AndroidInterface.getRadioStations) {
+      const raw = AndroidInterface.getRadioStations();
+      if (raw && raw.length > 2) data = JSON.parse(raw);
+    }
+  } catch(e) { console.warn('AndroidInterface.getRadioStations failed:', e); }
+
+  // 2) Try companion server API as fallback (same device, port 19110)
+  if (!data) {
+    try {
+      const r = await fetch('http://localhost:19110/api/radio', { signal: AbortSignal.timeout(2000) });
+      if (r.ok) {
+        const json = await r.json();
+        if (Array.isArray(json) && json.length) data = json;
+      }
+    } catch(e) { /* server not running or timeout — fall through */ }
+  }
+
+  // 3) Fall back to localStorage
+  if (!data) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) data = JSON.parse(raw);
+    } catch(e) {}
+  }
+
+  if (data && data.length) {
+    stations = data.map(s => ({ ...s, fav: !!s.fav }));
+  } else {
+    stations = DEFAULT_STATIONS.map(s => ({...s}));
+  }
+  save();
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(stations));
+  // Sync to Android SharedPreferences if available
+  try {
+    if (typeof AndroidInterface !== 'undefined' && AndroidInterface.saveRadioStations) {
+      AndroidInterface.saveRadioStations(JSON.stringify(stations));
+    }
+  } catch(e) {}
+  // Sync back to companion server (fire-and-forget)
+  try {
+    fetch('http://localhost:19110/api/radio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stations)
+    }).catch(() => {});
+  } catch(e) {}
+}
+
+const GENRE_BUCKETS = [
+  { name: 'Ambient', match: /(ambient|drone|space|meditation)/i },
+  // 'Chill' bucket removed per the user — its tab is replaced by the always-
+  // present PodCasts tab (saved podcast links). Former Chill stations
+  // fall through to 'Mix' via the normalizeGenre default.
+  { name: 'Electronic', match: /(electronic|house|future soul|hip-hop|beats|fluid|blend)/i },
+  { name: 'Rock', match: /(rock|indie|pop|punk|wave|alt)/i },
+  { name: 'Jazz', match: /(jazz|lounge|bossa|spy-fi)/i },
+  { name: 'Classical', match: /(classical|orchestra|opera)/i },
+  { name: 'News', match: /(news|npr|bbc|program)/i },
+  { name: 'Mix', match: /(eclectic|folk|roots|world|americana|celtic)/i }
+];
+
+function normalizeGenre(genre) {
+  const raw = String(genre || '').trim();
+  if (!raw) return 'Mix';
+  const bucket = GENRE_BUCKETS.find(entry => entry.match.test(raw));
+  return bucket ? bucket.name : 'Mix';
+}
+
+// ── Genre tabs ────────────────────────────────────────────────────
+function getGenres() {
+  const present = new Set();
+  stations.forEach(s => { present.add(normalizeGenre(s.genre)); });
+  const ordered = GENRE_BUCKETS.map(g => g.name).filter(name => present.has(name));
+  // PodCasts is always present (it lists hearted podcast links, not
+  // stations) — it took over the slot the Chill genre used to occupy.
+  return ['Favorites', 'All', ...ordered, 'PodCasts'];
+}
+
+function renderGenres() {
+  const el = document.getElementById('genreTabs');
+  el.innerHTML = getGenres().map(g => {
+    const isFav = g === 'Favorites';
+    const cls = (g === activeGenre ? ' active' : '') + (isFav ? ' fav' : '');
+    return `<div class="genre${cls}" onclick="filterGenre('${g}')">${isFav ? '\u2665 ' : ''}${g}</div>`;
+  }).join('');
+}
+
+function filterGenre(g) {
+  activeGenre = g;
+  // Mirror to native SharedPreferences so the dim-mode HUD on the
+  // glasses can fall back to the first station in this genre when
+  // nothing is currently playing. Fire-and-forget; failures here
+  // never block the UI.
+  try {
+    if (typeof AndroidInterface !== 'undefined' && AndroidInterface.saveRadioActiveGenre) {
+      AndroidInterface.saveRadioActiveGenre(String(g || ''));
+    }
+  } catch(e) {}
+  renderGenres();
+  renderStations();
+}
+
+// ── Station list ──────────────────────────────────────────────────
+function filteredStations() {
+  if (activeGenre === 'Favorites') return stations.filter(s => s.fav);
+  if (activeGenre === 'All') return stations;
+  return stations.filter(s => normalizeGenre(s.genre) === activeGenre);
+}
+
+// ── Saved podcasts (♥) ────────────────────────────────────────────
+function loadSavedPodcasts() {
+  try {
+    const raw = localStorage.getItem(SAVED_PODCASTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function persistSavedPodcasts(list) {
+  try { localStorage.setItem(SAVED_PODCASTS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+function isPodcastItem(item) {
+  return !!(item && item.url && String(item.kind || '').toLowerCase() === 'podcast');
+}
+
+function podcastSavedIndex(url) {
+  return loadSavedPodcasts().findIndex(p => p.url === url);
+}
+
+/**
+ * Toolbar ＋ while a podcast plays — SAVES (or unsaves) the podcast
+ * link into the PodCasts tab. Saving is the +'s job; the heart on
+ * each row is for FAVORITING (Favorites tab), mirroring stations.
+ */
+function togglePodcastLinkSaved(item) {
+  let list = loadSavedPodcasts();
+  const existing = list.findIndex(p => p.url === item.url);
+  if (existing >= 0) {
+    list.splice(existing, 1);
+    flashStatus('Removed from PodCasts');
+  } else {
+    const meta = (adHocStream && adHocStream.url === item.url) ? adHocStream : {};
+    list.unshift({
+      name: meta.name || item.name || 'Podcast',
+      subtitle: meta.subtitle || '',
+      artist: meta.artist || '',
+      showId: meta.showId || '',
+      url: item.url,
+      fav: false,
+      ts: Date.now()
+    });
+    list = list.slice(0, 50);  // sane cap
+    flashStatus('＋ Saved to PodCasts');
+  }
+  persistSavedPodcasts(list);
+  if (activeGenre === 'PodCasts' || activeGenre === 'Favorites') renderStations();
+  updateAddButtonState();
+}
+
+/** Row heart on a saved podcast — toggles its Favorites membership. */
+function togglePodcastFav(i) {
+  const list = loadSavedPodcasts();
+  if (i < 0 || i >= list.length) return;
+  list[i].fav = !list[i].fav;
+  persistSavedPodcasts(list);
+  renderGenres();
+  renderStations();
+}
+
+/** One saved-podcast list row. [i] indexes the FULL saved list so the
+ *  same builder serves both the PodCasts and Favorites tabs. */
+function savedPodcastRowHtml(p, i) {
+  const isShow = p.type === 'show';
+  const isCurrent = !isShow && !!(adHocStream && adHocStream.url === p.url);
+  const playing = isCurrent && hasNativeRadioBridge() &&
+    (nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering);
+  const favCls = p.fav ? ' on' : '';
+  // SHOW rows are saved PODCASTERS (whole episode lists) — tapping one
+  // deep-links into podcasts.html's episode view for that show.
+  const desc = isShow
+    ? (p.artist ? esc(p.artist) + ' — episode list' : 'Episode list — tap to browse')
+    : esc(p.subtitle || p.artist || 'Saved podcast');
+  // Saved EPISODES display as "Podcaster: Title". The PODCASTER part is
+  // a link (accent + underline): tapping it opens that podcaster's
+  // episode list via the podcasts browser's existing machinery
+  // (openPodcast / loadPodcastsByArtist); tapping elsewhere still plays.
+  let nameHtml;
+  if (!isShow) {
+    const sepIdx = String(p.name || '').indexOf(': ');
+    if (sepIdx > 0) {
+      const podcaster = String(p.name).slice(0, sepIdx);
+      const rest = String(p.name).slice(sepIdx + 1);
+      nameHtml = `<span class="pod-show-link" ` +
+        `onclick="event.stopPropagation();openPodcasterEpisodes(${i})" ` +
+        `title="Open this podcaster's episode list">${esc(podcaster)}</span>:${esc(rest)}`;
+    } else {
+      nameHtml = esc(p.name);
+    }
+  } else {
+    nameHtml = '🎙 ' + esc(p.name);
+  }
+  return `<div class="station${isCurrent ? ' active' : ''}" onclick="playSavedPodcast(${i})">
+    <div class="dot${playing ? ' pulse' : ''}"></div>
+    <div class="info">
+      <div class="name">${nameHtml}</div>
+      <div class="desc">${desc}</div>
+    </div>
+    <div class="genre-tag">${isShow ? 'SHOW' : 'PodCast'}</div>
+    <button class="pod-heart${favCls}" onclick="event.stopPropagation();togglePodcastFav(${i})" title="Favorite">${p.fav ? '♥' : '♡'}</button>
+  </div>`;
+}
+
+function renderSavedPodcasts(listEl) {
+  const saved = loadSavedPodcasts();
+  if (!saved.length) {
+    listEl.innerHTML =
+      '<div class="empty">No saved podcasts yet — tap the ＋ while a podcast is playing</div>';
+    return;
+  }
+  listEl.innerHTML = saved.map((p, i) => savedPodcastRowHtml(p, i)).join('');
+}
+
+/**
+ * Podcaster-link tap on a saved EPISODE row → open the podcaster's
+ * episode list using the podcasts browser's EXISTING machinery:
+ *   • showId saved with the episode → openPodcast deep link (exact show);
+ *   • otherwise → loadPodcastsByArtist deep link (creator search by the
+ *     saved artist, falling back to the podcaster name prefix).
+ */
+function openPodcasterEpisodes(i) {
+  const list = loadSavedPodcasts();
+  const p = list[i];
+  if (!p) return;
+  const sepIdx = String(p.name || '').indexOf(': ');
+  const podcaster = sepIdx > 0 ? String(p.name).slice(0, sepIdx).trim() : String(p.name || '').trim();
+  if (p.showId) {
+    window.location.href = 'file:///android_asset/podcasts.html' +
+      '?showId=' + encodeURIComponent(p.showId) +
+      '&showTitle=' + encodeURIComponent(podcaster) +
+      '&showArtist=' + encodeURIComponent(p.artist || '');
+    return;
+  }
+  const term = (p.artist || podcaster).trim();
+  if (!term) return;
+  window.location.href = 'file:///android_asset/podcasts.html' +
+    '?artistShows=' + encodeURIComponent(term);
+}
+
+/** Play a hearted podcast — same ad-hoc/native path the
+ *  podcasts.html → radio.html?playUrl handoff uses. */
+function playSavedPodcast(i) {
+  const list = loadSavedPodcasts();
+  const p = list[i];
+  if (!p) return;
+  // Saved SHOW — open the podcaster's episode list in the podcasts
+  // browser (deep link) instead of playing audio.
+  if (p.type === 'show' && p.showId) {
+    window.location.href = 'file:///android_asset/podcasts.html' +
+      '?showId=' + encodeURIComponent(p.showId) +
+      '&showTitle=' + encodeURIComponent(p.name || '') +
+      '&showArtist=' + encodeURIComponent(p.artist || '') +
+      '&showArt=' + encodeURIComponent(p.art || '');
+    return;
+  }
+  if (!p.url) return;
+  playSavedPodcastResolved(p);
+}
+
+function playSavedPodcastResolved(p) {
+  currentIdx = -1;
+  clearSpotifyQueue();
+  clearStreamQueue();
+  adHocStream = {
+    name: p.name || 'Podcast',
+    genre: 'Podcast',
+    subtitle: p.subtitle || '',
+    artist: p.artist || '',
+    url: p.url,
+    kind: 'podcast'
+  };
+  const displayName = p.subtitle ? (p.name + ': ' + p.subtitle) : (p.name || 'Podcast');
+  if (hasNativeRadioBridge()) {
+    try {
+      let stateResult;
+      if (typeof AndroidInterface.playNativeRadioStreamEx === 'function') {
+        stateResult = AndroidInterface.playNativeRadioStreamEx(
+          p.url, displayName, 'Podcast', 'podcast');
+      } else {
+        stateResult = AndroidInterface.playNativeRadioStream(
+          p.url, displayName, 'Podcast');
+      }
+      applyNativeRadioState(stateResult);
+    } catch (e) { console.warn('Saved podcast native play failed:', e); }
+  } else {
+    audio.src = p.url;
+    audio.load();
+    audio.play().catch(e => console.warn('Play failed:', e));
+  }
+  updateUI();
+}
+
+
+
+function renderStations() {
+  const list = document.getElementById('stationList');
+  if (activeGenre === 'PodCasts') {
+    renderSavedPodcasts(list);
+    return;
+  }
+  const filtered = filteredStations();
+
+  // Favorites also lists hearted PODCASTS, right under the stations —
+  // the row heart (♡/♥) is the single "shows in Favorites"
+  // control for both kinds. Indices map into the FULL saved list.
+  let favPodcastHtml = '';
+  if (activeGenre === 'Favorites') {
+    favPodcastHtml = loadSavedPodcasts()
+      .map((p, i) => ({ p: p, i: i }))
+      .filter(x => x.p.fav)
+      .map(x => savedPodcastRowHtml(x.p, x.i))
+      .join('');
+  }
+
+  if (!filtered.length && !favPodcastHtml) {
+    list.innerHTML = activeGenre === 'Favorites'
+      ? '<div class="empty">No favorites yet — tap the ♡ heart on any station or saved podcast</div>'
+      : '<div class="empty">No stations in this category</div>';
+    return;
+  }
+  const stationHtml = filtered.map(s => {
+    const realIdx = stations.indexOf(s);
+    const isActive = realIdx === currentIdx;
+    const playing = isActive && isStationPlaying(s);
+    const favCls = s.fav ? ' on' : '';
+    return `<div class="station${isActive ? ' active' : ''}" onclick="playStation(${realIdx})" ondblclick="showEditModal(${realIdx})">
+      <div class="dot${playing ? ' pulse' : ''}"></div>
+      <div class="info">
+        <div class="name">${esc(s.name)}</div>
+        <div class="desc">${esc(s.desc || s.genre || '')}</div>
+      </div>
+      <div class="genre-tag">${esc(normalizeGenre(s.genre))}</div>
+      <button class="fav-btn${favCls}" onclick="event.stopPropagation();toggleFav(${realIdx})" title="Favorite">${s.fav ? '\u2665' : '\u2661'}</button>
+    </div>`;
+  }).join('');
+  list.innerHTML = stationHtml + favPodcastHtml;
+}
+
+function toggleFav(idx) {
+  if (idx < 0 || idx >= stations.length) return;
+  stations[idx].fav = !stations[idx].fav;
+  save();
+  renderGenres();
+  renderStations();
+}
+
+// ── Playback ──────────────────────────────────────────────────────
+function playStation(idx) {
+  if (idx < 0 || idx >= stations.length) return;
+  currentIdx = idx;
+  adHocStream = null;  // Clear ad-hoc state when playing a saved station
+  clearSpotifyQueue();  // Switching to a station cancels any Spotify queue
+  clearStreamQueue();   // and any ad-hoc M3U/audio queue
+  if (hasNativeRadioBridge()) {
+    try {
+      applyNativeRadioState(AndroidInterface.playNativeRadioStream(
+        stations[idx].url,
+        stations[idx].name || '',
+        normalizeGenre(stations[idx].genre)
+      ));
+    } catch (e) {
+      console.warn('Native play failed:', e);
+      nativePlaybackState.error = e && e.message ? e.message : String(e);
+    }
+    updateUI();
+    return;
+  }
+  if (idx === currentIdx && !audio.paused) { audio.pause(); updateUI(); return; }
+  audio.src = stations[idx].url;
+  audio.load();
+  audio.play().catch(e => console.warn('Play failed:', e));
+  updateUI();
+}
+
+function togglePlay() {
+  // Handle ad-hoc podcast/spotify stream toggle when no station is selected
+  if (currentIdx < 0 && hasNativeRadioBridge()) {
+    const nPlaying = nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering;
+    if (nPlaying) {
+      try { applyNativeRadioState(AndroidInterface.pauseNativeRadioStream()); } catch(e) {}
+    } else if (isSpotifyMode() && spotifyQueue && spotifyQueue.length) {
+      // Queue loaded but player is idle — (re)start from the saved index.
+      playSpotifyQueueItem(spotifyQueueIndex >= 0 ? spotifyQueueIndex : 0);
+      return;
+    } else if (adHocStream) {
+      try { applyNativeRadioState(AndroidInterface.resumeNativeRadioStream()); } catch(e) {}
+    } else if (stations.length) {
+      playStation(0); return;
+    }
+    updateUI();
+    return;
+  }
+  if (currentIdx < 0) { if (stations.length) playStation(0); return; }
+  if (hasNativeRadioBridge()) {
+    try {
+      if (nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering) {
+        applyNativeRadioState(AndroidInterface.pauseNativeRadioStream());
+      } else {
+        applyNativeRadioState(AndroidInterface.resumeNativeRadioStream());
+      }
+    } catch (e) {
+      console.warn('Native toggle failed:', e);
+    }
+    updateUI();
+    return;
+  }
+  if (audio.paused) {
+    if (!audio.src || audio.src === location.href) { audio.src = stations[currentIdx].url; audio.load(); }
+    audio.play().catch(e => console.warn('Play failed:', e));
+  } else { audio.pause(); }
+  updateUI();
+}
+
+function nextStation() {
+  const filtered = filteredStations();
+  if (!filtered.length) return;
+  syncNativeRadioState();
+  const curInFiltered = findCurrentStationInList(filtered);
+  const nextFi = (curInFiltered + 1) % filtered.length;
+  playStation(resolveStationIndex(filtered[nextFi]));
+}
+
+function prevStation() {
+  const filtered = filteredStations();
+  if (!filtered.length) return;
+  syncNativeRadioState();
+  const curInFiltered = findCurrentStationInList(filtered);
+  const prevFi = (curInFiltered - 1 + filtered.length) % filtered.length;
+  playStation(resolveStationIndex(filtered[prevFi]));
+}
+
+function normStationValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function stationMatches(left, right) {
+  if (!left || !right) return false;
+  const leftUrl = normStationValue(left.url);
+  const rightUrl = normStationValue(right.url);
+  if (leftUrl && rightUrl && leftUrl === rightUrl) return true;
+  const leftName = normStationValue(left.name);
+  const rightName = normStationValue(right.name || right.stationName);
+  if (leftName && rightName && leftName === rightName) return true;
+  return false;
+}
+
+function resolveStationIndex(station) {
+  if (!station) return -1;
+  const byIdentity = stations.findIndex(s => stationMatches(s, station));
+  if (byIdentity >= 0) return byIdentity;
+  return stations.indexOf(station);
+}
+
+function findCurrentStationInList(list) {
+  const current = currentIdx >= 0 ? stations[currentIdx] : null;
+  let found = list.findIndex(s => stationMatches(s, current));
+  if (found >= 0) return found;
+
+  const nativeCurrent = {
+    name: nativePlaybackState.stationName || externalPlaybackState.stationName || '',
+    stationName: nativePlaybackState.stationName || externalPlaybackState.stationName || '',
+    url: nativePlaybackState.url || externalPlaybackState.url || ''
+  };
+  found = list.findIndex(s => stationMatches(s, nativeCurrent));
+  if (found >= 0) {
+    const realIdx = resolveStationIndex(list[found]);
+    if (realIdx >= 0) currentIdx = realIdx;
+    return found;
+  }
+
+  return -1;
+}
+
+function setVolume(v) {
+  audio.volume = v / 100;
+  document.getElementById('volPct').textContent = v + '%';
+}
+
+function syncPlaybackUiFromExternalState() {
+  try {
+    if (typeof AndroidInterface === 'undefined' || !AndroidInterface.getRadioPlaybackState) return;
+    const raw = AndroidInterface.getRadioPlaybackState();
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    externalPlaybackState = {
+      playing: !!state.playing,
+      stationName: state.stationName || '',
+      genre: state.genre || '',
+      url: state.url || '',
+      updatedAt: state.updatedAt || 0
+    };
+    if (externalPlaybackState.stationName) {
+      const matchedIdx = stations.findIndex(s => stationMatches(s, externalPlaybackState));
+      if (matchedIdx >= 0) currentIdx = matchedIdx;
+    } else if (audio.paused) {
+      currentIdx = currentIdx >= 0 ? currentIdx : -1;
+    }
+  } catch (e) {
+    console.warn('getRadioPlaybackState failed:', e);
+  }
+}
+
+function isExternallyPlayingStation(station) {
+  return !!(
+      station &&
+      externalPlaybackState &&
+      externalPlaybackState.playing &&
+      stationMatches(station, externalPlaybackState)
+  );
+}
+
+function isStationPlaying(station) {
+  if (!station) return false;
+  if (hasNativeRadioBridge()) {
+    return !!(
+      station.name === nativePlaybackState.stationName &&
+      (nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering)
+    );
+  }
+  return !audio.paused || isExternallyPlayingStation(station);
+}
+
+function reportPlaybackState() {
+  if (hasNativeRadioBridge()) return;
+  try {
+    if (typeof AndroidInterface === 'undefined' || !AndroidInterface.saveRadioPlaybackState) return;
+    const station = currentIdx >= 0 ? stations[currentIdx] : null;
+    const playing = !!(station && isStationPlaying(station));
+    AndroidInterface.saveRadioPlaybackState(
+      playing ? (station.name || '') : '',
+      playing ? (station.genre || '') : '',
+      playing
+    );
+  } catch (e) {
+    console.warn('saveRadioPlaybackState failed:', e);
+  }
+}
+
+function currentPlaybackItem() {
+  syncNativeRadioState();
+  if (currentIdx >= 0 && stations[currentIdx]) {
+    var station = stations[currentIdx];
+    return {
+      name: station.name || '',
+      genre: station.genre || '',
+      url: station.url || '',
+      kind: 'radio',
+      stationIndex: currentIdx
+    };
+  }
+  if (adHocStream && adHocStream.url) {
+    return {
+      name: adHocStream.name || nativePlaybackState.stationName || 'Stream',
+      genre: adHocStream.genre || nativePlaybackState.genre || '',
+      url: adHocStream.url || nativePlaybackState.url || '',
+      kind: adHocStream.kind || nativePlaybackState.kind || 'radio',
+      stationIndex: -1
+    };
+  }
+  if (nativePlaybackState && nativePlaybackState.url) {
+    return {
+      name: nativePlaybackState.stationName || 'Stream',
+      genre: nativePlaybackState.genre || '',
+      url: nativePlaybackState.url || '',
+      kind: nativePlaybackState.kind || 'radio',
+      stationIndex: -1
+    };
+  }
+  return null;
+}
+
+function findSavedStationByUrl(url) {
+  var clean = normalizeUrlForCompare(url);
+  if (!clean) return -1;
+  return stations.findIndex(function(s) {
+    return normalizeUrlForCompare(s.url) === clean;
+  });
+}
+
+function getMediaSavedState(item) {
+  if (!item || !item.url || typeof AndroidInterface === 'undefined' ||
+      typeof AndroidInterface.isMediaUrlSavedToLibrary !== 'function') {
+    return { saved: false };
+  }
+  if (mediaSaveCache[item.url]) return mediaSaveCache[item.url];
+  try {
+    var raw = AndroidInterface.isMediaUrlSavedToLibrary(item.url, item.name || '', item.kind || '');
+    var parsed = JSON.parse(raw || '{}');
+    mediaSaveCache[item.url] = parsed;
+    return parsed;
+  } catch (e) {
+    return { saved: false };
+  }
+}
+
+function inferStationGenre(item) {
+  var rawGenre = String((item && item.genre) || '').trim();
+  var generic = /^(audio|media|file|stream|playlist|mix|other)$/i.test(rawGenre);
+  if (rawGenre && !generic) return normalizeGenre(rawGenre);
+  var haystack = [
+    item && item.name,
+    item && item.genre,
+    item && item.url
+  ].join(' ');
+  var bucket = GENRE_BUCKETS.find(function(entry) { return entry.match.test(haystack); });
+  return bucket ? bucket.name : 'Mix';
+}
+
+function addCurrentItemAsStation(item, message) {
+  if (!item || !item.url) return;
+  var existingIdx = findSavedStationByUrl(item.url);
+  if (existingIdx >= 0 || item.stationIndex >= 0) {
+    flashStatus('✓ Already saved in TapRadio');
+    currentIdx = existingIdx >= 0 ? existingIdx : item.stationIndex;
+    updateAddButtonState();
+    return;
+  }
+  var genre = inferStationGenre(item);
+  stations.push({
+    name: item.name || 'New Station',
+    url: item.url,
+    genre: genre,
+    desc: 'Saved from TapRadio',
+    fav: false
+  });
+  currentIdx = stations.length - 1;
+  adHocStream = null;
+  save();
+  renderGenres();
+  renderStations();
+  flashStatus((message || '✓ Added to TapRadio') + ' (' + genre + ')');
+  updateAddButtonState();
+}
+
+function mediaSaveErrorText(result) {
+  if (!result) return '';
+  if (typeof result === 'string') return result;
+  var parts = [result.error, result.message, result.reason, result.detail, result.status]
+    .filter(function(part) { return part !== undefined && part !== null && String(part).trim(); });
+  if (parts.length) return parts.join(' ');
+  try {
+    return JSON.stringify(result);
+  } catch (e) {
+    return String(result);
+  }
+}
+
+function isLiveStreamSaveError(result) {
+  var text = mediaSaveErrorText(result).toLowerCase();
+  return text.indexOf('live stream') !== -1 ||
+    text.indexOf('not a finite audio file') !== -1 ||
+    text.indexOf('finite audio file') !== -1 ||
+    text.indexOf('tapradio station') !== -1;
+}
+
+function flashStatus(message) {
+  var now = document.getElementById('nowPlaying');
+  if (!now) return;
+  var previous = now.textContent;
+  now.textContent = message;
+  setTimeout(function() {
+    if (now.textContent === message) updateUI();
+  }, 1600);
+}
+
+function updateAddButtonState() {
+  var btn = document.getElementById('btnAddCurrent');
+  if (!btn) return;
+  var item = currentPlaybackItem();
+  // Saved state is always shown as a BOLD ＋ (class 'added'), never a ✓ —
+  // the dim/semi-transparent ＋ means the current item isn't saved yet.
+  btn.classList.remove('added', 'saving');
+  btn.textContent = '＋';
+  btn.title = 'Add current station or save current file';
+  if (!item || !item.url) return;
+
+  if (isPodcastItem(item)) {
+    if (podcastSavedIndex(item.url) >= 0) {
+      btn.classList.add('added');
+      btn.title = 'Saved in PodCasts — tap to remove';
+    } else {
+      btn.title = 'Save this podcast to PodCasts';
+    }
+    return;
+  }
+
+  if (isMediaSaveTarget(item)) {
+    var mediaState = getMediaSavedState(item);
+    if (mediaState && mediaState.saved) {
+      btn.classList.add('added');
+      btn.title = 'Already saved to Media Library';
+    } else {
+      btn.title = 'Save this audio/playlist to Media Library';
+    }
+    return;
+  }
+
+  if (findSavedStationByUrl(item.url) >= 0 || item.stationIndex >= 0) {
+    btn.classList.add('added');
+    btn.title = 'Already saved in TapRadio';
+  } else {
+    btn.title = 'Add current IP radio station to TapRadio';
+  }
+}
+
+function handleAddCurrent() {
+  var item = currentPlaybackItem();
+  if (!item || !item.url) {
+    showAddModal();
+    return;
+  }
+
+  // Podcasts: ＋ saves the LINK into the PodCasts tab (toggle). It no
+  // longer falls through to "add as a TapRadio station" — that was the
+  // +/heart confusion. Favoriting (Favorites tab) is the row heart's job.
+  if (isPodcastItem(item)) {
+    togglePodcastLinkSaved(item);
+    return;
+  }
+
+  if (isMediaSaveTarget(item)) {
+    var currentState = getMediaSavedState(item);
+    if (currentState && currentState.saved) {
+      flashStatus('✓ Already in Media Library');
+      updateAddButtonState();
+      return;
+    }
+    if (typeof AndroidInterface === 'undefined' ||
+        typeof AndroidInterface.saveMediaUrlToLibrary !== 'function') {
+      alert('Media Library save is not available in this build.');
+      return;
+    }
+    var btn = document.getElementById('btnAddCurrent');
+    if (btn) { btn.classList.add('saving'); btn.textContent = '…'; }
+    try {
+      var raw = AndroidInterface.saveMediaUrlToLibrary(item.url, item.name || '', item.kind || '');
+      var result;
+      try {
+        result = JSON.parse(raw || '{}');
+      } catch (parseError) {
+        result = { status: 'error', error: raw || (parseError && parseError.message) || 'Save failed' };
+      }
+      if (result.status === 'saved' || result.status === 'exists') {
+        mediaSaveCache[item.url] = { saved: true, path: result.path || '' };
+        flashStatus(result.status === 'exists' ? '✓ Already in Media Library' : '✓ Saved to Media Library');
+      } else if (isLiveStreamSaveError(result)) {
+        addCurrentItemAsStation(item, '✓ Added live stream to TapRadio');
+        return;
+      } else {
+        alert('Could not save media: ' + (mediaSaveErrorText(result) || 'unknown error'));
+      }
+    } catch (e) {
+      if (isLiveStreamSaveError(e)) {
+        addCurrentItemAsStation(item, '✓ Added live stream to TapRadio');
+        return;
+      }
+      alert('Could not save media: ' + (e && e.message ? e.message : e));
+    }
+    updateAddButtonState();
+    return;
+  }
+
+  addCurrentItemAsStation(item, '✓ Added to TapRadio');
+}
+
+
+function updateUI() {
+  const station = currentIdx >= 0 ? stations[currentIdx] : null;
+  let playing = currentIdx >= 0 && isStationPlaying(station);
+
+  // ── Ad-hoc stream support (podcasts, etc.) ──
+  // When currentIdx is -1 but native ExoPlayer is actively playing,
+  // reflect the playing state in the toolbar using the ad-hoc stream info.
+  let displayName = station ? station.name : 'Select a station';
+  if (!playing && currentIdx === -1 && hasNativeRadioBridge()) {
+    const nPlaying = nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering;
+    if (nPlaying) {
+      playing = true;
+      displayName = nativePlaybackState.stationName || (adHocStream ? adHocStream.name : 'Podcast');
+    } else if (adHocStream) {
+      displayName = adHocStream.name;
+    }
+  }
+
+  const btn = document.getElementById('btnPlay');
+  btn.innerHTML = playing ? '&#9646;&#9646;' : '&#9654;';
+  btn.classList.toggle('playing', playing);
+  const now = document.getElementById('nowPlaying');
+  if (playing) {
+    setNowPlayingLine('\u25B6 ', displayName, currentTrackLabel());
+  } else if (currentIdx >= 0) {
+    setNowPlayingLine('\u23F8 ', displayName, currentTrackLabel());
+  } else if (adHocStream) {
+    setNowPlayingLine('\u23F8 ', adHocStream.name, currentTrackLabel());
+  } else {
+    now.textContent = 'Select a station';
+  }
+  renderStations();
+  reportPlaybackState();
+  updateAddButtonState();
+}
+
+audio.addEventListener('playing', updateUI);
+audio.addEventListener('pause', updateUI);
+audio.addEventListener('ended', () => {
+  reportPlaybackState();
+  if (isSpotifyMode() && spotifyQueue && spotifyQueue.length) {
+    spotifyQueueNext();
+  } else {
+    nextStation();
+  }
+});
+audio.addEventListener('error', () => {
+  reportPlaybackState();
+  document.getElementById('nowPlaying').textContent = '\u26A0 Stream error \u2014 trying next...';
+  setTimeout(() => nextStation(), 2000);
+});
+
+// ── Add/Edit modal ────────────────────────────────────────────────
+function showAddModal() {
+  editIdx = -1;
+  document.getElementById('btnDelete').style.display = 'none';
+
+  // Auto-populate from current playback state:
+  //  - Podcast playing → pre-fill as a podcast bookmark
+  //  - Radio station playing → pre-fill as a station save
+  //  - Nothing playing → blank form
+  var isPodcast = (adHocStream && adHocStream.kind === 'podcast') ||
+    (nativePlaybackState.kind === 'podcast');
+  var isPlaying = (currentIdx >= 0) ||
+    (nativePlaybackState.playing || nativePlaybackState.preparing || nativePlaybackState.buffering);
+
+  if (isPodcast && isPlaying) {
+    var name = (adHocStream ? adHocStream.name : nativePlaybackState.stationName) || '';
+    var url = (adHocStream ? adHocStream.url : nativePlaybackState.url) || '';
+    var artist = (adHocStream ? adHocStream.artist : '') || '';
+    document.getElementById('modalTitle').textContent = 'Bookmark Podcast';
+    document.getElementById('editName').value = name;
+    document.getElementById('editUrl').value = url;
+    document.getElementById('editGenre').value = 'Podcast';
+    document.getElementById('editDesc').value = artist ? ('By ' + artist) : '';
+  } else if (isPlaying && currentIdx >= 0) {
+    var station = stations[currentIdx];
+    document.getElementById('modalTitle').textContent = 'Save Station';
+    document.getElementById('editName').value = station.name || '';
+    document.getElementById('editUrl').value = station.url || '';
+    document.getElementById('editGenre').value = station.genre || '';
+    document.getElementById('editDesc').value = station.desc || '';
+  } else if (isPlaying && adHocStream) {
+    document.getElementById('modalTitle').textContent = 'Save Station';
+    document.getElementById('editName').value = adHocStream.name || '';
+    document.getElementById('editUrl').value = adHocStream.url || '';
+    document.getElementById('editGenre').value = adHocStream.genre || '';
+    document.getElementById('editDesc').value = '';
+  } else {
+    document.getElementById('modalTitle').textContent = 'Add Station';
+    document.getElementById('editName').value = '';
+    document.getElementById('editUrl').value = '';
+    document.getElementById('editGenre').value = '';
+    document.getElementById('editDesc').value = '';
+  }
+
+  document.getElementById('editOverlay').classList.add('show');
+  // Use requestAnimationFrame to ensure the DOM has painted the modal
+  // visible before focusing — fixes the race where focus() fires before
+  // the overlay display:flex takes effect.
+  requestAnimationFrame(function() {
+    document.getElementById('editName').focus();
+  });
+}
+
+function showEditModal(idx) {
+  editIdx = idx;
+  const s = stations[idx];
+  document.getElementById('modalTitle').textContent = 'Edit Station';
+  document.getElementById('editName').value = s.name;
+  document.getElementById('editUrl').value = s.url;
+  document.getElementById('editGenre').value = s.genre || '';
+  document.getElementById('editDesc').value = s.desc || '';
+  document.getElementById('btnDelete').style.display = '';
+  document.getElementById('editOverlay').classList.add('show');
+  setTimeout(function() {
+    document.getElementById('editName').focus();
+  }, 0);
+}
+
+function hideModal() { document.getElementById('editOverlay').classList.remove('show'); }
+
+function saveStation() {
+  const name = document.getElementById('editName').value.trim();
+  const url = document.getElementById('editUrl').value.trim();
+  const genre = document.getElementById('editGenre').value.trim();
+  const desc = document.getElementById('editDesc').value.trim();
+  if (!name || !url) { alert('Name and URL are required'); return; }
+  if (editIdx >= 0) {
+    stations[editIdx] = { ...stations[editIdx], name, url, genre, desc };
+  } else {
+    stations.push({ name, url, genre, desc, fav: false });
+  }
+  save(); renderGenres(); renderStations(); hideModal();
+}
+
+function deleteStation() {
+  if (editIdx < 0) return;
+  if (!confirm('Delete "' + stations[editIdx].name + '"?')) return;
+  if (currentIdx === editIdx) {
+    if (hasNativeRadioBridge()) {
+      try { applyNativeRadioState(AndroidInterface.stopNativeRadioStream()); } catch (e) { console.warn('Native stop failed:', e); }
+    } else {
+      audio.pause();
+      audio.src = '';
+    }
+    currentIdx = -1;
+  } else if (currentIdx > editIdx) currentIdx--;
+  stations.splice(editIdx, 1);
+  save(); renderGenres(); renderStations(); updateUI(); hideModal();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── Keyboard shortcuts ───────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (document.getElementById('editOverlay').classList.contains('show')) return;
+  switch(e.key) {
+    case ' ': e.preventDefault(); togglePlay(); break;
+    case 'ArrowRight': nextStation(); break;
+    case 'ArrowLeft': prevStation(); break;
+    case 'ArrowUp': e.preventDefault(); setVolumeBy(5); break;
+    case 'ArrowDown': e.preventDefault(); setVolumeBy(-5); break;
+  }
+});
+function setVolumeBy(delta) {
+  const sl = document.getElementById('volSlider');
+  const v = Math.max(0, Math.min(100, parseInt(sl.value) + delta));
+  sl.value = v; setVolume(v);
+}
+
+// ── External sync (companion app can call these) ─────────────────
+window.tapRadioGetStations = () => JSON.stringify(stations);
+window.tapRadioSetStations = (json) => {
+  try { stations = JSON.parse(json); save(); renderGenres(); renderStations(); }
+  catch(e) { console.error('tapRadioSetStations error:', e); }
+};
+
+window.addEventListener('focus', () => { syncPlaybackUiFromExternalState(); syncNativeRadioState(); updateUI(); });
+window.addEventListener('pageshow', () => { syncPlaybackUiFromExternalState(); syncNativeRadioState(); updateUI(); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    syncPlaybackUiFromExternalState();
+    syncNativeRadioState();
+    updateUI();
+  }
+});
+window.tapRadioSyncPlaybackUi = () => {
+  syncPlaybackUiFromExternalState();
+  syncNativeRadioState();
+  updateUI();
+};
+window.tapRadioNativeResumePlayback = () => {
+  if (hasNativeRadioBridge()) {
+    applyNativeRadioState(AndroidInterface.resumeNativeRadioStream());
+    updateUI();
+  } else {
+    togglePlay();
+  }
+};
+window.tapRadioNativePausePlayback = () => {
+  if (hasNativeRadioBridge()) {
+    applyNativeRadioState(AndroidInterface.pauseNativeRadioStream());
+    updateUI();
+  } else {
+    togglePlay();
+  }
+};
+window.tapRadioNativeStopPlayback = () => {
+  if (hasNativeRadioBridge()) {
+    applyNativeRadioState(AndroidInterface.stopNativeRadioStream());
+    updateUI();
+  }
+};
+
+// ── Podcast-aware prev/next buttons ─────────────────────────────
+// For podcasts: prev = rewind 20s, next = skip ahead 20s.
+// For radio stations: prev = previous station, next = next station.
+function isPodcastPlaying() {
+  return (adHocStream && adHocStream.kind === 'podcast') ||
+    (nativePlaybackState.kind === 'podcast');
+}
+
+function handlePrev() {
+  // 1) Spotify queue: step to previous track in queue.
+  if (isSpotifyMode() && spotifyQueue && spotifyQueue.length) {
+    spotifyQueuePrev();
+    return;
+  }
+  if (isStreamQueueMode()) {
+    streamQueuePrev();
+    return;
+  }
+  if (isPodcastPlaying() && hasNativeRadioBridge() &&
+      typeof AndroidInterface.seekNativeRadioStream === 'function') {
+    // Rewind 20 seconds
+    syncNativeRadioState();
+    var pos = nativePlaybackState.positionMs || 0;
+    var newPos = Math.max(0, pos - 20000);
+    var state = AndroidInterface.seekNativeRadioStream(newPos);
+    applyNativeRadioState(state);
+    updateUI();
+  } else {
+    prevStation();
+  }
+}
+
+function handleNext() {
+  // 1) Spotify queue: step to next track in queue.
+  if (isSpotifyMode() && spotifyQueue && spotifyQueue.length) {
+    spotifyQueueNext();
+    return;
+  }
+  if (isStreamQueueMode()) {
+    streamQueueNext();
+    return;
+  }
+  if (isPodcastPlaying() && hasNativeRadioBridge() &&
+      typeof AndroidInterface.seekNativeRadioStream === 'function') {
+    // Skip ahead 20 seconds
+    syncNativeRadioState();
+    var pos = nativePlaybackState.positionMs || 0;
+    var dur = nativePlaybackState.durationMs || 0;
+    var newPos = dur > 0 ? Math.min(dur - 1000, pos + 20000) : pos + 20000;
+    var state = AndroidInterface.seekNativeRadioStream(newPos);
+    applyNativeRadioState(state);
+    updateUI();
+  } else {
+    nextStation();
+  }
+}
+
+init();
+</script>
+</body>
+</html>

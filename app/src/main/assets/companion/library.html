@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Library — TapInsight</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;padding:16px;max-width:860px;margin:0 auto;padding-bottom:60px}
+h1{color:#00e5ff;font-size:22px;margin-bottom:2px}
+.sub{color:#888;font-size:13px;margin-bottom:20px}
+
+.nav{display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid #333}
+.nav a{flex:1;padding:10px;text-align:center;text-decoration:none;font-size:13px;font-weight:600;color:#aaa;background:#1a1a1a;transition:all .2s}
+.nav a.active{background:#00e5ff;color:#000}
+.nav a:hover:not(.active){background:#222}
+
+.card{background:#111;border:1px solid #2d3d4a;border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.card h2{font-size:14px;color:#8fdfff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.card p{font-size:13px;color:#cfd8dc;line-height:1.6;margin-bottom:6px}
+.card code{background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;font-size:12px;word-break:break-all}
+
+.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.btn{padding:8px 14px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#e0e0e0;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
+.btn:hover{background:#222;border-color:#00e5ff}
+.btn.primary{background:#00e5ff;color:#000;border-color:#00e5ff}
+.btn.primary:hover{background:#00b8d4}
+.btn.accent{background:#7c4dff;color:#fff;border-color:#7c4dff}
+.btn.accent:hover{background:#651fff}
+.btn.danger{border-color:#e53935;color:#ef5350}
+.btn.danger:hover{background:#e53935;color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.small{padding:4px 10px;font-size:11px}
+
+.breadcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:13px;color:#8fdfff;margin-bottom:10px}
+.breadcrumbs .crumb{color:#8fdfff;cursor:pointer;text-decoration:none}
+.breadcrumbs .crumb:hover{text-decoration:underline}
+.breadcrumbs .sep{color:#555;margin:0 4px}
+.breadcrumbs .crumb.current{color:#eee;cursor:default;text-decoration:none}
+
+.entry-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.entry{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;transition:border-color .15s}
+.entry:hover{border-color:#444}
+.entry .icon{font-size:18px;width:24px;text-align:center;flex-shrink:0}
+.entry .name{flex:1;font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry .meta{font-size:11px;color:#666;flex-shrink:0}
+.entry .actions{display:flex;gap:4px;flex-shrink:0}
+.entry.folder .icon{color:#ffc107}
+.entry.playlist .icon{color:#b388ff}
+.entry.audio .icon{color:#4caf50}
+.entry.video .icon{color:#ff5722}
+.entry.image .icon{color:#80cbc4}
+.entry.other .icon{color:#555}
+.entry.folder{cursor:pointer}
+.entry.image{cursor:pointer}
+
+/* Photo entries replace the icon column with an actual thumbnail so the
+   user sees what each photo is at a glance. The thumb sits in the same
+   24-px slot as kind icons but expands to ~48px, with the entry row
+   gaining a bit of height accordingly. */
+.entry.image .thumb{
+  width:48px;height:48px;border-radius:6px;flex-shrink:0;object-fit:cover;
+  background:#0f0f0f;border:1px solid #2a2a2a;display:block;
+}
+.entry.image{padding:8px 12px}
+
+/* Photo lightbox — only used for IMAGE clicks. The existing modal-overlay
+   CSS is too constrained (max 720px wide, padded) for full-screen photo
+   viewing, so this is its own surface. */
+.photo-lightbox{
+  position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:300;
+  display:flex;flex-direction:column;
+}
+.photo-lightbox.hidden{display:none}
+.photo-lightbox .top{
+  display:flex;align-items:center;padding:12px 16px;gap:12px;
+  background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);
+}
+.photo-lightbox .top .name{flex:1;font-size:13px;color:#ddd;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-lightbox .top button{
+  background:transparent;border:0;color:#eee;font-size:20px;
+  cursor:pointer;padding:6px 10px;border-radius:6px;
+}
+.photo-lightbox .top button:hover{background:rgba(255,255,255,.08)}
+.photo-lightbox .stage{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  padding:20px;overflow:hidden;
+}
+.photo-lightbox .stage img{
+  max-width:100%;max-height:100%;object-fit:contain;
+  border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.6);
+}
+.empty{text-align:center;color:#555;padding:28px 16px;font-size:13px}
+
+.status{padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;display:none}
+.status.ok{display:block;background:#1b5e20;color:#a5d6a7}
+.status.err{display:block;background:#b71c1c;color:#ef9a9a}
+.status.info{display:block;background:#0d47a1;color:#90caf9}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal-overlay.hidden{display:none}
+.modal{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:18px;width:min(720px,96vw);max-height:92vh;overflow-y:auto}
+.modal h2{color:#00e5ff;font-size:16px;margin-bottom:12px}
+.modal .modal-sub{color:#888;font-size:12px;margin-bottom:14px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+
+.pl-entries{display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow-y:auto;margin-bottom:12px;padding:4px}
+.pl-entry{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0f0f0f;border:1px solid #2a2a2a;border-radius:6px;cursor:grab}
+.pl-entry.dragging{opacity:.4}
+.pl-entry .handle{color:#555;font-size:14px;flex-shrink:0;cursor:grab;padding:0 4px}
+.pl-entry .kind-icon{font-size:14px;flex-shrink:0}
+.pl-entry .pl-title{flex:1;background:#060606;border:1px solid #333;color:#fff;font-size:13px;padding:6px 8px;border-radius:4px;min-width:0}
+.pl-entry .pl-title:focus{border-color:#00e5ff;outline:none}
+.pl-entry .pl-path{font-size:10px;color:#666;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-entry .pl-remove{background:none;border:none;color:#e53935;font-size:16px;cursor:pointer;padding:2px 8px}
+.pl-entry .pl-remove:hover{color:#ff5252}
+
+.add-picker{background:#0a0a0a;border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:10px}
+.add-picker h3{font-size:13px;color:#b388ff;margin-bottom:8px}
+.add-picker .picker-list{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.picker-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;cursor:pointer;font-size:12px}
+.picker-item:hover{background:#1a1a1a}
+.picker-item .check{width:16px;color:#4caf50}
+.picker-item.selected{background:#0d3318}
+
+.upload-zone{border:2px dashed #333;border-radius:10px;padding:18px;text-align:center;color:#888;font-size:13px;cursor:pointer;transition:all .15s}
+.upload-zone:hover{border-color:#00e5ff;color:#00e5ff}
+.upload-zone.drag-over{border-color:#00e5ff;background:rgba(0,229,255,.05);color:#00e5ff}
+.upload-zone input[type=file]{display:none}
+.upload-progress{display:none;margin-top:10px;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:6px;padding:8px 10px}
+.upload-progress.visible{display:block}
+.upload-progress .bar-wrap{height:6px;background:#222;border-radius:3px;overflow:hidden;margin-top:4px}
+.upload-progress .bar{height:100%;background:#00e5ff;width:0%;transition:width .2s}
+.upload-progress .label{font-size:11px;color:#aaa;display:flex;justify-content:space-between}
+
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);padding:12px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:200;opacity:0;transition:all .3s;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:90%}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{background:#1b5e20;color:#a5d6a7;border:1px solid #4caf50}
+.toast.err{background:#b71c1c;color:#ef9a9a;border:1px solid #f44336}
+.toast.info{background:#0d47a1;color:#90caf9;border:1px solid #2962ff}
+
+.docs-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+@media(min-width:680px){.docs-grid{grid-template-columns:1fr 1fr}}
+.doc-box{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:12px}
+.doc-box h3{font-size:12px;color:#8fdfff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.doc-box p,.doc-box li{font-size:12px;color:#bbb;line-height:1.5}
+.doc-box ul{padding-left:18px;margin-top:4px}
+.doc-box pre{background:#060606;border:1px solid #222;border-radius:4px;padding:6px 8px;font-size:11px;color:#9ef3ff;overflow-x:auto;margin-top:6px}
+.copy-btn{background:#1a1a1a;border:1px solid #333;color:#9ef3ff;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:6px}
+.copy-btn:hover{background:#222;border-color:#00e5ff}
+
+.playlist-actions{display:flex;gap:6px;margin-left:auto;flex-shrink:0}
+.filter-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:#888}
+.filter-row input{flex:1;padding:7px 10px;background:#111;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px}
+.filter-row input:focus{border-color:#00e5ff;outline:none}
+</style>
+</head>
+<body>
+
+<h1>Media Library</h1>
+<p class="sub">Manage videos, audio, text files, and M3U playlists on your glasses</p>
+
+<div class="nav">
+  <a href="/">Setup</a>
+  <a href="/browser">Browser</a>
+  <a href="/dashboard">Dashboard</a>
+  <a href="/radio">TapRadio</a>
+  <a href="/library" class="active">Library</a>
+  <a href="/openclaw">Agents</a>
+</div>
+
+<!-- Root info card -->
+<div class="card" id="rootCard">
+  <h2>Media Folder on Glasses</h2>
+  <p>Drop media files into this folder over USB/MTP, or upload them here. Uploads from the root auto-route by type.</p>
+  <p><code id="rootPath">Loading…</code>
+    <button class="copy-btn" onclick="copyRootPath()">Copy path</button>
+    <button class="copy-btn" onclick="openMediaFolderHelp()" title="Show how to reach this folder over USB">📂 Open folder</button></p>
+  <p id="rootSpace" style="font-size:11px;color:#888"></p>
+</div>
+
+<!-- "Open folder" help modal — explains how to reach the glasses'
+     app-private Media folder from a Mac / Windows / Linux desktop
+     over USB/MTP. We don't have a reliable cross-platform way to
+     actually open the folder from a browser (file:// from http:// is
+     blocked, and Android app-private storage is often hidden over
+     MTP anyway), so we show clear, copy-able instructions instead. -->
+<div class="modal-overlay hidden" id="folderHelpModal">
+  <div class="modal" style="max-width:560px">
+    <h2>📂 Open the Media folder over USB</h2>
+    <p class="modal-sub">
+      <code id="folderHelpPath">Android/data/&lt;app&gt;/files/Media</code>
+    </p>
+    <p class="modal-sub" style="margin-top:6px;color:#ffb870">
+      ⚠ This is Android <i>app-private</i> storage. On Android 11+ it's hidden from desktop file browsers by default and may not be reachable without sideloading tools. The <b>Upload</b> button in this page is the supported path; the instructions below are for advanced cases.
+    </p>
+
+    <div style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:12px 14px;margin-top:14px">
+      <div style="font-weight:600;color:#80cbc4;margin-bottom:6px">🍎 Mac</div>
+      <ol style="margin:0 0 0 18px;padding:0;line-height:1.7;color:#bbb;font-size:12.5px">
+        <li>Install <a href="https://www.android.com/filetransfer/" target="_blank" rel="noopener" style="color:#9ef3ff">Android File Transfer</a> (free from Google) — macOS doesn't speak MTP natively.</li>
+        <li>Plug the glasses in via USB. On the glasses, pull down the notification shade and set USB mode to <b>File transfer (MTP)</b>.</li>
+        <li>Open <b>Android File Transfer</b> (it auto-launches on connection). Navigate to <code id="folderHelpPathMac">Android/data/…/files/Media</code>.</li>
+        <li>If the <code>Android/data</code> folder doesn't appear: the glasses' MTP layer is hiding it. Use the companion app's <b>Upload</b> button instead, or use ADB: <code>adb push /local/file /storage/emulated/0/&lt;path&gt;</code>.</li>
+      </ol>
+    </div>
+
+    <div style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:12px 14px;margin-top:10px">
+      <div style="font-weight:600;color:#80cbc4;margin-bottom:6px">🪟 Windows</div>
+      <ol style="margin:0 0 0 18px;padding:0;line-height:1.7;color:#bbb;font-size:12.5px">
+        <li>Plug glasses in via USB and switch USB mode to <b>File transfer (MTP)</b>.</li>
+        <li>Open <b>File Explorer</b> — the glasses appear under <b>This PC</b>.</li>
+        <li>Navigate to <code id="folderHelpPathWin">Internal storage\Android\data\…\files\Media</code>.</li>
+      </ol>
+    </div>
+
+    <div style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:12px 14px;margin-top:10px">
+      <div style="font-weight:600;color:#80cbc4;margin-bottom:6px">🐧 Linux / ADB (any OS)</div>
+      <ol style="margin:0 0 0 18px;padding:0;line-height:1.7;color:#bbb;font-size:12.5px">
+        <li>Enable developer mode + USB debugging on the glasses (one-time).</li>
+        <li>Push files via ADB:
+          <div style="background:#060606;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#9ef3ff;font-size:11.5px;word-break:break-all" id="folderHelpAdbCmd">adb push ~/photo.jpg /storage/emulated/0/Android/data/…/files/Media/Photos/</div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn primary" onclick="closeFolderHelpModal()">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="btn" onclick="goHome()">🏠 Root</button>
+  <button class="btn" onclick="loadFolder('Photos')" title="Jump to Media/Photos">📷 Photos</button>
+  <button class="btn" onclick="refresh()">↻ Refresh</button>
+  <button class="btn primary" onclick="openUploadModal()">⬆ Upload</button>
+  <button class="btn" onclick="newFolder()">📁 New Folder</button>
+  <button class="btn accent" onclick="autoGenerate()">♪ Auto-generate playlist</button>
+  <button class="btn" onclick="addToGlassesDashboard()" title="Add a Media Library icon to the on-glasses TapLink Dashboard">📺 Add to Glasses Dashboard</button>
+  <button class="btn" onclick="showDocs()">📖 How it works</button>
+</div>
+
+<div id="status" class="status"></div>
+
+<!-- Breadcrumb + listing -->
+<div class="breadcrumbs" id="breadcrumbs"></div>
+<div class="entry-list" id="entryList"></div>
+
+<!-- Docs card -->
+<div class="card" id="docsCard" style="display:none">
+  <h2>How the Library Works</h2>
+  <div class="docs-grid">
+    <div class="doc-box">
+      <h3>Folder Layout</h3>
+      <p>Your media lives at:</p>
+      <pre id="docsPath">…</pre>
+      <ul>
+        <li><b>Music/</b> — default audio folder</li>
+        <li><b>Videos/</b> — default video folder</li>
+        <li><b>Playlists/</b> — default <code>.m3u</code>/<code>.m3u8</code> folder, including IP-radio station lists</li>
+        <li><b>Text/</b> — default folder for readable text/TTS files</li>
+        <li>Nested folders are fully supported</li>
+        <li>Each folder can have its own <code>.m3u</code></li>
+      </ul>
+    </div>
+    <div class="doc-box">
+      <h3>Playlists (M3U)</h3>
+      <p>Paths inside a <code>.m3u</code> file are relative to the playlist's own directory. Example:</p>
+      <pre>#EXTM3U
+#EXTINF:180,Morning Coffee
+coffee.mp3
+#EXTINF:240,Subway Ride
+../Videos/commute.mp4</pre>
+      <p>Auto-generate (top toolbar) creates a <code>.m3u</code> for the current folder, listing every playable file in order.</p>
+    </div>
+    <div class="doc-box">
+      <h3>Supported Formats</h3>
+      <ul>
+        <li><b>Audio:</b> mp3, m4a, aac, ogg, opus, wav, flac</li>
+        <li><b>Video:</b> mp4, webm, mkv, mov, m4v, 3gp, avi</li>
+        <li><b>Text / TTS:</b> txt, md, markdown, log, csv, json, xml, html, rtf, ini, cfg, conf, yaml, toml</li>
+        <li><b>Playlists:</b> m3u, m3u8</li>
+      </ul>
+    </div>
+    <div class="doc-box">
+      <h3>Playing on the Glasses</h3>
+      <p>The easiest way: tap the <b>Media Library</b> tile in your TapLink Dashboard (Navigation / Entertainment section) — it's added automatically on install.</p>
+      <p>If the tile is missing, click <b>📺 Add to Glasses Dashboard</b> in the toolbar above, then re-launch TapBrowser on the glasses.</p>
+      <p style="margin-top:6px;color:#666">Tapping <b>▶ Play</b> on any playlist also works — it gives you a direct URL for advanced use.</p>
+      <p style="margin-top:6px;color:#666">Range requests (seeking) are fully supported.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Upload modal -->
+<div class="modal-overlay hidden" id="uploadModal">
+  <div class="modal">
+    <h2>Upload Media</h2>
+    <p class="modal-sub">Files will be added to <code id="uploadTarget">/</code>. Photos and videos auto-route to <code>Photos/</code> / <code>Videos/</code> regardless of the current folder.</p>
+
+    <!-- Primary upload: any file from the desktop / phone the browser is on. -->
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('uploadInput').click()">
+      <div>📁 Click to choose files or drag-drop here</div>
+      <div style="font-size:11px;color:#666;margin-top:4px">Photos, videos, audio, text, or .m3u playlists</div>
+      <input type="file" id="uploadInput" multiple accept="image/*,video/*,audio/*,.m3u,.m3u8,.txt,.md,.markdown,.log,.csv,.json,.xml,.html,.htm,.rtf,.ini,.cfg,.conf,.yaml,.yml,.toml,text/*">
+    </div>
+
+    <!-- Folder upload: albums, photo sets, any directory tree. The
+         folder's own name and subfolder structure are recreated inside
+         the current library folder, so an album lands as Music/<Album>/
+         with its tracks (and cover art) together. -->
+    <div class="upload-zone" id="uploadFolderZone" style="margin-top:10px"
+         onclick="document.getElementById('uploadFolderInput').click()">
+      <div>💿 Upload a whole folder (album, photo set…)</div>
+      <div style="font-size:11px;color:#666;margin-top:4px">Folder name and structure are kept</div>
+      <input type="file" id="uploadFolderInput" webkitdirectory>
+    </div>
+
+    <!-- USB import path: explains how to grab the glasses' DCIM photos
+         from a desktop browser without needing the on-glasses media
+         permission to be granted. Same upload zone, just a how-to. -->
+    <details id="usbHelp" style="margin-top:14px;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px">
+      <summary style="cursor:pointer;font-size:13px;color:#80cbc4;font-weight:600;list-style:none;display:flex;align-items:center;gap:6px">
+        <span>📷 Import DCIM photos from glasses (USB)</span>
+        <span style="margin-left:auto;font-size:11px;color:#666;font-weight:400">if grant flow on glasses isn't working</span>
+      </summary>
+      <ol style="margin-top:10px;padding-left:20px;color:#bbb;font-size:12.5px;line-height:1.7">
+        <li>Plug the glasses into your desktop with a USB cable.</li>
+        <li>On the glasses, pull down the notification shade and switch USB mode to <b>File transfer (MTP)</b>.</li>
+        <li>On your desktop, open the glasses storage in Finder/Explorer and navigate to <code>Internal storage › DCIM › Camera</code>.</li>
+        <li>Drag the photos / videos you want into the upload area above (or click and pick them).</li>
+      </ol>
+      <p style="margin-top:8px;font-size:11.5px;color:#888">
+        Photos save to <code>Media/Photos/</code> and videos to <code>Media/Videos/</code> on the glasses, where they appear in the TapInsight gallery alongside saves from <i>"save this photo"</i>.
+      </p>
+    </details>
+
+    <div class="upload-progress" id="uploadProgress">
+      <div class="label"><span id="uploadFileName">Uploading…</span><span id="uploadPct">0%</span></div>
+      <div class="bar-wrap"><div class="bar" id="uploadBar"></div></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeUploadModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Playlist editor modal -->
+<div class="modal-overlay hidden" id="editorModal">
+  <div class="modal">
+    <h2 id="editorTitle">Edit Playlist</h2>
+    <p class="modal-sub" id="editorSub"></p>
+
+    <div id="editorWarnings" style="display:none"></div>
+
+    <div class="pl-entries" id="plEntries"></div>
+
+    <div class="add-picker">
+      <h3>Add from folder</h3>
+      <div class="filter-row">
+        <input type="text" id="pickerFilter" placeholder="Filter…" oninput="renderPicker()">
+        <span id="pickerCount" style="font-size:11px;color:#666"></span>
+      </div>
+      <div class="picker-list" id="pickerList"></div>
+      <div style="margin-top:8px">
+        <button class="btn small accent" onclick="addPickedToPlaylist()">+ Add selected</button>
+        <button class="btn small" onclick="selectAllPicker()">Select all</button>
+        <button class="btn small" onclick="clearPicker()">Clear</button>
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn danger" onclick="deleteCurrentPlaylist()">Delete playlist</button>
+      <button class="btn" onclick="closeEditor()">Cancel</button>
+      <button class="btn primary" onclick="savePlaylist()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Play-URL modal -->
+<div class="modal-overlay hidden" id="playModal">
+  <div class="modal">
+    <h2>Play on Glasses</h2>
+    <p class="modal-sub"><b>Recommended:</b> open the <b>Media Library</b> tile on your glasses' TapLink Dashboard (Navigation / Entertainment) — from there you can browse and tap this playlist directly. If that tile is missing, use <b>📺 Add to Glasses Dashboard</b> in the toolbar.</p>
+    <p class="modal-sub" style="margin-top:8px;color:#888">The URL below is for advanced/debugging use only:</p>
+    <pre id="playUrl" style="background:#060606;padding:12px;border-radius:6px;border:1px solid #333;color:#9ef3ff;font-size:11px;word-break:break-all;margin-bottom:10px"></pre>
+    <button class="btn" onclick="copyPlayUrl()">📋 Copy URL</button>
+    <div class="modal-btns">
+      <button class="btn primary" onclick="closePlayModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo lightbox — opens when the user clicks an IMAGE entry. -->
+<div class="photo-lightbox hidden" id="photoLightbox">
+  <div class="top">
+    <button id="photoCloseBtn" aria-label="Close">✕</button>
+    <div class="name" id="photoName"></div>
+    <button id="photoOpenBtn" aria-label="Open original" title="Open in new tab">↗</button>
+  </div>
+  <div class="stage">
+    <img id="photoImg" alt="">
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────
+let currentPath = '';          // folder relative path, '' = root
+let currentListing = null;     // last listFolder response
+let rootInfo = null;           // /api/library/root response
+let editorPlaylist = null;     // { path, name, entries:[{title, relativePath, url, kind, isAbsoluteUrl}] }
+let editorFolderFiles = [];    // files available to add (playlist's own folder)
+let pickerSelected = new Set();
+let dragSrcIdx = null;
+
+// ── API helpers ──────────────────────────────────────────────────────
+async function api(url, opts) {
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  // Token is injected by the companion shim already
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    let errMsg = r.status + ' ' + r.statusText;
+    try { const j = await r.json(); if (j.error) errMsg = j.error; } catch(e){}
+    throw new Error(errMsg);
+  }
+  return r.json();
+}
+
+function toast(msg, kind) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (kind || 'ok');
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+function showStatus(msg, kind) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + (kind || 'info');
+  if (kind === 'ok') setTimeout(() => el.className = 'status', 3000);
+}
+
+function formatBytes(b) {
+  if (!b) return '';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
+}
+
+function kindIcon(kind) {
+  return ({
+    FOLDER: '📁', PLAYLIST: '🎵', AUDIO: '♪', VIDEO: '▶',
+    IMAGE: '🖼', TEXT: '📄', OTHER: '•'
+  })[kind] || '•';
+}
+
+/**
+ * Build the URL the companion server uses to stream a library file.
+ * The endpoint is `/media/file?path=<rel>` (note: NOT `/api/library/file`
+ * — that one doesn't exist). It requires the session token, which the
+ * companion HTML pages already have via cookie, so authenticated fetches
+ * + image src loads both work transparently.
+ */
+function libraryFileUrl(relativePath) {
+  return '/media/file?path=' + encodeURIComponent(relativePath);
+}
+
+/**
+ * Open the photo lightbox over the page. Streams the full-size image
+ * from /media/file?path=…, which the same companion server backs with
+ * Range support so the WebView/browser fetches incrementally.
+ *
+ * Esc and click-on-backdrop both dismiss. The "↗" button opens the
+ * file in a new tab so the user can download it via the browser's
+ * normal Save-As affordance — which is the meaningful "download"
+ * action on a phone, unlike the glasses-side button we removed.
+ */
+function openPhotoLightbox(entry) {
+  const lb = document.getElementById('photoLightbox');
+  const img = document.getElementById('photoImg');
+  const name = document.getElementById('photoName');
+  const openBtn = document.getElementById('photoOpenBtn');
+  const url = libraryFileUrl(entry.relativePath);
+  img.src = url;
+  name.textContent = entry.name;
+  openBtn.onclick = () => window.open(url, '_blank');
+  lb.classList.remove('hidden');
+}
+function closePhotoLightbox() {
+  document.getElementById('photoLightbox').classList.add('hidden');
+  document.getElementById('photoImg').src = '';
+}
+
+// ── Root info ────────────────────────────────────────────────────────
+async function loadRootInfo() {
+  try {
+    rootInfo = await api('/api/library/root');
+    document.getElementById('rootPath').textContent = rootInfo.rootShortHint;
+    document.getElementById('docsPath').textContent = rootInfo.rootShortHint;
+    const free = formatBytes(rootInfo.freeBytes);
+    const total = formatBytes(rootInfo.totalBytes);
+    if (free && total) {
+      document.getElementById('rootSpace').textContent = free + ' free of ' + total;
+    }
+  } catch (e) {
+    showStatus('Could not load library root: ' + e.message, 'err');
+  }
+}
+
+function copyRootPath() {
+  if (!rootInfo) return;
+  navigator.clipboard.writeText(rootInfo.rootShortHint).then(
+    () => toast('Path copied to clipboard'),
+    () => toast('Copy failed', 'err')
+  );
+}
+
+/**
+ * Show the "Open folder" help modal. The path the server reports is
+ * server-relative (e.g. `Android/data/com.TapLink.app/files/Media`).
+ * We populate Mac, Windows, and ADB-shaped variants of it so the
+ * user can just copy/paste their way into the right place without
+ * having to mentally translate path separators or invent a guess
+ * for the package name.
+ */
+function openMediaFolderHelp() {
+  if (!rootInfo) {
+    toast('Library info not loaded yet — try again in a moment', 'err');
+    return;
+  }
+  const macPath = rootInfo.rootShortHint;
+  // Windows uses backslashes; Mac/Linux use forward slashes. The path
+  // we get from the server is already Mac/Linux-shaped.
+  const winPath = 'Internal storage\\' + macPath.replace(/\//g, '\\');
+  const adbCmd = 'adb push ~/your-file.jpg /storage/emulated/0/' +
+    macPath + '/Photos/';
+  document.getElementById('folderHelpPath').textContent = macPath;
+  document.getElementById('folderHelpPathMac').textContent = macPath;
+  document.getElementById('folderHelpPathWin').textContent = winPath;
+  document.getElementById('folderHelpAdbCmd').textContent = adbCmd;
+  document.getElementById('folderHelpModal').classList.remove('hidden');
+}
+function closeFolderHelpModal() {
+  document.getElementById('folderHelpModal').classList.add('hidden');
+}
+
+// ── Folder navigation ────────────────────────────────────────────────
+async function loadFolder(path) {
+  try {
+    const enc = encodeURIComponent(path);
+    currentListing = await api('/api/library/list?path=' + enc);
+    currentPath = currentListing.relativePath;
+    renderBreadcrumbs(currentListing.breadcrumbs);
+    renderEntries(currentListing.entries);
+    document.getElementById('uploadTarget').textContent = '/' + (currentPath || '');
+  } catch (e) {
+    showStatus('Could not load folder: ' + e.message, 'err');
+  }
+}
+
+function renderBreadcrumbs(bc) {
+  const el = document.getElementById('breadcrumbs');
+  el.innerHTML = '';
+  bc.forEach((c, i) => {
+    if (i > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'sep'; sep.textContent = '›';
+      el.appendChild(sep);
+    }
+    const a = document.createElement('span');
+    a.className = 'crumb' + (i === bc.length - 1 ? ' current' : '');
+    a.textContent = c.name;
+    if (i < bc.length - 1) {
+      a.onclick = () => loadFolder(c.path);
+    }
+    el.appendChild(a);
+  });
+}
+
+function renderEntries(entries) {
+  const el = document.getElementById('entryList');
+  el.innerHTML = '';
+  if (!entries || entries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Empty folder. Upload some media or drop files over USB.';
+    el.appendChild(empty);
+    return;
+  }
+  entries.forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'entry ' + entry.kind.toLowerCase();
+    // IMAGE entries get an actual <img> thumbnail in place of the
+    // emoji icon column. Everything else keeps the existing layout.
+    const iconCell = entry.kind === 'IMAGE'
+      ? '<img class="thumb" loading="lazy" decoding="async" src="' +
+          libraryFileUrl(entry.relativePath) + '" alt="">'
+      : '<div class="icon">' + kindIcon(entry.kind) + '</div>';
+    div.innerHTML =
+      iconCell +
+      '<div class="name"></div>' +
+      '<div class="meta">' + (entry.kind === 'FOLDER' ? '' : formatBytes(entry.sizeBytes)) + '</div>' +
+      '<div class="actions"></div>';
+    div.querySelector('.name').textContent = entry.name;
+    const actions = div.querySelector('.actions');
+    if (entry.kind === 'FOLDER') {
+      div.onclick = () => loadFolder(entry.relativePath);
+    } else if (entry.kind === 'IMAGE') {
+      // Whole row is clickable → opens full-size lightbox.
+      div.onclick = (ev) => {
+        if (ev.target.closest('.actions')) return;
+        openPhotoLightbox(entry);
+      };
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn small danger';
+      delBtn.textContent = '✕';
+      delBtn.onclick = (ev) => { ev.stopPropagation(); deleteEntry(entry); };
+      actions.append(delBtn);
+    } else if (entry.kind === 'PLAYLIST') {
+      const playBtn = document.createElement('button');
+      playBtn.className = 'btn small primary';
+      playBtn.textContent = '▶ Play';
+      playBtn.onclick = (ev) => { ev.stopPropagation(); showPlayUrl(entry); };
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn small accent';
+      editBtn.textContent = 'Edit';
+      editBtn.onclick = (ev) => { ev.stopPropagation(); openEditor(entry); };
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn small danger';
+      delBtn.textContent = '✕';
+      delBtn.onclick = (ev) => { ev.stopPropagation(); deleteEntry(entry); };
+      actions.append(playBtn, editBtn, delBtn);
+    } else {
+      // audio/video/other: allow delete
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn small danger';
+      delBtn.textContent = '✕';
+      delBtn.onclick = (ev) => { ev.stopPropagation(); deleteEntry(entry); };
+      actions.append(delBtn);
+    }
+    el.appendChild(div);
+  });
+}
+
+function goHome() { loadFolder(''); }
+function refresh() { loadFolder(currentPath); }
+
+async function deleteEntry(entry) {
+  if (!confirm('Delete "' + entry.name + '"?' +
+      (entry.kind === 'FOLDER' ? '\n\nThis removes the folder AND everything inside it.' : ''))) return;
+  try {
+    await api('/api/library/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path: entry.relativePath })
+    });
+    toast('Deleted ' + entry.name);
+    refresh();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'err');
+  }
+}
+
+// ── Add Media Library icon to on-glasses TapLink Dashboard ───────────
+async function addToGlassesDashboard() {
+  try {
+    const res = await api('/api/library/ensure-dashboard-icon', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: '{}'
+    });
+    if (res && res.added === true) {
+      toast('Added to Navigation / Entertainment. Re-launch TapBrowser on the glasses to see it.');
+    } else if (res && res.added === false) {
+      toast('Media Library icon is already in your dashboard.');
+    } else {
+      toast('Dashboard updated.');
+    }
+  } catch (e) {
+    toast('Add failed: ' + e.message, 'err');
+  }
+}
+
+// ── Auto-generate ────────────────────────────────────────────────────
+async function autoGenerate() {
+  if (!confirm('Auto-generate a playlist for the current folder?\nIt will include every audio/video file in ' +
+               (currentPath || 'Media/'))) return;
+  try {
+    const res = await api('/api/library/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ folder: currentPath })
+    });
+    toast('Created ' + res.name);
+    refresh();
+  } catch (e) {
+    toast('Generate failed: ' + e.message, 'err');
+  }
+}
+
+// ── Upload ───────────────────────────────────────────────────────────
+function openUploadModal() {
+  document.getElementById('uploadTarget').textContent = '/' + (currentPath || '');
+  document.getElementById('uploadModal').classList.remove('hidden');
+  document.getElementById('uploadProgress').classList.remove('visible');
+  document.getElementById('uploadInput').value = '';
+  document.getElementById('uploadFolderInput').value = '';
+}
+function closeUploadModal() {
+  document.getElementById('uploadModal').classList.add('hidden');
+  refresh();
+}
+
+async function newFolder() {
+  const name = prompt('New folder name (created in /' + (currentPath || '') + '):');
+  if (!name) return;
+  const clean = name.trim().replace(/[\\/:*?"<>|]/g, '-');
+  if (!clean) return;
+  try {
+    const r = await fetch('/api/library/mkdir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ path: (currentPath ? currentPath + '/' : '') + clean })
+    });
+    const data = await r.json();
+    if (data.status === 'ok') { toast('Folder created: ' + clean); refresh(); }
+    else showStatus('Create folder failed: ' + (data.error || r.status), 'err');
+  } catch (e) {
+    showStatus('Create folder failed: ' + e.message, 'err');
+  }
+}
+
+// Folder upload: one request per subdirectory, preserving the picked
+// folder's name + structure under the CURRENT library folder. Explicit
+// folder targets intentionally bypass the photo/video auto-routing —
+// an album's cover.jpg belongs WITH the album, not in Photos/.
+async function doUploadFolder(files) {
+  if (!files || files.length === 0) return;
+  const progressEl = document.getElementById('uploadProgress');
+  const barEl = document.getElementById('uploadBar');
+  const pctEl = document.getElementById('uploadPct');
+  const nameEl = document.getElementById('uploadFileName');
+  progressEl.classList.add('visible');
+  const groups = {};
+  for (const f of files) {
+    const rel = f.webkitRelativePath || f.name;
+    const dir = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
+    (groups[dir] = groups[dir] || []).push(f);
+  }
+  const total = files.length;
+  let done = 0, saved = 0, failed = 0;
+  for (const dir of Object.keys(groups)) {
+    const targetFolder = (currentPath ? currentPath + '/' : '') + dir;
+    const fd = new FormData();
+    fd.append('folder', targetFolder);
+    groups[dir].forEach((f, i) => fd.append('file_' + i, f, f.name));
+    nameEl.textContent = (dir || 'folder') + ' (' + groups[dir].length + ' files)';
+    try {
+      const r = await fetch('/api/library/upload', {
+        method: 'POST', body: fd, credentials: 'include'
+      });
+      const res = await r.json();
+      saved += (res.saved || []).length;
+      failed += (res.errors || []).length;
+    } catch (e) {
+      failed += groups[dir].length;
+    }
+    done += groups[dir].length;
+    const pct = Math.round((done / total) * 100);
+    barEl.style.width = pct + '%';
+    pctEl.textContent = pct + '%';
+  }
+  toast('Folder upload: ' + saved + ' file(s)' + (failed ? ', ' + failed + ' failed' : ''));
+  setTimeout(closeUploadModal, 800);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const zone = document.getElementById('uploadZone');
+  const input = document.getElementById('uploadInput');
+  const folderInput = document.getElementById('uploadFolderInput');
+  folderInput.addEventListener('change', () => doUploadFolder(folderInput.files));
+  input.addEventListener('change', () => doUpload(input.files));
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    doUpload(e.dataTransfer.files);
+  });
+
+  // Photo lightbox close affordances. Backdrop click closes, but a
+  // click directly on the image must NOT — otherwise zoom-gesture
+  // taps would dismiss. Esc also closes.
+  const lb = document.getElementById('photoLightbox');
+  document.getElementById('photoCloseBtn').addEventListener('click', closePhotoLightbox);
+  lb.addEventListener('click', (e) => {
+    if (e.target === lb || e.target.classList.contains('stage')) {
+      closePhotoLightbox();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !lb.classList.contains('hidden')) closePhotoLightbox();
+  });
+});
+
+async function doUpload(files) {
+  if (!files || files.length === 0) return;
+  const progressEl = document.getElementById('uploadProgress');
+  const barEl = document.getElementById('uploadBar');
+  const pctEl = document.getElementById('uploadPct');
+  const nameEl = document.getElementById('uploadFileName');
+  progressEl.classList.add('visible');
+
+  // Image / video uploads always auto-route to Media/Photos or
+  // Media/Videos regardless of which folder the user is currently
+  // browsing — otherwise dragging a photo while inside Music/ would
+  // leave it in the wrong place and out of the photos gallery's
+  // scope. We detect by extension because file.type can be empty on
+  // older browsers / certain MTP sources. If ALL files are
+  // photo/video, send folder='' to trigger server-side auto-route.
+  const photoVideoExt = /\.(jpe?g|png|webp|gif|bmp|heic|heif|mp4|mov|m4v|3gp|webm|mkv|avi)$/i;
+  const allPhotoVideo = Array.from(files).every(f => photoVideoExt.test(f.name));
+  const fd = new FormData();
+  fd.append('folder', allPhotoVideo ? '' : currentPath);
+  let totalBytes = 0;
+  for (let i = 0; i < files.length; i++) {
+    fd.append('file_' + i, files[i], files[i].name);
+    totalBytes += files[i].size;
+  }
+  nameEl.textContent = files.length === 1 ? files[0].name : files.length + ' files';
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/library/upload');
+  // Add session token header manually since XMLHttpRequest isn't wrapped by the fetch shim.
+  // The companion shim sets a cookie that the server also accepts.
+  xhr.withCredentials = true;
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      barEl.style.width = pct + '%';
+      pctEl.textContent = pct + '%';
+    }
+  };
+  xhr.onload = () => {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      try {
+        const res = JSON.parse(xhr.responseText);
+        toast('Uploaded ' + (res.saved ? res.saved.length : files.length) + ' file(s)');
+        if (res.errors && res.errors.length > 0) {
+          showStatus('Some files failed: ' + res.errors.join(', '), 'err');
+        }
+      } catch(e) {
+        toast('Upload complete');
+      }
+      setTimeout(closeUploadModal, 600);
+    } else {
+      toast('Upload failed (' + xhr.status + ')', 'err');
+    }
+  };
+  xhr.onerror = () => toast('Upload error', 'err');
+  xhr.send(fd);
+}
+
+// ── Playlist editor ──────────────────────────────────────────────────
+async function openEditor(playlistEntry) {
+  try {
+    const enc = encodeURIComponent(playlistEntry.relativePath);
+    const parsed = await api('/api/library/playlist?path=' + enc);
+    editorPlaylist = {
+      path: parsed.relativePath,
+      name: parsed.name,
+      entries: parsed.entries.map(e => ({
+        title: e.title,
+        relativePath: e.relativePath,
+        url: e.url,
+        kind: e.kind,
+        isAbsoluteUrl: e.isAbsoluteUrl,
+        durationSeconds: e.durationSeconds,
+        rawPath: e.rawPath
+      }))
+    };
+    document.getElementById('editorTitle').textContent = 'Edit — ' + parsed.name;
+    document.getElementById('editorSub').textContent = parsed.relativePath;
+
+    const warnBox = document.getElementById('editorWarnings');
+    if (parsed.warnings && parsed.warnings.length > 0) {
+      warnBox.style.display = 'block';
+      warnBox.className = 'status err';
+      warnBox.style.marginBottom = '10px';
+      warnBox.textContent = 'Warnings: ' + parsed.warnings.join('; ');
+    } else {
+      warnBox.style.display = 'none';
+    }
+
+    // Populate "add from folder" with the playlist folder's siblings
+    const folderPath = parsed.relativePath.includes('/')
+      ? parsed.relativePath.substring(0, parsed.relativePath.lastIndexOf('/'))
+      : '';
+    const folderListing = await api('/api/library/list?path=' + encodeURIComponent(folderPath));
+    editorFolderFiles = folderListing.entries.filter(
+      e => e.kind === 'AUDIO' || e.kind === 'VIDEO'
+    );
+    pickerSelected.clear();
+
+    renderEditorEntries();
+    renderPicker();
+    document.getElementById('editorModal').classList.remove('hidden');
+  } catch (e) {
+    toast('Could not open playlist: ' + e.message, 'err');
+  }
+}
+
+function closeEditor() {
+  document.getElementById('editorModal').classList.add('hidden');
+  editorPlaylist = null;
+}
+
+function renderEditorEntries() {
+  const el = document.getElementById('plEntries');
+  el.innerHTML = '';
+  if (!editorPlaylist || editorPlaylist.entries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Playlist is empty. Add tracks from the folder below.';
+    el.appendChild(empty);
+    return;
+  }
+  editorPlaylist.entries.forEach((entry, idx) => {
+    const row = document.createElement('div');
+    row.className = 'pl-entry';
+    row.draggable = true;
+    row.dataset.idx = idx;
+    row.innerHTML =
+      '<span class="handle">☰</span>' +
+      '<span class="kind-icon">' + kindIcon(entry.kind) + '</span>' +
+      '<input class="pl-title" type="text" />' +
+      '<span class="pl-path"></span>' +
+      '<button class="pl-remove" title="Remove">×</button>';
+    const titleInput = row.querySelector('.pl-title');
+    titleInput.value = entry.title || '';
+    titleInput.oninput = () => { entry.title = titleInput.value; };
+    row.querySelector('.pl-path').textContent = entry.isAbsoluteUrl ? entry.rawPath : entry.relativePath;
+    row.querySelector('.pl-remove').onclick = () => {
+      editorPlaylist.entries.splice(idx, 1);
+      renderEditorEntries();
+    };
+    row.addEventListener('dragstart', (e) => {
+      dragSrcIdx = idx;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      dragSrcIdx = null;
+    });
+    row.addEventListener('dragover', (e) => { e.preventDefault(); });
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (dragSrcIdx === null || dragSrcIdx === idx) return;
+      const [moved] = editorPlaylist.entries.splice(dragSrcIdx, 1);
+      editorPlaylist.entries.splice(idx, 0, moved);
+      renderEditorEntries();
+    });
+    el.appendChild(row);
+  });
+}
+
+function renderPicker() {
+  const list = document.getElementById('pickerList');
+  const filter = document.getElementById('pickerFilter').value.toLowerCase();
+  list.innerHTML = '';
+  const filtered = editorFolderFiles.filter(
+    f => !filter || f.name.toLowerCase().includes(filter)
+  );
+  document.getElementById('pickerCount').textContent =
+    filtered.length + ' file' + (filtered.length === 1 ? '' : 's');
+  filtered.forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'picker-item' + (pickerSelected.has(f.relativePath) ? ' selected' : '');
+    item.innerHTML =
+      '<span class="check">' + (pickerSelected.has(f.relativePath) ? '✓' : '') + '</span>' +
+      '<span class="kind-icon">' + kindIcon(f.kind) + '</span>' +
+      '<span></span>';
+    item.querySelector('span:last-child').textContent = f.name;
+    item.onclick = () => {
+      if (pickerSelected.has(f.relativePath)) pickerSelected.delete(f.relativePath);
+      else pickerSelected.add(f.relativePath);
+      renderPicker();
+    };
+    list.appendChild(item);
+  });
+}
+
+function selectAllPicker() {
+  editorFolderFiles.forEach(f => pickerSelected.add(f.relativePath));
+  renderPicker();
+}
+function clearPicker() {
+  pickerSelected.clear();
+  renderPicker();
+}
+function addPickedToPlaylist() {
+  if (pickerSelected.size === 0) { toast('Pick some files first', 'err'); return; }
+  editorFolderFiles.forEach(f => {
+    if (pickerSelected.has(f.relativePath)) {
+      editorPlaylist.entries.push({
+        title: f.name.replace(/\.[^.]+$/, ''),
+        relativePath: f.relativePath,
+        kind: f.kind,
+        isAbsoluteUrl: false,
+        durationSeconds: null,
+        rawPath: f.relativePath
+      });
+    }
+  });
+  pickerSelected.clear();
+  renderPicker();
+  renderEditorEntries();
+}
+
+async function savePlaylist() {
+  if (!editorPlaylist) return;
+  try {
+    const payload = {
+      path: editorPlaylist.path,
+      entries: editorPlaylist.entries.map(e => ({
+        targetPathOrUrl: e.isAbsoluteUrl ? e.rawPath : e.relativePath,
+        title: e.title || '',
+        durationSeconds: e.durationSeconds
+      }))
+    };
+    const res = await api('/api/library/playlist', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    toast('Saved ' + res.entryCount + ' entries');
+    closeEditor();
+    refresh();
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'err');
+  }
+}
+
+async function deleteCurrentPlaylist() {
+  if (!editorPlaylist) return;
+  if (!confirm('Delete playlist "' + editorPlaylist.name + '"?')) return;
+  try {
+    await api('/api/library/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path: editorPlaylist.path })
+    });
+    toast('Deleted');
+    closeEditor();
+    refresh();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'err');
+  }
+}
+
+// ── Play URL modal ───────────────────────────────────────────────────
+let pendingPlayUrl = '';
+function showPlayUrl(entry) {
+  const token = window.__companionToken || '';
+  const plist = encodeURIComponent(entry.relativePath);
+  const title = encodeURIComponent(entry.name);
+  pendingPlayUrl =
+    'file:///android_asset/media_player.html?type=playlist' +
+    '&title=' + title +
+    '&playlist=' + plist +
+    '&token=' + encodeURIComponent(token);
+  document.getElementById('playUrl').textContent = pendingPlayUrl;
+  document.getElementById('playModal').classList.remove('hidden');
+}
+function closePlayModal() { document.getElementById('playModal').classList.add('hidden'); }
+function copyPlayUrl() {
+  navigator.clipboard.writeText(pendingPlayUrl).then(
+    () => toast('URL copied — open the TapBrowser on your glasses and paste'),
+    () => toast('Copy failed', 'err')
+  );
+}
+
+// ── Docs toggle ──────────────────────────────────────────────────────
+function showDocs() {
+  const c = document.getElementById('docsCard');
+  c.style.display = c.style.display === 'none' ? 'block' : 'none';
+  if (c.style.display === 'block') c.scrollIntoView({behavior:'smooth'});
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+(async function init() {
+  await loadRootInfo();
+  await loadFolder('');
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Soft moonlit-blue halo drawn behind the earth orb while Gemini is
+  speaking.  Built as a layer-list of two stacked radial gradients so
+  the glow reads as atmospheric firelight-in-blue rather than a single
+  solid disc:
+
+    1) Outer diffuse halo — very wide gradientRadius (105%) with a
+       translucent mid-stop, so the edge of the glow bleeds softly into
+       the panel instead of terminating in a hard circle.  This is
+       what makes the halo look "dithered" rather than a flat coloured
+       shape with an abrupt boundary.
+
+    2) Inner moonlit body — tighter radius (55%) with a brighter but
+       never fully-opaque highlight so the halo has colour depth near
+       the orb.  Alpha tops out at 0xB3 (~70%) in the core rather than
+       0xFF, so the halo never reads as a solid fill — it glows.
+
+  android:dither="true" enables hardware dithering on both layers,
+  which smooths the gradient across low-bit displays so the colour
+  transitions don't band into concentric rings.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape
+            android:dither="true"
+            android:shape="oval">
+            <gradient
+                android:centerColor="#3D4AA6FF"
+                android:centerX="0.5"
+                android:centerY="0.5"
+                android:endColor="#004AA6FF"
+                android:gradientRadius="105%"
+                android:startColor="#66B3DCFF"
+                android:type="radial" />
+        </shape>
+    </item>
+    <item>
+        <shape
+            android:dither="true"
+            android:shape="oval">
+            <gradient
+                android:centerColor="#664AA6FF"
+                android:centerX="0.5"
+                android:centerY="0.5"
+                android:endColor="#004AA6FF"
+                android:gradientRadius="55%"
+                android:startColor="#B3B3DCFF"
+                android:type="radial" />
+        </shape>
+    </item>
+</layer-list>

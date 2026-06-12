@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>TapRadio — Top Podcasts</title>
+<style>
+:root {
+  --bg: #000;
+  --card: #0a0a0a;
+  --accent: #00e5ff;
+  --text: #f5f5f5;
+  --muted: #888;
+  --border: rgba(255,255,255,.08);
+  --glow: rgba(0,229,255,.18);
+  --kb-offset: 0px;
+  --mini-player-offset: 0px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  max-width: 960px;
+  max-height: 480px;
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.03);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.topbar h1 {
+  font-size: 14px;
+  letter-spacing: .5px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.topbar .sub {
+  font-size: 11px;
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar .actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.back-btn {
+  display: none;
+  background: rgba(0,229,255,.08);
+  border: 1px solid rgba(0,229,255,.25);
+  color: var(--accent);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+.back-btn:active {
+  background: rgba(0,229,255,.18);
+}
+.back-btn.visible { display: inline-block; }
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px 10px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+.list::-webkit-scrollbar { width: 3px; }
+.list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.15);
+  border-radius: 4px;
+}
+
+.pod {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255,255,255,.02);
+  transition: all .15s;
+  cursor: pointer;
+}
+.pod:active {
+  background: rgba(0,229,255,.08);
+  border-color: rgba(0,229,255,.25);
+  box-shadow: 0 0 12px var(--glow);
+}
+.pod .rank {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.pod .art {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: var(--card);
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+.pod .info {
+  flex: 1;
+  min-width: 0;
+}
+.pod .title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.pod .artist {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+/* Clickable show / creator pills inside an episode card.
+   Tapping these triggers navigation, NOT the parent card. */
+.pod .meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+.pod .pill {
+  color: var(--accent);
+  background: rgba(0,229,255,.08);
+  border: 1px solid rgba(0,229,255,.25);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+}
+.pod .pill:active {
+  background: rgba(0,229,255,.22);
+}
+.pod .meta .dot {
+  color: rgba(255,255,255,.18);
+  font-size: 10px;
+}
+.pod .meta .when,
+.pod .meta .dur {
+  color: var(--muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.pod .desc {
+  font-size: 11px;
+  color: rgba(245,245,245,.72);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pod .chev {
+  color: var(--muted);
+  font-size: 16px;
+  flex-shrink: 0;
+  padding-right: 4px;
+  align-self: center;
+}
+
+
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.empty.error { color: #ff6b6b; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <button class="back-btn" id="backBtn" onclick="goBack()">&larr; Back</button>
+    <h1 id="title">Top Podcasts</h1>
+    <div class="sub" id="subtitle">via Apple iTunes</div>
+    <!-- ＋ Save this show's EPISODE LIST into TapRadio's PodCasts tab.
+         Visible only on the per-show episodes view. Dim ＋ = not saved;
+         accent ＋ = saved (tap again to remove). -->
+    <button class="back-btn" id="saveShowBtn" style="display:none;flex-shrink:0;font-weight:700"
+            title="Save this show to TapRadio PodCasts">＋</button>
+  </div>
+  <div class="list" id="list">
+    <div class="empty">Loading…</div>
+  </div>
+
+<script>
+(function() {
+  'use strict';
+
+  // -------- State --------
+  // Possible views:
+  //   'podcasts'        — list of shows (top chart, artist results, etc.)
+  //   'episode_search'  — list of episodes from a topic search (from Kotlin)
+  //   'episodes'        — list of episodes drilled into from a single show
+  //   'stations_list'   — mixed list of discovered radio stations + podcasts
+  //                       (from tapradio action='search' + display='glasses')
+  // history holds previous {view, ...} snapshots for the back button.
+  var state = {
+    view: 'podcasts',
+    podcasts: [],               // current shows list
+    episodeResults: [],         // current episode-search list
+    stationsList: [],           // current discovered-stations list (mixed)
+    chartTitle: '',             // headline label (e.g. "10 episodes about 'amiga 500'")
+    currentPodcast: null,       // show drilled into for 'episodes' view
+    loadingId: null,            // collectionId currently loading episodes
+    history: []                 // navigation stack for back button
+  };
+  var PAGE_STATE_VERSION = 1;
+  var PAGE_STATE_KEY_PREFIX = 'tapradio_podcasts_state:';
+
+  function getPageStateKey() {
+    return PAGE_STATE_KEY_PREFIX + window.location.pathname + window.location.search;
+  }
+
+  function persistPageState() {
+    if (!window.location.search) return;
+    try {
+      var snapshot = {
+        version: PAGE_STATE_VERSION,
+        state: state
+      };
+      sessionStorage.setItem(getPageStateKey(), JSON.stringify(snapshot));
+    } catch (e) {
+      console.warn('podcasts.html: failed to persist page state', e);
+    }
+  }
+
+  function restorePageState() {
+    if (!window.location.search) return false;
+    try {
+      var raw = sessionStorage.getItem(getPageStateKey());
+      if (!raw) return false;
+      var saved = JSON.parse(raw);
+      if (!saved || saved.version !== PAGE_STATE_VERSION || !saved.state) return false;
+      state.view = saved.state.view || 'podcasts';
+      state.podcasts = Array.isArray(saved.state.podcasts) ? saved.state.podcasts : [];
+      state.episodeResults = Array.isArray(saved.state.episodeResults) ? saved.state.episodeResults : [];
+      state.stationsList = Array.isArray(saved.state.stationsList) ? saved.state.stationsList : [];
+      state.chartTitle = saved.state.chartTitle || '';
+      state.currentPodcast = saved.state.currentPodcast || null;
+      state.loadingId = saved.state.loadingId || null;
+      state.history = Array.isArray(saved.state.history) ? saved.state.history : [];
+      return true;
+    } catch (e) {
+      console.warn('podcasts.html: failed to restore page state', e);
+      return false;
+    }
+  }
+
+  function renderCurrentState() {
+    if (state.view === 'stations_list') {
+      renderStationsList();
+      return;
+    }
+    if (state.view === 'episode_search') {
+      renderEpisodeSearch();
+      return;
+    }
+    if (state.view === 'episodes' && state.currentPodcast) {
+      if (state.currentPodcast._episodes && state.currentPodcast._episodes.length > 0) {
+        renderEpisodes(state.currentPodcast, state.currentPodcast._episodes);
+      } else {
+        renderEpisodesLoading(state.currentPodcast);
+        loadEpisodesFromItunes(state.currentPodcast);
+      }
+      return;
+    }
+    renderPodcasts();
+  }
+
+  // Expose goBack globally so the inline onclick on the back button works.
+  window.goBack = goBack;
+
+  // -------- Save show → TapRadio PodCasts tab --------
+  // Shares the same localStorage store radio.html's PodCasts tab reads
+  // (same file:///android_asset origin). A saved SHOW entry carries
+  // type:'show' + showId; tapping it in TapRadio deep-links back here
+  // via ?showId=… and reopens this episode list.
+  var SAVED_PODCASTS_KEY = 'tapinsight_saved_podcasts';
+
+  function loadSavedPodcastEntries() {
+    try {
+      var raw = localStorage.getItem(SAVED_PODCASTS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function persistSavedPodcastEntries(list) {
+    try { localStorage.setItem(SAVED_PODCASTS_KEY, JSON.stringify(list.slice(0, 50))); }
+    catch (e) {}
+  }
+  function isShowSaved(id) {
+    return loadSavedPodcastEntries().some(function(p) {
+      return p && p.type === 'show' && String(p.showId) === String(id);
+    });
+  }
+  function updateSaveShowBtn() {
+    var btn = document.getElementById('saveShowBtn');
+    if (!btn) return;
+    var pod = state.currentPodcast;
+    var visible = state.view === 'episodes' && pod && pod.id;
+    btn.style.display = visible ? '' : 'none';
+    if (!visible) return;
+    var saved = isShowSaved(pod.id);
+    btn.style.opacity = saved ? '1' : '0.55';
+    btn.style.color = saved ? '#00e5ff' : '';
+    btn.title = saved
+      ? 'Saved in TapRadio PodCasts — tap to remove'
+      : 'Save this show to TapRadio PodCasts';
+  }
+  document.getElementById('saveShowBtn').addEventListener('click', function() {
+    var pod = state.currentPodcast;
+    if (!pod || !pod.id) return;
+    var list = loadSavedPodcastEntries();
+    var idx = list.findIndex(function(p) {
+      return p && p.type === 'show' && String(p.showId) === String(pod.id);
+    });
+    if (idx >= 0) {
+      list.splice(idx, 1);
+    } else {
+      list.unshift({
+        type: 'show',
+        showId: String(pod.id),
+        name: pod.title || 'Podcast',
+        artist: pod.artist || '',
+        art: pod.art || '',
+        fav: false,
+        ts: Date.now()
+      });
+    }
+    persistSavedPodcastEntries(list);
+    updateSaveShowBtn();
+  });
+  // Light poll keeps the button in sync with whichever view is active
+  // without threading a call through every render function.
+  setInterval(updateSaveShowBtn, 600);
+
+  function parsePayload() {
+    try {
+      var qs = window.location.search;
+      if (!qs || qs.length < 2) return null;
+      var params = new URLSearchParams(qs);
+      var raw = params.get('data');
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn('podcasts.html: failed to parse payload', e);
+      return null;
+    }
+  }
+
+  window.tapBrowserSetKeyboardState = function(isVisible, keyboardHeight) {
+    var visible = !!isVisible;
+    var px = Math.max(0, parseInt(keyboardHeight, 10) || 0);
+    document.documentElement.style.setProperty('--kb-offset', px + 'px');
+    document.body.classList.toggle('keyboard-open', visible);
+  };
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function encodeParam(s) {
+    return encodeURIComponent(s == null ? '' : String(s));
+  }
+
+  function formatPubDate(raw) {
+    if (!raw) return '';
+    try {
+      var d = new Date(raw);
+      if (isNaN(d.getTime())) return raw;
+      return d.toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric'
+      });
+    } catch (e) {
+      return raw;
+    }
+  }
+
+  function formatDuration(raw) {
+    if (!raw) return '';
+    // If it's already HH:MM:SS or MM:SS, return as-is
+    if (/^\d+(:\d+){1,2}$/.test(raw)) return raw;
+    // Otherwise try parsing as seconds
+    var n = parseInt(raw, 10);
+    if (isNaN(n) || n <= 0) return raw;
+    var h = Math.floor(n / 3600);
+    var m = Math.floor((n % 3600) / 60);
+    var s = n % 60;
+    if (h > 0) {
+      return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  // -------- Rendering --------
+  function renderPodcasts() {
+    var list = document.getElementById('list');
+    var titleEl = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var backBtn = document.getElementById('backBtn');
+
+    state.view = 'podcasts';
+    titleEl.textContent = 'Top Podcasts';
+    subtitle.textContent = state.chartTitle || 'via Apple iTunes';
+    if (state.history.length > 0) {
+      backBtn.classList.add('visible');
+    } else {
+      backBtn.classList.remove('visible');
+    }
+
+    if (!state.podcasts || state.podcasts.length === 0) {
+      list.innerHTML = '<div class="empty">No podcasts to display.</div>';
+      return;
+    }
+
+    var html = '';
+    state.podcasts.forEach(function(item, idx) {
+      var rank = idx + 1;
+      var title = escapeHtml(item.title || 'Untitled');
+      var artist = escapeHtml(item.artist || '');
+      var art = escapeHtml(item.art || '');
+      var desc = escapeHtml(item.desc || '');
+      // Use idx (not rank) so we can look up in state.podcasts directly.
+      html += '<div class="pod" data-idx="' + idx + '">';
+      html += '  <div class="rank">' + rank + '</div>';
+      if (art) {
+        html += '  <img class="art" src="' + art + '" alt="" ' +
+                'onerror="this.style.visibility=\'hidden\'">';
+      } else {
+        html += '  <div class="art"></div>';
+      }
+      html += '  <div class="info">';
+      html += '    <div class="title">' + title + '</div>';
+      if (artist) {
+        html += '    <div class="artist">' + artist + '</div>';
+      }
+      if (desc) {
+        html += '    <div class="desc">' + desc + '</div>';
+      }
+      html += '  </div>';
+      html += '  <div class="chev">&rsaquo;</div>';
+      html += '</div>';
+    });
+    list.innerHTML = html;
+
+    // Attach click handlers
+    var rows = list.querySelectorAll('.pod');
+    rows.forEach(function(row) {
+      row.addEventListener('click', function() {
+        var idx = parseInt(row.getAttribute('data-idx'), 10);
+        var pod = state.podcasts[idx];
+        if (pod) {
+          // Push current view onto history so the back button can return.
+          pushHistory();
+          openPodcast(pod);
+        }
+      });
+    });
+    persistPageState();
+  }
+
+  // Render a mixed list of discovered RADIO STATIONS + PODCASTS from
+  // tapradio action='search' + display='glasses'. Stations tap straight
+  // through to radio.html (the native ExoPlayer-backed player) while
+  // podcast rows drill into the standard episodes view.
+  //
+  // Item shape (from buildStationSearchHudUrl in TapRadioTool.kt):
+  //   { kind: 'station', title, artist (country), genre (tag),
+  //     streamUrl, art (favicon), codec, bitrate }
+  //   { kind: 'show',    title, artist, art, itunes, id, desc, genre }
+  function renderStationsList() {
+    var list = document.getElementById('list');
+    var titleEl = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var backBtn = document.getElementById('backBtn');
+
+    state.view = 'stations_list';
+    titleEl.textContent = 'Discovered';
+    subtitle.textContent = state.chartTitle || 'Radio stations & podcasts';
+    if (state.history.length > 0) {
+      backBtn.classList.add('visible');
+    } else {
+      backBtn.classList.remove('visible');
+    }
+
+    if (!state.stationsList || state.stationsList.length === 0) {
+      list.innerHTML = '<div class="empty">No stations or podcasts found.</div>';
+      persistPageState();
+      return;
+    }
+
+    var html = '';
+    state.stationsList.forEach(function(item, idx) {
+      var rank = idx + 1;
+      var title = escapeHtml(item.title || 'Untitled');
+      var artist = escapeHtml(item.artist || '');
+      var genre = escapeHtml(item.genre || '');
+      var art = escapeHtml(item.art || '');
+      var isStation = (item.kind === 'station');
+
+      // Compose a single "meta" line for the row. For stations show
+      // the primary tag and codec/bitrate; for podcasts show artist
+      // and genre. Keeps both kinds visually consistent on one card.
+      var metaParts = [];
+      if (isStation) {
+        if (genre) metaParts.push(genre);
+        if (item.codec) {
+          var tech = String(item.codec);
+          if (item.bitrate && item.bitrate > 0) {
+            tech += ' ' + item.bitrate + 'kbps';
+          }
+          metaParts.push(tech);
+        }
+      } else {
+        if (genre) metaParts.push(genre);
+      }
+      var meta = escapeHtml(metaParts.join(' · '));
+
+      html += '<div class="pod" data-idx="' + idx + '" data-kind="' +
+              (isStation ? 'station' : 'show') + '">';
+      html += '  <div class="rank">' + rank + '</div>';
+      if (art) {
+        html += '  <img class="art" src="' + art + '" alt="" ' +
+                'onerror="this.style.visibility=\'hidden\'">';
+      } else {
+        html += '  <div class="art"></div>';
+      }
+      html += '  <div class="info">';
+      html += '    <div class="title">' + title + '</div>';
+      if (artist) {
+        html += '    <div class="artist">' +
+                (isStation ? '&#x1F4FB; ' : '&#x1F3A7; ') +  // 📻 / 🎧 prefix
+                artist + '</div>';
+      } else {
+        html += '    <div class="artist">' +
+                (isStation ? '&#x1F4FB; Radio station' : '&#x1F3A7; Podcast') +
+                '</div>';
+      }
+      if (meta) {
+        html += '    <div class="desc">' + meta + '</div>';
+      }
+      html += '  </div>';
+      html += '  <div class="chev">&rsaquo;</div>';
+      html += '</div>';
+    });
+    list.innerHTML = html;
+
+    // Attach click handlers — stations play directly, shows drill into
+    // episodes (same path as the top-podcasts chart flow).
+    var rows = list.querySelectorAll('.pod');
+    rows.forEach(function(row) {
+      row.addEventListener('click', function() {
+        var idx = parseInt(row.getAttribute('data-idx'), 10);
+        var item = state.stationsList[idx];
+        if (!item) return;
+        if (item.kind === 'station') {
+          playStationFromCard(item);
+        } else {
+          pushHistory();
+          openPodcast(item);
+        }
+      });
+    });
+    persistPageState();
+  }
+
+  // Navigate to radio.html to play a discovered station using the native
+  // ExoPlayer backend. Mirrors playEpisode() for podcasts.
+  function playStationFromCard(station) {
+    if (!station || !station.streamUrl) return;
+    persistPageState();
+    var url = 'file:///android_asset/radio.html' +
+      '?playUrl=' + encodeParam(station.streamUrl) +
+      '&playName=' + encodeParam(station.title || '') +
+      '&playGenre=' + encodeParam(station.genre || 'Radio') +
+      '&playArtist=' + encodeParam(station.artist || '') +
+      '&playArt=' + encodeParam(station.art || '') +
+      '&playKind=radio';
+    window.location.href = url;
+  }
+
+  // Render the topic-search episode list. Each card shows the episode
+  // title, two clickable pills (show name and creator), date/duration,
+  // and a 2-line description. Tapping the card plays the episode.
+  // Tapping the show pill drills into that show's episodes; tapping
+  // the creator pill fetches other podcasts by that creator.
+  function renderEpisodeSearch() {
+    var list = document.getElementById('list');
+    var titleEl = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var backBtn = document.getElementById('backBtn');
+
+    state.view = 'episode_search';
+    titleEl.textContent = 'Episodes';
+    subtitle.textContent = state.chartTitle || '';
+    if (state.history.length > 0) {
+      backBtn.classList.add('visible');
+    } else {
+      backBtn.classList.remove('visible');
+    }
+
+    if (!state.episodeResults || state.episodeResults.length === 0) {
+      list.innerHTML = '<div class="empty">No episodes to display.</div>';
+      return;
+    }
+
+    var html = '';
+    state.episodeResults.forEach(function(ep, idx) {
+      var rank = idx + 1;
+      var epTitle = escapeHtml(ep.episodeTitle || ep.title || 'Untitled episode');
+      var showTitle = escapeHtml(ep.showTitle || '');
+      var artist = escapeHtml(ep.artist || '');
+      var art = escapeHtml(ep.art || ep.artworkUrl || '');
+      var desc = escapeHtml(ep.desc || ep.description || '');
+      var when = escapeHtml(formatPubDate(ep.releaseDate));
+      var dur = escapeHtml(formatDurationMs(ep.durationMs));
+
+      html += '<div class="pod episode-card" data-ep-idx="' + idx + '">';
+      html += '  <div class="rank">' + rank + '</div>';
+      if (art) {
+        html += '  <img class="art" src="' + art + '" alt="" ' +
+                'onerror="this.style.visibility=\'hidden\'">';
+      } else {
+        html += '  <div class="art"></div>';
+      }
+      html += '  <div class="info">';
+      html += '    <div class="title">' + epTitle + '</div>';
+      // Meta line: clickable show pill + clickable creator pill + date · dur
+      html += '    <div class="meta">';
+      if (showTitle) {
+        html += '<span class="pill show-pill" data-action="show" data-ep-idx="' + idx + '">' +
+                showTitle + '</span>';
+      }
+      if (artist) {
+        html += '<span class="pill artist-pill" data-action="artist" data-ep-idx="' + idx + '">' +
+                artist + '</span>';
+      }
+      if (when) {
+        html += '<span class="when">' + when + '</span>';
+      }
+      if (dur) {
+        if (when) html += '<span class="dot">·</span>';
+        html += '<span class="dur">' + dur + '</span>';
+      }
+      html += '    </div>';
+      if (desc) {
+        html += '    <div class="desc">' + desc + '</div>';
+      }
+      html += '  </div>';
+      html += '  <div class="chev">&#9658;</div>';
+      html += '</div>';
+    });
+    list.innerHTML = html;
+
+    // Card click → play the episode (unless the click was on a pill,
+    // which has its own handler that calls stopPropagation).
+    var rows = list.querySelectorAll('.pod');
+    rows.forEach(function(row) {
+      row.addEventListener('click', function(e) {
+        // Ignore clicks on pills — they handle their own navigation.
+        if (e.target.classList && e.target.classList.contains('pill')) return;
+        var idx = parseInt(row.getAttribute('data-ep-idx'), 10);
+        var ep = state.episodeResults[idx];
+        if (ep) playEpisodeFromSearch(ep);
+      });
+    });
+
+    // Show pill → drill into that show's episode list (existing behavior).
+    var showPills = list.querySelectorAll('.show-pill');
+    showPills.forEach(function(pill) {
+      pill.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var idx = parseInt(pill.getAttribute('data-ep-idx'), 10);
+        var ep = state.episodeResults[idx];
+        if (!ep) return;
+        // Push current view onto history, then drill in.
+        pushHistory();
+        // Build a podcast-shaped object that openPodcast() can consume.
+        var pod = {
+          id: ep.collectionId,
+          title: ep.showTitle,
+          artist: ep.artist,
+          art: ep.art || ep.artworkUrl
+        };
+        openPodcast(pod);
+      });
+    });
+
+    // Artist pill → fetch other podcasts by this creator from iTunes.
+    var artistPills = list.querySelectorAll('.artist-pill');
+    artistPills.forEach(function(pill) {
+      pill.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var idx = parseInt(pill.getAttribute('data-ep-idx'), 10);
+        var ep = state.episodeResults[idx];
+        if (!ep || !ep.artist) return;
+        pushHistory();
+        loadPodcastsByArtist(ep.artist);
+      });
+    });
+    persistPageState();
+  }
+
+  // Format a duration given in milliseconds as H:MM:SS or M:SS
+  function formatDurationMs(ms) {
+    var n = parseInt(ms, 10);
+    if (isNaN(n) || n <= 0) return '';
+    var totalSec = Math.round(n / 1000);
+    var h = Math.floor(totalSec / 3600);
+    var m = Math.floor((totalSec % 3600) / 60);
+    var s = totalSec % 60;
+    if (h > 0) {
+      return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  // Push a snapshot of the current view onto the history stack so
+  // back-button navigation can restore it.
+  function pushHistory() {
+    state.history.push({
+      view: state.view,
+      podcasts: state.podcasts.slice(),
+      episodeResults: state.episodeResults.slice(),
+      stationsList: state.stationsList.slice(),
+      chartTitle: state.chartTitle,
+      currentPodcast: state.currentPodcast
+    });
+  }
+
+  // Restore the most recent history snapshot.
+  function popHistory() {
+    if (state.history.length === 0) return false;
+    var prev = state.history.pop();
+    state.view = prev.view;
+    state.podcasts = prev.podcasts;
+    state.episodeResults = prev.episodeResults;
+    state.stationsList = Array.isArray(prev.stationsList) ? prev.stationsList : [];
+    state.chartTitle = prev.chartTitle;
+    state.currentPodcast = prev.currentPodcast;
+    if (state.view === 'stations_list') {
+      renderStationsList();
+    } else if (state.view === 'episode_search') {
+      renderEpisodeSearch();
+    } else if (state.view === 'episodes' && state.currentPodcast) {
+      // Re-render episodes from cached _episodes if present.
+      if (state.currentPodcast._episodes) {
+        renderEpisodes(state.currentPodcast, state.currentPodcast._episodes);
+      } else {
+        // Re-fetch
+        loadEpisodesFromItunes(state.currentPodcast);
+      }
+    } else {
+      renderPodcasts();
+    }
+    return true;
+  }
+
+  // Play an episode from the search results — uses the direct audio URL
+  // returned by iTunes' podcastEpisode entity (no RSS feed needed).
+  function playEpisodeFromSearch(ep) {
+    var audio = ep.audioUrl || '';
+    if (!audio) return;
+    persistPageState();
+    var url = 'file:///android_asset/radio.html' +
+      '?playUrl=' + encodeParam(audio) +
+      '&playName=' + encodeParam(ep.showTitle || ep.episodeTitle || '') +
+      '&playGenre=' + encodeParam('Podcast') +
+      '&playSubtitle=' + encodeParam(ep.episodeTitle || '') +
+      '&playArtist=' + encodeParam(ep.artist || '') +
+      '&playArt=' + encodeParam(ep.art || ep.artworkUrl || '') +
+      '&playShowId=' + encodeParam(ep.collectionId || '') +
+      '&playKind=podcast';
+    window.location.href = url;
+  }
+
+  // Search iTunes for podcasts by a specific artist and switch to the
+  // 'podcasts' view. Uses attribute=artistTerm so we get shows where the
+  // artist field exactly matches, instead of generic keyword matches.
+  function loadPodcastsByArtist(artistName) {
+    var list = document.getElementById('list');
+    var titleEl = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var backBtn = document.getElementById('backBtn');
+    state.view = 'podcasts';
+    state.chartTitle = 'By ' + artistName;
+    titleEl.textContent = 'Podcasts';
+    subtitle.textContent = state.chartTitle;
+    backBtn.classList.add('visible');
+    list.innerHTML = '<div class="empty">Loading podcasts by ' + escapeHtml(artistName) + '\u2026</div>';
+
+    var url = 'https://itunes.apple.com/search' +
+      '?term=' + encodeURIComponent(artistName) +
+      '&media=podcast&entity=podcast&attribute=artistTerm&limit=25';
+
+    fetch(url, { cache: 'no-store' })
+      .then(function(resp) {
+        if (!resp.ok) throw new Error('iTunes search HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(function(data) {
+        var results = (data && data.results) || [];
+        // Filter to exact artist matches first; fall back to substring.
+        var lcArtist = artistName.toLowerCase();
+        var exact = results.filter(function(r) {
+          return (r.artistName || '').toLowerCase() === lcArtist;
+        });
+        var picks = exact.length > 0 ? exact : results;
+        // Map to the same shape renderPodcasts() expects.
+        state.podcasts = picks.map(function(r) {
+          return {
+            id: String(r.collectionId || ''),
+            title: r.collectionName || r.trackName || 'Untitled',
+            artist: r.artistName || '',
+            art: r.artworkUrl600 || r.artworkUrl100 || '',
+            desc: ''  // no description field on the search-API result
+          };
+        });
+        if (state.podcasts.length === 0) {
+          list.innerHTML = '<div class="empty">No other podcasts found for ' +
+            escapeHtml(artistName) + '.</div>';
+          return;
+        }
+        renderPodcasts();
+      })
+      .catch(function(err) {
+        list.innerHTML = '<div class="empty error">Failed to load podcasts: ' +
+          escapeHtml((err && err.message) || String(err)) + '</div>';
+      });
+  }
+
+  function renderEpisodesLoading(pod) {
+    var list = document.getElementById('list');
+    var titleEl = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var backBtn = document.getElementById('backBtn');
+
+    state.view = 'episodes';
+    titleEl.textContent = 'Episodes';
+    subtitle.textContent = pod.title || '';
+    backBtn.classList.add('visible');
+
+    list.innerHTML = '<div class="empty">Loading episodes…</div>';
+    persistPageState();
+  }
+
+  function renderEpisodes(pod, episodes) {
+    var list = document.getElementById('list');
+    var titleEl = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var backBtn = document.getElementById('backBtn');
+
+    state.view = 'episodes';
+    titleEl.textContent = 'Episodes';
+    subtitle.textContent = pod.title || '';
+    backBtn.classList.add('visible');
+
+    if (!episodes || episodes.length === 0) {
+      list.innerHTML = '<div class="empty">No episodes found.</div>';
+      return;
+    }
+
+    var html = '';
+    episodes.forEach(function(ep, idx) {
+      var rank = idx + 1;
+      var title = escapeHtml(ep.title || 'Untitled episode');
+      var dur = formatDuration(ep.duration);
+      var date = formatPubDate(ep.pubDate);
+      var subline = [dur, date].filter(function(s){ return !!s; }).join('  •  ');
+      var art = escapeHtml(pod.art || '');
+
+      html += '<div class="pod" data-ep-idx="' + idx + '">';
+      html += '  <div class="rank">' + rank + '</div>';
+      if (art) {
+        html += '  <img class="art" src="' + art + '" alt="" ' +
+                'onerror="this.style.visibility=\'hidden\'">';
+      } else {
+        html += '  <div class="art"></div>';
+      }
+      html += '  <div class="info">';
+      html += '    <div class="title">' + title + '</div>';
+      if (subline) {
+        html += '    <div class="artist">' + escapeHtml(subline) + '</div>';
+      }
+      html += '  </div>';
+      html += '  <div class="chev">&rsaquo;</div>';
+      html += '</div>';
+    });
+    list.innerHTML = html;
+
+    // Attach click handlers
+    var rows = list.querySelectorAll('.pod');
+    rows.forEach(function(row) {
+      row.addEventListener('click', function() {
+        var idx = parseInt(row.getAttribute('data-ep-idx'), 10);
+        var ep = episodes[idx];
+        if (ep) playEpisode(pod, ep);
+      });
+    });
+    persistPageState();
+  }
+
+  function renderEpisodesError(pod, msg) {
+    var list = document.getElementById('list');
+    var titleEl = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var backBtn = document.getElementById('backBtn');
+
+    state.view = 'episodes';
+    titleEl.textContent = 'Episodes';
+    subtitle.textContent = pod.title || '';
+    backBtn.classList.add('visible');
+
+    list.innerHTML = '<div class="empty error">' + escapeHtml(msg || 'Failed to load episodes.') + '</div>';
+    persistPageState();
+  }
+
+  // -------- Actions --------
+  //
+  // Episode loading is done entirely in JavaScript via fetch(). We hit
+  // the iTunes Lookup API to resolve the podcast's RSS feed URL, then
+  // fetch and parse the RSS feed directly. This works because pages
+  // loaded from file:///android_asset/ on Android WebView can make
+  // cross-origin HTTPS requests (confirmed by ar_nav.html which fetches
+  // Google Places API the same way). No native bridge dependency.
+
+  function openPodcast(pod) {
+    state.currentPodcast = pod;
+
+    if (!pod.id) {
+      renderEpisodesError(pod, 'Podcast ID not available');
+      return;
+    }
+
+    // Use cached episodes if we already fetched them for this podcast.
+    if (pod._episodes && pod._episodes.length > 0) {
+      renderEpisodes(pod, pod._episodes);
+      return;
+    }
+
+    state.loadingId = pod.id;
+    renderEpisodesLoading(pod);
+    loadEpisodesFromItunes(pod);
+  }
+
+  function hasNativeEpisodeLoader() {
+    return typeof GroqBridge !== 'undefined' &&
+      typeof GroqBridge.fetchPodcastEpisodes === 'function';
+  }
+
+  function requestNativeEpisodes(pod) {
+    if (!pod || !pod.id || !hasNativeEpisodeLoader()) return false;
+    try {
+      GroqBridge.fetchPodcastEpisodes(String(pod.id), 20);
+      return true;
+    } catch (e) {
+      console.warn('podcasts.html: native episode fetch failed to start', e);
+      return false;
+    }
+  }
+
+  function loadEpisodesFromItunes(pod) {
+    var collectionId = String(pod.id);
+    var lookupUrl = 'https://itunes.apple.com/lookup?id=' + encodeURIComponent(collectionId);
+
+    var stale = function() {
+      return !state.currentPodcast || String(state.currentPodcast.id) !== collectionId;
+    };
+
+    fetch(lookupUrl, { cache: 'no-store' })
+      .then(function(resp) {
+        if (!resp.ok) throw new Error('iTunes lookup HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(function(data) {
+        if (stale()) return null;
+        var results = (data && data.results) || [];
+        if (results.length === 0) {
+          throw new Error('Podcast not found in iTunes');
+        }
+        var feedUrl = results[0].feedUrl;
+        if (!feedUrl) {
+          throw new Error('No RSS feed available for this podcast');
+        }
+        // Force HTTPS if the feed came back as plain HTTP (some older feeds
+        // return http:// which Android blocks under MIXED_CONTENT_NEVER_ALLOW).
+        if (feedUrl.indexOf('http://') === 0) {
+          feedUrl = 'https://' + feedUrl.substring(7);
+        }
+        return fetch(feedUrl, { cache: 'no-store' });
+      })
+      .then(function(resp) {
+        if (resp === null) return null;        // stale
+        if (!resp.ok) throw new Error('RSS feed HTTP ' + resp.status);
+        return resp.text();
+      })
+      .then(function(xmlText) {
+        if (xmlText === null || stale()) return;
+        var episodes = parseRssEpisodes(xmlText, 20);
+        if (episodes.length === 0) {
+          renderEpisodesError(pod, 'No episodes found in this feed.');
+          return;
+        }
+        pod._episodes = episodes;
+        renderEpisodes(pod, episodes);
+      })
+      .catch(function(err) {
+        if (stale()) return;
+        if (requestNativeEpisodes(pod)) return;
+        var msg = (err && err.message) ? err.message : String(err);
+        renderEpisodesError(pod, 'Failed to load episodes: ' + msg);
+      });
+  }
+
+  function parseRssEpisodes(xmlText, max) {
+    var episodes = [];
+    try {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(xmlText, 'application/xml');
+      // If the parser emitted an error document, bail out.
+      var parserError = doc.getElementsByTagName('parsererror');
+      if (parserError && parserError.length > 0) return episodes;
+
+      var items = doc.getElementsByTagName('item');
+      var limit = Math.min(items.length, max || 20);
+      for (var i = 0; i < limit; i++) {
+        var item = items[i];
+        var titleEl = item.getElementsByTagName('title')[0];
+        var pubDateEl = item.getElementsByTagName('pubDate')[0];
+        var enclosure = item.getElementsByTagName('enclosure')[0];
+        var audioUrl = enclosure ? enclosure.getAttribute('url') : '';
+        if (!audioUrl) continue;
+
+        // itunes:duration is namespaced; iterate children to find it.
+        var duration = '';
+        var children = item.childNodes;
+        for (var c = 0; c < children.length; c++) {
+          var child = children[c];
+          if (child.nodeType !== 1 || !child.nodeName) continue;
+          if (child.nodeName.toLowerCase() === 'itunes:duration') {
+            duration = (child.textContent || '').trim();
+          }
+        }
+
+        episodes.push({
+          title: titleEl ? (titleEl.textContent || '').trim() : 'Untitled episode',
+          audioUrl: audioUrl,
+          pubDate: pubDateEl ? (pubDateEl.textContent || '').trim() : '',
+          duration: duration
+        });
+      }
+    } catch (e) {
+      console.warn('podcasts.html: parseRssEpisodes failed', e);
+    }
+    return episodes;
+  }
+
+  window.onPodcastEpisodesLoaded = function(collectionId, jsonStr) {
+    var pod = state.currentPodcast;
+    if (!pod || String(pod.id) !== String(collectionId)) return;
+    try {
+      var episodes = JSON.parse(jsonStr);
+      if (!Array.isArray(episodes) || episodes.length === 0) {
+        renderEpisodesError(pod, 'No episodes found in this feed.');
+        return;
+      }
+      pod._episodes = episodes;
+      renderEpisodes(pod, episodes);
+    } catch (e) {
+      console.warn('podcasts.html: failed to parse native episode payload', e);
+      renderEpisodesError(pod, 'Failed to load episodes from native parser.');
+    }
+  };
+
+  function onPodcastEpisodesError(collectionId, message) {
+    var pod = state.currentPodcast;
+    if (!pod || String(pod.id) !== String(collectionId)) return;
+    renderEpisodesError(pod, message);
+  }
+
+  function playEpisode(pod, ep) {
+    if (!ep.audioUrl) return;
+    persistPageState();
+    var url = 'file:///android_asset/radio.html' +
+      '?playUrl=' + encodeParam(ep.audioUrl) +
+      '&playName=' + encodeParam(pod.title || '') +
+      '&playGenre=' + encodeParam('Podcast') +
+      '&playSubtitle=' + encodeParam(ep.title || '') +
+      '&playArtist=' + encodeParam(pod.artist || '') +
+      '&playArt=' + encodeParam(pod.art || '') +
+      '&playShowId=' + encodeParam(pod.id || '') +
+      '&playKind=podcast';
+    window.location.href = url;
+  }
+
+  function goBack() {
+    // Prefer the history stack if anything is on it (episode-search →
+    // episodes drill-in, or episode-search → artist's other shows).
+    if (state.history.length > 0) {
+      popHistory();
+      return;
+    }
+    // Legacy fallback: if we drilled into a show from a top-podcasts
+    // list (no history pushed), just pop back to the show list.
+    if (state.view === 'episodes') {
+      state.currentPodcast = null;
+      renderPodcasts();
+    }
+  }
+
+
+  // -------- Init --------
+  // Deep link from TapRadio's PodCasts tab: ?showId=… reopens a saved
+  // show's episode list directly (renderEpisodesLoading → iTunes lookup).
+  try {
+    var deepParams = new URLSearchParams(window.location.search || '');
+    var deepShowId = deepParams.get('showId');
+    if (deepShowId) {
+      var deepPod = {
+        id: String(deepShowId),
+        title: deepParams.get('showTitle') || 'Podcast',
+        artist: deepParams.get('showArtist') || '',
+        art: deepParams.get('showArt') || ''
+      };
+      try {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (e2) {}
+      // Reuse the standard drill-in path (cached episodes or iTunes
+      // lookup -> renderEpisodes) — same function the show pills use.
+      openPodcast(deepPod);
+      updateSaveShowBtn();
+      return;
+    }
+    // Saved EPISODE rows without a stored showId fall back to the
+    // creator search — also a baked-in flow (artist pill).
+    var deepArtist = deepParams.get('artistShows');
+    if (deepArtist) {
+      try {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (e3) {}
+      loadPodcastsByArtist(deepArtist);
+      return;
+    }
+  } catch (e) {
+    console.warn('podcasts.html: deep-link failed', e);
+  }
+
+  var payload = parsePayload();
+  if (restorePageState()) {
+    renderCurrentState();
+  } else if (payload && payload.items) {
+    state.chartTitle = payload.title || '';
+    if (payload.kind === 'episode_search') {
+      state.episodeResults = payload.items;
+      renderEpisodeSearch();
+    } else if (payload.kind === 'stations') {
+      state.stationsList = payload.items;
+      renderStationsList();
+    } else {
+      state.podcasts = payload.items;
+      renderPodcasts();
+    }
+  } else {
+    renderPodcasts();
+  }
+})();
+</script>
+</body>
+</html>

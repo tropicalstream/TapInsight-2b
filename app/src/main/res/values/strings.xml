@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TapInsight 0.2b</string>
+    <string name="chat_hint">Ask TapInsight…</string>
+    <string name="settings_title">Settings</string>
+    <string name="gemini_api_key_label">Gemini API Key</string>
+    <string name="calendar_api_key_label">Calendar API Key</string>
+    <string name="api_key_placeholder">Enter API key…</string>
+    <string name="save">Save</string>
+    <string name="listening">Listening…</string>
+    <string name="web_error">Unable to load page</string>
+    <string name="api_key_required">API Key Required</string>
+    <string name="url_hint">Search or enter URL</string>
+
+    <!-- Chat panel -->
+    <string name="hud_time">--:--</string>
+    <string name="hud_calendar">No upcoming events</string>
+    <string name="hud_ai_status">Gemini connection status</string>
+    <!-- hud_research_ready string removed with completion-verification retirement. -->
+    <string name="hud_battery_charging">Battery charging</string>
+    <string name="hud_openclaw_status">OpenClaw gateway status</string>
+    <string name="hud_hermes_status">Hermes gateway status</string>
+    <string name="hud_tapclaw_result_ready">TapClaw result ready</string>
+    <string name="hud_notifications_bell">Notifications</string>
+    <string name="hud_notifications_empty">No notifications</string>
+    <string name="hud_notifications_title">NOTIFICATIONS</string>
+    <string name="send">Send</string>
+
+    <!-- Settings panel -->
+    <string name="settings_save">Save Settings</string>
+    <string name="settings_add_bookmark">Add Bookmark</string>
+
+    <!-- Web panel -->
+    <string name="web_go">Go</string>
+    <string name="web_new_tab">New Tab</string>
+    <string name="web_mode_mobile">Mobile</string>
+    <string name="web_mode_desktop">Desktop</string>
+    <string name="web_mode_ar">AR</string>
+
+    <!-- Voice / STT states -->
+    <string name="stt_listening">Listening (on-device)…</string>
+    <string name="stt_routing">Routing via Gemini…</string>
+    <string name="stt_speaking">Speaking…</string>
+    <string name="stt_mic_denied">Microphone permission required</string>
+    <string name="stt_camera_denied">Camera permission required</string>
+    <string name="stt_explanation">Voice is processed on-device. Gemini handles intent routing.</string>
+
+    <!-- Permission fallback states -->
+    <string name="perm_mic_needed">Hold to speak requires microphone access</string>
+    <string name="perm_camera_needed">Vision queries require camera access</string>
+    <string name="perm_calendar_needed">Calendar display requires calendar access</string>
+</resources>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Pressed state - simple highlight -->
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#4069F0AE"/>
+        </shape>
+    </item>
+
+    <!-- Hovered state - subtle blue highlight -->
+    <item android:state_hovered="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#3082B1FF"/>
+        </shape>
+    </item>
+
+    <!-- Default state - transparent (see-through on AR display) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#00000000"/>
+        </shape>
+    </item>
+</selector>

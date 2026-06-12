@@ -1,0 +1,17 @@
+{
+  "gateway_settings": {
+    "url": "http://openclaw.ai",
+    "port": "8080",
+    "tool_path": "/v1/chat/completions",
+    "gatewayToken": "",
+    "timeout_ms": 15000
+  },
+  "api_keys": {
+    "gemini_model": "gemini-3.1-pro-preview",
+    "gemini_key": "YOUR_KEY_HERE"
+  },
+  "mouse_settings": {
+    "sensitivity": 0.5,
+    "acceleration": true
+  }
+}

@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agents — TapInsight</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;padding:16px;max-width:640px;margin:0 auto}
+h1{color:#e91e63;font-size:22px;margin-bottom:2px}
+.sub{color:#888;font-size:13px;margin-bottom:20px}
+.nav{display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid #333}
+.nav a{flex:1;padding:10px;text-align:center;text-decoration:none;font-size:13px;font-weight:600;color:#aaa;background:#1a1a1a;transition:all .2s}
+.nav a.active{background:#e91e63;color:#fff}
+.nav a:hover:not(.active){background:#222}
+.section{background:#1a1a1a;border-radius:10px;padding:16px;margin-bottom:14px;border-left:3px solid #e91e63}
+.section-title{font-size:15px;font-weight:600;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.section-desc{font-size:12px;color:#999;margin-bottom:10px;line-height:1.5}
+label{display:flex;align-items:center;gap:6px;font-size:12px;color:#aaa;margin-bottom:4px;margin-top:10px}
+label:first-of-type{margin-top:0}
+input[type="text"],input[type="password"],input[type="number"]{width:100%;padding:10px;background:#111;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px;font-family:inherit}
+input:focus{border-color:#e91e63;outline:none}
+select{width:100%;padding:10px;background:#111;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px}
+.hint{font-size:11px;color:#666;margin-top:2px}
+.btn-row{display:flex;gap:10px;margin-top:16px}
+button{flex:1;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s}
+button:active{opacity:.7}
+.btn-save{background:#e91e63;color:#fff}
+.btn-reset{background:#333;color:#ccc}
+.status{text-align:center;font-size:13px;margin-top:10px;min-height:20px}
+.status.ok{color:#4caf50}.status.err{color:#f44336}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;z-index:200;opacity:0;transition:transform .4s ease,opacity .4s ease;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:90%}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{background:#1b5e20;color:#a5d6a7;border:1px solid #4caf50}
+.toast.err{background:#b71c1c;color:#ef9a9a;border:1px solid #f44336}
+</style>
+</head>
+<body>
+
+<h1>🤖 Agents</h1>
+<p class="sub">Configure the local AI agents your glasses can route voice commands to. Each is independently enable-able — say <b>tapclaw</b> for OpenClaw, <b>hermes</b> for Hermes.</p>
+
+<div class="nav">
+  <a href="/">Setup</a>
+  <a href="/browser">Browser</a>
+  <a href="/dashboard">Dashboard</a>
+  <a href="/radio">TapRadio</a>
+  <a href="/library">Library</a>
+  <a href="/openclaw" class="active">Agents</a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     HERMES AGENT (PRIMARY) — endpoint + API key for the NousResearch
+     hermes-agent OpenAI-compatible API server. The voice keyword
+     'hermes' routes exclusively to this tool (RULE ZERO-H in GeminiRouter).
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="section" style="border:1px solid #6a4dff;background:linear-gradient(180deg,#1a1438 0%,#0e0a1f 100%)">
+  <div class="section-title" style="color:#c9b9ff">🪶 Hermes Connection</div>
+  <p class="section-desc">Configure the NousResearch <code style="background:#1a1228;padding:2px 6px;border-radius:4px;color:#c9b9ff">hermes-agent</code> API server. When enabled, saying "<b>hermes</b> &lt;your request&gt;" routes the full message exclusively to this agent.</p>
+
+  <label>Enable Hermes</label>
+  <select id="hermesEnabled"><option value="false">Disabled</option><option value="true">Enabled</option></select>
+  <div class="hint">Turn on to enable the "<b>hermes</b>" voice prefix. Requires a working endpoint + API key below.</div>
+
+  <label>Endpoint URL</label>
+  <input type="text" id="hermesEndpoint" placeholder="http://192.168.1.x:8642  (LAN)  or  https://your-tunnel.trycloudflare.com">
+  <div class="hint">Where your hermes-agent server is reachable. Defaults to port <code>8642</code>. Bare hostnames assume <code>https://</code>; <code>host:port</code> uses <code>http://</code>.</div>
+
+  <!-- LAN setup — promoted to the primary block because for most users
+       (glasses + Mac on same Wi-Fi) it requires zero account, zero
+       account, zero YAML, zero domain. Just a LAN IP and a port. -->
+  <div style="margin-top:10px;background:#0d2818;border:1px solid #1d5b34;border-radius:8px;padding:12px 14px;font-size:12px;color:#c8efd5">
+    <div style="font-weight:600;color:#7eecaa;font-size:13px;margin-bottom:6px">✅ Easiest: glasses + Mac on the same Wi-Fi</div>
+    <p style="margin:0 0 8px 0;color:#b6dcc4">No Cloudflare account, no domain, no config files. Just paste your Mac's LAN IP into the field above.</p>
+    <ol style="margin:0 0 0 18px;padding:0;line-height:1.6;color:#b6dcc4">
+      <li>On the Mac, find your local IP:
+        <div style="background:#062014;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#c8efd5">ipconfig getifaddr en0</div>
+        (Or: System Settings → Network → Wi-Fi → Details — look for "IP address".)
+      </li>
+      <li>Paste <code style="background:#062014;padding:1px 5px;border-radius:3px;color:#9ef3ff">http://&lt;that-ip&gt;:8642</code> into the Endpoint URL field above. Example: <code style="background:#062014;padding:1px 5px;border-radius:3px;color:#9ef3ff">http://192.168.1.170:8642</code></li>
+      <li>Make sure Hermes is running on the Mac (<code>hermes start</code> or your usual command).</li>
+    </ol>
+    <p style="margin:8px 0 0 0;color:#8fb8a0;font-size:11px">⚠ Won't work over cellular — only when the glasses are on the same Wi-Fi as your Mac. If you need remote access, expand the Cloudflare option below.</p>
+  </div>
+
+  <details style="margin-top:8px;background:#0d0922;border:1px solid #2a1e54;border-radius:8px;padding:10px 12px;font-size:12px;color:#cfc7ff">
+    <summary style="cursor:pointer;font-weight:600;color:#c9b9ff;outline:none">🌐 Need cell-network access? Use a Cloudflare Tunnel</summary>
+    <p style="margin:10px 0 6px 0;color:#bfb6e2">A Cloudflare Tunnel gives your Hermes server a public <code>https://</code> URL so the glasses can reach it over cellular. The quick mode below requires no account.</p>
+
+    <div style="background:#1a1228;border:1px solid #3a2c66;border-radius:6px;padding:10px 12px;margin:8px 0">
+      <div style="font-weight:600;color:#e8def8;margin-bottom:4px">Recommended — Quick tunnel (no account, ~30 seconds)</div>
+      <ol style="margin:6px 0 6px 18px;padding:0;line-height:1.6">
+        <li>Install once: <code style="background:#0d0922;padding:1px 5px;border-radius:3px">brew install cloudflared</code></li>
+        <li>Run pointed at the Hermes port (default <code>8642</code>):
+          <div style="background:#0d0922;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#e8def8">cloudflared tunnel --url http://localhost:8642</div>
+        </li>
+        <li>The terminal prints a URL like <code style="background:#0d0922;padding:1px 5px;border-radius:3px;color:#9ef3ff">https://random-words-1234.trycloudflare.com</code>. Copy that and paste it into the Endpoint URL field above.</li>
+      </ol>
+      <p style="margin:6px 0 0 0;color:#a89bc7;font-size:11px">The URL changes every time you restart <code>cloudflared</code>, so re-paste after a restart. Tunnel runs only while that terminal is open.</p>
+    </div>
+
+    <details style="margin-top:8px;background:#1a1228;border:1px solid #3a2c66;border-radius:6px;padding:8px 10px">
+      <summary style="cursor:pointer;font-weight:600;color:#e8def8;font-size:12px;outline:none">⚙ Advanced: permanent URL on your own domain (named tunnel)</summary>
+      <p style="margin:8px 0 4px 0;color:#bfb6e2;font-size:11.5px">If you have a domain on Cloudflare and want a stable URL that survives restarts:</p>
+      <ol style="margin:4px 0 4px 18px;padding:0;line-height:1.55;font-size:11.5px">
+        <li>One-time: <code style="background:#0d0922;padding:1px 5px;border-radius:3px">cloudflared login</code></li>
+        <li>Create a tunnel:
+          <div style="background:#0d0922;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#e8def8">cloudflared tunnel create hermes</div>
+        </li>
+        <li>Route a hostname (replace <code>hermes.example.com</code> with one on a domain you own through Cloudflare):
+          <div style="background:#0d0922;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#e8def8">cloudflared tunnel route dns hermes hermes.example.com</div>
+        </li>
+        <li>Edit <code style="background:#0d0922;padding:1px 5px;border-radius:3px">~/.cloudflared/config.yml</code> to map the hostname to your Hermes port:
+          <pre style="background:#0d0922;padding:8px 10px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#e8def8;font-size:11px;white-space:pre;overflow-x:auto">tunnel: &lt;your-tunnel-id&gt;
+credentials-file: ~/.cloudflared/&lt;id&gt;.json
+
+ingress:
+  - hostname: hermes.example.com
+    service: http://127.0.0.1:8642
+  - service: http_status:404</pre>
+        </li>
+        <li>Start the tunnel:
+          <div style="background:#0d0922;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#e8def8">cloudflared tunnel run hermes</div>
+        </li>
+        <li>Paste <code style="background:#0d0922;padding:1px 5px;border-radius:3px;color:#9ef3ff">https://hermes.example.com</code> into the Endpoint URL field above. The named-tunnel command does NOT print a URL — the URL is the hostname you mapped in step 3. Check anytime with <code>cat ~/.cloudflared/config.yml</code>.</li>
+      </ol>
+      <p style="margin:4px 0 0 0;color:#a89bc7;font-size:11px">One <code>config.yml</code> can list multiple <code>hostname → service</code> pairs so one tunnel serves Hermes, TapClaw, and the relay.</p>
+    </details>
+  </details>
+
+  <label>API Key</label>
+  <div style="position:relative">
+    <input type="password" id="hermesApiKey" placeholder="Your Hermes API_SERVER_KEY (bearer token)">
+    <button onclick="togglePw('hermesApiKey')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#c9b9ff;cursor:pointer;background:none;border:none">👁</button>
+  </div>
+  <div class="hint">Set on the server side via <code>hermes config set API_SERVER_KEY ...</code> in <code>~/.hermes/.env</code> (generate one with <code>openssl rand -hex 32</code>).</div>
+
+  <label>Session ID</label>
+  <input type="text" id="hermesSessionId" placeholder="main">
+  <div class="hint">Forwarded as <code>X-Hermes-Session-Id</code>. <code>main</code> is the default; use distinct IDs (e.g. <code>glasses</code>) to isolate conversations.</div>
+
+  <label>Timeout (seconds)</label>
+  <input type="number" id="hermesTimeoutSeconds" placeholder="0 (default 30s)" min="0" max="600">
+  <div class="hint">Streaming budget — the longest Hermes may go between streamed chunks while it reasons or runs tools before the glasses give up. 0 = 30s. The effective wait is floored at 5 min, so raise this above 300 only for very long agent runs (max 600 = 10 min). If Hermes "sticks in limbo", a higher value here keeps the glasses from dropping the stream and killing the task mid-run.</div>
+
+  <!-- ── Hermes follow-up toggle ──
+       When enabled, Gemini Live keeps the mic open for ~30 s after a
+       Hermes turn's TTS finishes so you can ask a natural follow-up
+       without re-activating. -->
+  <div style="background:#1a1633;border:1px solid #3a2c66;border-radius:8px;padding:12px 14px;margin:14px 0 4px 0">
+    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#e0e0e0;line-height:1.5">
+      <input id="hermesAutoFollowupToggle" type="checkbox"
+             style="margin-top:3px;width:16px;height:16px;accent-color:#ffd86b;cursor:pointer;flex-shrink:0">
+      <span>
+        <span style="font-weight:600;color:#ffd86b">Auto follow-up after Hermes</span><br>
+        <span style="color:#bbb">After Hermes responds and Gemini's TTS finishes, keep the mic listening for 30 s so you can ask a natural follow-up without re-activating. Off by default.</span>
+      </span>
+    </label>
+  </div>
+
+  <button onclick="saveAll()" style="background:#7c4dff;color:#fff;padding:10px 18px;font-size:13px;font-weight:600;border-radius:8px;border:none;cursor:pointer;width:100%;margin-top:14px">
+    💾 Save Hermes Settings
+  </button>
+</div>
+
+<hr style="border:none;border-top:1px dashed #333;margin:24px 0">
+<h2 style="color:#e91e63;font-size:18px;margin:0 0 6px 0">🦞 TapClaw / OpenClaw</h2>
+<p style="color:#888;font-size:12px;margin:0 0 12px 0">Personal AI agent running on your own server. When enabled, saying <b>tapclaw</b> or <b>openclaw</b> &lt;your request&gt; forwards the message to it.</p>
+
+<!-- Quick Setup -->
+<div class="section">
+  <div class="section-title">⚡ Quick Setup</div>
+  <p class="section-desc">On your TapClaw server, run <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff">openclaw qr</code> to display a QR code. Scan it here to auto-fill everything below.</p>
+  <button id="qrScanClawBtn" style="background:#00e676;color:#000;padding:10px 18px;font-size:13px;font-weight:600;border-radius:8px;border:none;cursor:pointer;width:100%;margin-bottom:8px" onclick="startQrScan()">
+    📷 Scan TapClaw QR Code
+  </button>
+  <div id="qrClawResult" style="display:none;margin-top:4px;padding:10px;background:#111;border-radius:6px;border:1px solid #333;font-size:12px"></div>
+  <div style="margin-top:8px">
+    <p style="font-size:11px;color:#666;margin-bottom:4px">Or paste a setup URL:</p>
+    <input type="text" id="clawSetupUrl" placeholder="tapinsight://openclaw?url=http://...&token=...">
+    <input type="hidden" id="openClawSetupCode">
+    <button style="background:#444;color:#ccc;padding:6px 12px;font-size:12px;border-radius:6px;border:none;cursor:pointer;width:100%;margin-top:6px" onclick="applyClawSetupUrl()">Apply Setup URL</button>
+  </div>
+</div>
+
+<!-- Connection Settings -->
+<div class="section">
+  <div class="section-title">🔧 Connection Settings</div>
+
+  <label>Enable TapClaw</label>
+  <select id="openClawEnabled"><option value="false">Disabled</option><option value="true">Enabled</option></select>
+  <div class="hint">Turn on to enable the "tapclaw" voice prefix for forwarding commands to your TapClaw agent.</div>
+
+  <label>Gateway URL</label>
+  <input type="text" id="openClawEndpoint" placeholder="ws://192.168.1.x:18789  (LAN)  or  wss://your-tunnel.trycloudflare.com">
+  <div class="hint">TapClaw uses WebSocket, so use <code>ws://</code> on LAN or <code>wss://</code> through a Cloudflare Tunnel.</div>
+
+  <!-- LAN setup — primary path for same-WiFi users. -->
+  <div style="margin-top:10px;background:#0d2818;border:1px solid #1d5b34;border-radius:8px;padding:12px 14px;font-size:12px;color:#c8efd5">
+    <div style="font-weight:600;color:#7eecaa;font-size:13px;margin-bottom:6px">✅ Easiest: glasses + Mac on the same Wi-Fi</div>
+    <p style="margin:0 0 8px 0;color:#b6dcc4">No Cloudflare account, no domain, no config files. Just your Mac's LAN IP and the TapClaw port.</p>
+    <ol style="margin:0 0 0 18px;padding:0;line-height:1.6;color:#b6dcc4">
+      <li>On the Mac, find your local IP:
+        <div style="background:#062014;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#c8efd5">ipconfig getifaddr en0</div>
+      </li>
+      <li>Paste <code style="background:#062014;padding:1px 5px;border-radius:3px;color:#9ef3ff">ws://&lt;that-ip&gt;:18789</code> into the Gateway URL field above. Example: <code style="background:#062014;padding:1px 5px;border-radius:3px;color:#9ef3ff">ws://192.168.1.170:18789</code></li>
+      <li>Make sure the TapClaw gateway is running on the Mac.</li>
+    </ol>
+    <p style="margin:8px 0 0 0;color:#8fb8a0;font-size:11px">⚠ Won't work over cellular — only when the glasses are on the same Wi-Fi as your Mac. If you need remote access, expand the Cloudflare option below.</p>
+  </div>
+
+  <details style="margin-top:8px;background:#101820;border:1px solid #1f3543;border-radius:8px;padding:10px 12px;font-size:12px;color:#cfe7f5">
+    <summary style="cursor:pointer;font-weight:600;color:#9ef3ff;outline:none">🌐 Need cell-network access? Use a Cloudflare Tunnel</summary>
+    <p style="margin:10px 0 6px 0;color:#b6cfdc">A Cloudflare Tunnel gives your TapClaw gateway a public <code>wss://</code> URL so the glasses can reach it over cellular. The quick mode below requires no account.</p>
+
+    <div style="background:#0a0f14;border:1px solid #2a4150;border-radius:6px;padding:10px 12px;margin:8px 0">
+      <div style="font-weight:600;color:#d4eaf7;margin-bottom:4px">Recommended — Quick tunnel (no account, ~30 seconds)</div>
+      <ol style="margin:6px 0 6px 18px;padding:0;line-height:1.6">
+        <li>Install once: <code style="background:#080d11;padding:1px 5px;border-radius:3px">brew install cloudflared</code></li>
+        <li>Run pointed at the TapClaw gateway port (default <code>18789</code>):
+          <div style="background:#080d11;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#d4eaf7">cloudflared tunnel --url http://localhost:18789</div>
+        </li>
+        <li>The terminal prints a URL like <code style="background:#080d11;padding:1px 5px;border-radius:3px;color:#9ef3ff">https://random-words-1234.trycloudflare.com</code>. <b>Swap <code>https://</code> for <code>wss://</code></b> and paste it into the Gateway URL field above.</li>
+      </ol>
+      <p style="margin:6px 0 0 0;color:#8fa8b8;font-size:11px">The URL changes every time you restart <code>cloudflared</code>, so re-paste after a restart. Tunnel runs only while that terminal is open.</p>
+    </div>
+
+    <details style="margin-top:8px;background:#0a0f14;border:1px solid #2a4150;border-radius:6px;padding:8px 10px">
+      <summary style="cursor:pointer;font-weight:600;color:#d4eaf7;font-size:12px;outline:none">⚙ Advanced: permanent URL on your own domain (named tunnel)</summary>
+      <p style="margin:8px 0 4px 0;color:#b6cfdc;font-size:11.5px">If you have a domain on Cloudflare and want a stable URL that survives restarts:</p>
+      <ol style="margin:4px 0 4px 18px;padding:0;line-height:1.55;font-size:11.5px">
+        <li>One-time: <code style="background:#080d11;padding:1px 5px;border-radius:3px">cloudflared login</code></li>
+        <li>Create a tunnel:
+          <div style="background:#080d11;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#d4eaf7">cloudflared tunnel create tapclaw</div>
+        </li>
+        <li>Route a hostname (replace <code>tapclaw.example.com</code> with one on a domain you own through Cloudflare):
+          <div style="background:#080d11;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#d4eaf7">cloudflared tunnel route dns tapclaw tapclaw.example.com</div>
+        </li>
+        <li>Edit <code style="background:#080d11;padding:1px 5px;border-radius:3px">~/.cloudflared/config.yml</code> to map the hostname to the TapClaw port:
+          <pre style="background:#080d11;padding:8px 10px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#d4eaf7;font-size:11px;white-space:pre;overflow-x:auto">tunnel: &lt;your-tunnel-id&gt;
+credentials-file: ~/.cloudflared/&lt;id&gt;.json
+
+ingress:
+  - hostname: tapclaw.example.com
+    service: http://127.0.0.1:18789
+  - service: http_status:404</pre>
+        </li>
+        <li>Start the tunnel:
+          <div style="background:#080d11;padding:6px 8px;border-radius:5px;margin:4px 0;font-family:ui-monospace,Menlo,monospace;color:#d4eaf7">cloudflared tunnel run tapclaw</div>
+        </li>
+        <li>Paste <code style="background:#080d11;padding:1px 5px;border-radius:3px;color:#9ef3ff">wss://tapclaw.example.com</code> into the Gateway URL field above. The named-tunnel command does NOT print a URL — the URL is the hostname you mapped in step 3. Check anytime with <code>cat ~/.cloudflared/config.yml</code>.</li>
+      </ol>
+      <p style="margin:4px 0 0 0;color:#8fa8b8;font-size:11px">One <code>config.yml</code> can list multiple <code>hostname → service</code> pairs so one tunnel serves Hermes, TapClaw, and the relay.</p>
+    </details>
+  </details>
+
+  <label>Gateway Token</label>
+  <div style="position:relative">
+    <input type="password" id="openClawToken" placeholder="Your TapClaw bearer token">
+    <button onclick="togglePw('openClawToken')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#e91e63;cursor:pointer;background:none;border:none">👁</button>
+  </div>
+  <div class="hint">Bearer token for authentication. Find it with <code>openclaw config get gateway.auth.token</code>.</div>
+
+  <label>Session ID</label>
+  <input type="text" id="openClawSessionId" placeholder="main">
+  <div class="hint">TapClaw session to use. <code>main</code> is your default. Use different IDs (e.g. <code>glasses</code>) to isolate interactions.</div>
+
+  <label>Timeout (seconds)</label>
+  <input type="number" id="openClawTimeoutSeconds" placeholder="0 (default 30s)" min="0" max="600">
+  <div class="hint">How long to wait for a TapClaw response. 0 = default (30s). Set to 300-600 for Deep Research tasks.</div>
+
+  <!-- Hermes auto-followup toggle moved to the Hermes Connection
+       section at the top of the page. -->
+
+  <!-- ── Mode brackets (slash-command prefix + after-turn restore) ── -->
+  <hr style="border-color:#333;margin:18px 0 10px 0">
+  <div style="display:flex;align-items:center;gap:10px;margin:0 0 6px 0">
+    <span style="background:#7c4dff;color:#fff;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">⚡</span>
+    <span style="font-size:15px;font-weight:600;color:#fff">Mode Brackets — auto-prefix slash commands</span>
+  </div>
+  <div style="background:#0e1f2a;border:1px solid #1a3a4a;border-radius:8px;padding:10px 12px;margin:0 0 10px 0;font-size:12px;line-height:1.55;color:#cfe7f5">
+    On the FIRST message of each TapClaw session, TapInsight prepends
+    the slash commands you pick here so the agent uses your preferred
+    inference profile (e.g. <code>/fast</code> for snappy answers,
+    <code>/think low</code> to skip deep reasoning). After the turn
+    completes, it can fire-and-forget a restore command so the bare
+    TapClaw goes back to its default for any non-glasses use.
+  </div>
+
+  <label>First-Turn: Fast Mode</label>
+  <select id="openClawFastMode">
+    <option value="off">Off — don't send /fast</option>
+    <option value="fast">Fast — send /fast on first message</option>
+  </select>
+  <div class="hint">When set, prepends <code>/fast</code> to your first message of each session.</div>
+
+  <label>First-Turn: Think Level</label>
+  <select id="openClawThinkLevel">
+    <option value="">Default — don't send /think</option>
+    <option value="low">Low — <code>/think low</code> (snappiest)</option>
+    <option value="medium">Medium — <code>/think medium</code></option>
+    <option value="high">High — <code>/think high</code> (deepest reasoning)</option>
+  </select>
+  <div class="hint">When set, prepends <code>/think &lt;level&gt;</code> to your first message of each session.</div>
+
+  <label>After-Turn: Fast Mode</label>
+  <select id="openClawAfterFastMode">
+    <option value="off">Off — don't send /fast after turn</option>
+    <option value="fast">Fast — send /fast after each successful turn</option>
+  </select>
+  <div class="hint">Fired fire-and-forget once the agent completes. Useful when you want TapClaw in a different mode for non-glasses sessions.</div>
+
+  <label>After-Turn: Think Level</label>
+  <select id="openClawAfterThinkLevel">
+    <option value="">Default — don't send /think after turn</option>
+    <option value="low">Low — <code>/think low</code> after turn</option>
+    <option value="medium">Medium — <code>/think medium</code> after turn</option>
+    <option value="high">High — <code>/think high</code> after turn</option>
+  </select>
+  <div class="hint">Same idea — pick a "between-turns" reasoning level. Errors from the after-turn fire are logged and ignored; never blocks your next request.</div>
+
+  <!-- Connection Status -->
+  <div id="clawConnectionStatus" style="margin-top:14px;padding:12px;background:#0a0f14;border:1px solid #1a3a4a;border-radius:8px;display:none">
+    <div style="font-size:11px;color:#666;margin-bottom:4px">Active Gateway</div>
+    <div id="clawActiveUrl" style="font-size:13px;color:#8fdfff;font-family:monospace;word-break:break-all"></div>
+    <div id="clawConnectionType" style="font-size:11px;color:#888;margin-top:4px"></div>
+  </div>
+</div>
+
+<!-- ── OpenClaw Web Dashboard credentials ──
+     Separate from the gateway connection (above) — the gateway is the
+     real-time WebSocket your glasses talk to, while the "dashboard" is
+     the human-facing web UI that lives at a different URL. We collect
+     the URL + login here as a safe place to stash credentials; the
+     dashboard tile on the glasses opens the URL, and the user pastes
+     username/password into the dashboard's own login form. We do NOT
+     auto-submit credentials on the user's behalf. -->
+<div class="section">
+  <div class="section-title">🌐 Dashboard Access</div>
+  <p class="section-desc">Web URL + login for the OpenClaw dashboard, plus the address of this companion app on your LAN. These get used by the matching tiles on your glasses' browser dashboard (Utilities / Reference). Credentials are stored locally in this app — they're never sent to any server other than the dashboard itself when you log in.</p>
+
+  <label>OpenClaw Dashboard URL</label>
+  <input type="text" id="openClawDashboardUrl" placeholder="http://your-openclaw-host:18790/  or  https://your-tunnel.trycloudflare.com">
+  <div class="hint">The web UI for your OpenClaw server. Same host as the gateway, usually on a different port (commonly <code>18790</code>). Use the Cloudflare Tunnel URL when accessing from a different network.</div>
+
+  <label>Dashboard Username / Email</label>
+  <input type="text" id="openClawDashboardUsername" placeholder="Your dashboard login (email or username)">
+  <div class="hint">Whatever the dashboard's login form expects — typically your email address. Saved locally so you can copy/paste it on the glasses.</div>
+
+  <label>Dashboard Password</label>
+  <div style="position:relative">
+    <input type="password" id="openClawDashboardPassword" placeholder="Your dashboard password">
+    <button onclick="togglePw('openClawDashboardPassword')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#e91e63;cursor:pointer;background:none;border:none">👁</button>
+  </div>
+  <div class="hint">Stored as a password input in your phone's app prefs (same security model as the Gateway Token above). The companion app never auto-submits this — you paste it into the dashboard's login form yourself.</div>
+
+  <label>TapInsight Companion URL</label>
+  <input type="text" id="tapInsightCompanionUrl" placeholder="http://your-phone-lan-ip:8080/">
+  <div class="hint">LAN address where this companion app is reachable (the page you're looking at right now). Find your phone's WiFi IP in Settings → About → Status, or just check the URL bar of this very page on your phone. The glasses' Companion tile opens this URL so you can adjust settings without leaving the headset.</div>
+</div>
+
+<!-- Heartbeat Settings -->
+<div class="section">
+  <div class="section-title">❤️ Heartbeat Display</div>
+  <p class="section-desc">TapClaw sends progress updates while working on tasks. These appear as scrolling text on your HUD.</p>
+
+  <label>Heartbeat Update Interval (seconds)</label>
+  <input type="number" id="openClawHeartbeatIntervalSeconds" placeholder="20" min="10" max="120">
+  <div class="hint" id="openClawHeartbeatReadout" style="color:#8fdfff;font-weight:600">Currently polling every 20 seconds.</div>
+  <div class="hint">How often to refresh the heartbeat HUD display (10–120 seconds). Lower = more frequent updates, but uses more battery. Default: 20s.</div>
+
+  <label>Agent Status Poll Interval (seconds)</label>
+  <input type="number" id="agentStatusPollSeconds" placeholder="30" min="10" max="300">
+  <div class="hint">The HUD heartbeat ticker stays permanently visible and refreshes the live Hermes / TapClaw reachability on this cadence (10–300 seconds, default 30) — so a stalled agent query is visible instead of leaving the ticker blank.</div>
+
+  <label>Chat History Retention (days)</label>
+  <select id="hudChatHistoryDays">
+    <option value="1">1 day</option>
+    <option value="2">2 days</option>
+    <option value="3" selected>3 days (default)</option>
+    <option value="4">4 days</option>
+    <option value="5">5 days</option>
+  </select>
+  <div class="hint">Tapping the H or O badge in the HUD opens a history overlay listing every recent Hermes / OpenClaw turn. Records older than this window are pruned automatically (1–5 days, default 3). Tap any card to reload that conversation into Gemini.</div>
+</div>
+
+<!-- Test & Pair -->
+<div class="section">
+  <div class="section-title">🔗 Test & Pair</div>
+
+  <button id="testClawBtn" style="background:#333;color:#00e676;padding:10px 18px;font-size:13px;border-radius:8px;border:1px solid #1b5e20;cursor:pointer;width:100%" onclick="testClawConnection()">
+    🔗 Test TapClaw Connection
+  </button>
+  <div id="clawTestResult" style="display:none;margin-top:8px;padding:10px;background:#111;border-radius:6px;border:1px solid #333;font-size:12px"></div>
+</div>
+
+<!-- Remote Access -->
+<div class="section" style="border-left-color:#283593">
+  <div class="section-title" style="color:#7986cb">☁️ Remote Access</div>
+  <p class="section-desc">Access TapClaw from anywhere using a Cloudflare Tunnel. This creates a secure public URL for your local gateway.</p>
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button id="cfStatusBtn" style="flex:1;background:#1a237e;color:#9fa8da;padding:8px;font-size:12px;border-radius:6px;border:1px solid #283593;cursor:pointer" onclick="checkCfTunnel()">Check Tunnel Status</button>
+  </div>
+  <div id="cfTunnelStatus" style="display:none;padding:8px;background:#111;border-radius:6px;font-size:12px;margin-bottom:8px"></div>
+  <details style="margin-top:4px">
+    <summary style="font-size:12px;color:#7986cb;cursor:pointer">Setup instructions (named tunnel — recommended)</summary>
+    <div style="font-size:11px;color:#999;line-height:1.7;margin-top:8px">
+      A named tunnel gives you a permanent, stable URL. Requires a domain on Cloudflare (from ~$2/year).<br><br>
+      <b>Step 1 — Install cloudflared:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">brew install cloudflared</code><br><br>
+      <b>Step 2 — Log in to your Cloudflare account:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">cloudflared tunnel login</code><br>
+      A browser window opens. Authorize and select your domain.<br><br>
+      <b>Step 3 — Create the tunnel:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">cloudflared tunnel create tapclaw</code><br>
+      Note the tunnel ID from the output.<br><br>
+      <b>Step 4 — Route DNS:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">cloudflared tunnel route dns tapclaw tapclaw.yourdomain.com</code><br><br>
+      <b>Step 5 — Create config file:</b><br>
+      Create <code>~/.cloudflared/config.yml</code> with:<br>
+      <pre style="background:#0a0f14;padding:8px;border-radius:4px;color:#9ef3ff;margin:4px 0;white-space:pre-wrap;font-size:10px">tunnel: YOUR_TUNNEL_ID
+credentials-file: /Users/YOU/.cloudflared/YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: tapclaw.yourdomain.com
+    service: http://localhost:18789
+  - hostname: relay.yourdomain.com
+    service: http://localhost:18790
+  - service: http_status:404</pre>
+      <b>Step 6 — Allow the origin in OpenClaw:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">openclaw config set gateway.controlUi.allowedOrigins "https://tapclaw.yourdomain.com"</code><br>
+      Then restart the OpenClaw gateway.<br><br>
+      <b>Step 7 — Start the tunnel:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">cloudflared tunnel run tapclaw</code><br><br>
+      <b>Auto-start on login:</b>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">brew services start cloudflared</code><br><br>
+      <b>Alternative:</b> <a href="https://tailscale.com" target="_blank" style="color:#7986cb">Tailscale</a> (mesh VPN, free, no domain needed)
+    </div>
+  </details>
+  <details style="margin-top:6px">
+    <summary style="font-size:12px;color:#7986cb;cursor:pointer">Troubleshooting</summary>
+    <div style="font-size:11px;color:#999;line-height:1.7;margin-top:8px">
+      <b>"origin not allowed"</b> — Add your tunnel domain to <code>~/.openclaw/openclaw.json</code> under <code>gateway.controlUi.allowedOrigins</code> and restart the gateway.<br><br>
+      <b>"503 Service Unavailable"</b> — The tunnel is running but has no ingress rules. Check <code>~/.cloudflared/config.yml</code>.<br><br>
+      <b>"Error 1033" in browser</b> — The tunnel isn't running. Start it with <code>cloudflared tunnel run tapclaw</code>.<br><br>
+      <b>Vision relay not working remotely</b> — Make sure your Cloudflare config includes the <code>relay.</code> subdomain entry.
+    </div>
+  </details>
+</div>
+
+<!-- Vision Relay -->
+<div class="section" style="border-left-color:#5e1b1b">
+  <div class="section-title" style="color:#ef9a9a">📷 Vision Relay</div>
+  <p class="section-desc">Required for camera vision commands like <code>tapclaw what do you see</code>. A small background service on the same computer as TapClaw/OpenClaw receives camera frames and saves them to the workspace. That host can be Linux, a Mac, or a Windows PC.</p>
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button style="flex:1;background:#4a1515;color:#ef9a9a;padding:8px;font-size:12px;border-radius:6px;border:1px solid #5e1b1b;cursor:pointer" onclick="checkRelayStatus()">Check Relay</button>
+    <button style="flex:1;background:#4a1515;color:#ef9a9a;padding:8px;font-size:12px;border-radius:6px;border:1px solid #5e1b1b;cursor:pointer" onclick="viewSavedImages()">View Saved Images</button>
+  </div>
+  <div id="relayStatus" style="display:none;padding:8px;background:#111;border-radius:6px;font-size:12px;margin-bottom:8px"></div>
+  <details>
+    <summary style="font-size:12px;color:#ef9a9a;cursor:pointer">Install instructions</summary>
+    <div style="font-size:11px;color:#999;line-height:1.7;margin-top:8px">
+      Run on the same computer as TapClaw/OpenClaw:<br><br>
+      <b>Linux manual start:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">python3 -m pip install Pillow</code><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">python3 tools/image_relay.py</code><br><br>
+      <b>macOS quick install:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">pip3 install Pillow</code><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">bash tools/install-relay.sh</code><br><br>
+      <b>Windows manual start:</b><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">py -3 -m pip install Pillow</code><br>
+      <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff;display:inline-block;margin:4px 0">py -3 tools\\image_relay.py</code><br><br>
+      The macOS script installs a background service that starts automatically on login. On Linux, use a <code>systemd --user</code> service, <code>tmux</code>, <code>screen</code>, or desktop autostart if you want the relay to auto-start. On Windows, use Task Scheduler or your Startup folder.<br><br>
+      <b>Manual start on any OS:</b> <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff">python3 tools/image_relay.py</code><br>
+      <b>Uninstall macOS helper:</b> <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff">bash tools/install-relay.sh --uninstall</code><br>
+      <b>Logs:</b> <code style="background:#0a0f14;padding:2px 6px;border-radius:4px;color:#9ef3ff">/tmp/tapclaw-image-relay.log</code> on macOS, your terminal / systemd journal / redirected log file on Linux, or your terminal / redirected log file on Windows
+    </div>
+  </details>
+
+  <!-- Saved Images Gallery -->
+  <div id="imageGallery" style="margin-top:14px;display:none">
+    <div style="background:#111;border:1px solid #333;border-radius:8px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600;color:#ccc">Captured Frames</div>
+        <button style="background:#333;color:#888;padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #444;cursor:pointer;flex:none" onclick="document.getElementById('imageGallery').style.display='none'">Close</button>
+      </div>
+      <div id="imageGalleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px"></div>
+      <div id="imageGalleryEmpty" style="text-align:center;color:#666;font-size:12px;padding:20px">No images found. Use a vision command to capture frames.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Documentation -->
+<div class="section" style="border-left-color:#1b5e20">
+  <div class="section-title" style="color:#66bb6a">📘 OpenClaw Manual</div>
+  <p class="section-desc">The longer Media &amp; Files guide and Chrome CDP on Mac HOWTO now live in the instruction manual so this setup tab stays focused on pairing and connection settings.</p>
+  <div style="font-size:12px;color:#bbb;line-height:1.8">
+    Open <code>docs/user-guide.html</code> or the published TapInsight guide, then jump to <b>TapClaw / OpenClaw</b>.
+  </div>
+</div>
+
+<!-- Save / Reload -->
+<div class="btn-row">
+  <button class="btn-save" onclick="saveAll()">Save Configuration</button>
+  <button class="btn-reset" onclick="loadAll()">Reload</button>
+</div>
+<div id="status" class="status"></div>
+
+<!-- QR Scanner Modal -->
+<div id="qrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:100;padding:20px;overflow-y:auto">
+  <div style="background:#1a1a1a;border-radius:12px;padding:20px;max-width:400px;margin:40px auto;border:1px solid #333;text-align:center">
+    <h3 style="color:#e91e63;margin-bottom:10px">Scan TapClaw QR Code</h3>
+    <p style="font-size:12px;color:#aaa;margin-bottom:12px">Point your phone camera at the QR code</p>
+    <div id="qrVideoWrap" style="position:relative;width:100%;max-width:340px;margin:0 auto;border-radius:10px;overflow:hidden;background:#000">
+      <video id="qrVideo" autoplay playsinline muted style="width:100%;display:block"></video>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:180px;height:180px;border:2px solid rgba(233,30,99,0.5);border-radius:12px;pointer-events:none"></div>
+      <canvas id="qrCanvas" style="display:none"></canvas>
+    </div>
+    <div id="qrFallbackWrap" style="display:none">
+      <p style="font-size:13px;color:#ccc;margin:12px 0 8px">This browser can't scan live video. Use one of these options:</p>
+      <div style="background:#0d1117;border:1px solid #333;border-radius:8px;padding:12px;margin:8px 0;text-align:left">
+        <p style="font-size:13px;color:#e91e63;margin:0 0 8px"><b>Option 1:</b> Use your Camera app</p>
+        <ol style="font-size:12px;color:#aaa;margin:0;padding-left:20px;line-height:1.6">
+          <li>Open your iPhone Camera app</li>
+          <li>Point at the QR code — a link banner appears</li>
+          <li>Long-press the banner → Copy Link</li>
+          <li>Come back here and paste below</li>
+        </ol>
+      </div>
+      <div style="background:#0d1117;border:1px solid #333;border-radius:8px;padding:12px;margin:8px 0;text-align:left">
+        <p style="font-size:13px;color:#e91e63;margin:0 0 8px"><b>Option 2:</b> Take a photo</p>
+        <input type="file" id="qrPhotoInput" accept="image/*" capture="environment" style="font-size:13px;color:#ccc;margin-top:4px;width:100%">
+        <p style="font-size:11px;color:#666;margin:4px 0 0">Take a photo of the QR code. We'll try to read it.</p>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="qrPasteInput" placeholder="Or paste the URL / QR data here"
+               style="width:100%;padding:10px;font-size:13px;background:#111;border:1px solid #444;border-radius:6px;color:#fff;box-sizing:border-box">
+        <button onclick="handleQrPaste()" style="margin-top:8px;background:#00e676;color:#000;padding:8px 16px;font-size:13px;font-weight:600;border-radius:6px;border:none;cursor:pointer;width:100%">Apply</button>
+      </div>
+    </div>
+    <div id="qrStatus" style="font-size:12px;color:#888;margin-top:10px;min-height:20px"></div>
+    <button onclick="stopQrScan()" style="background:#333;color:#ccc;padding:8px 16px;border:none;border-radius:6px;cursor:pointer;margin-top:12px;font-size:13px">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Field Mapping ────────────────────────────────────────────
+const FIELDS = {
+  // ── Hermes Agent (primary) ──
+  hermesEnabled:          { key: 'hermes_enabled',          type: 'bool'   },
+  hermesEndpoint:         { key: 'hermes_endpoint',         type: 'string' },
+  hermesApiKey:           { key: 'hermes_api_key',          type: 'string' },
+  hermesSessionId:        { key: 'hermes_session_id',       type: 'string' },
+  hermesTimeoutSeconds:   { key: 'hermes_timeout_seconds',  type: 'int'    },
+  // Keep the Gemini Live mic open for ~30 s after a Hermes turn so the
+  // user can ask a natural follow-up without re-activating.
+  hermesAutoFollowupToggle: { key: 'hermes_auto_followup_enabled', type: 'bool' },
+  // ── TapClaw / OpenClaw (secondary, legacy) ──
+  openClawEnabled:     { key: 'openclaw_enabled',          type: 'bool'   },
+  openClawEndpoint:    { key: 'openclaw_endpoint',         type: 'string' },
+  openClawToken:       { key: 'openclaw_token',            type: 'string' },
+  openClawSessionId:   { key: 'openclaw_session_id',       type: 'string' },
+  openClawTimeoutSeconds: { key: 'openclaw_timeout_seconds', type: 'int' },
+  openClawHeartbeatIntervalSeconds: { key: 'openclaw_heartbeat_interval_seconds', type: 'int' },
+  agentStatusPollSeconds: { key: 'agent_status_poll_seconds', type: 'int' },
+  hudChatHistoryDays:    { key: 'hud_chat_history_days',    type: 'int' },
+  // Mode brackets — see OpenClawClient.consumeModePrefixForSession +
+  // fireAfterTurnRestoreIfConfigured for how these drive sendMessage.
+  openClawFastMode:        { key: 'openclaw_fast_mode',         type: 'string' },
+  openClawThinkLevel:      { key: 'openclaw_think_level',       type: 'string' },
+  openClawAfterFastMode:   { key: 'openclaw_after_fast_mode',   type: 'string' },
+  openClawAfterThinkLevel: { key: 'openclaw_after_think_level', type: 'string' },
+  // Web dashboard credentials — surfaced to the user verbatim so they
+  // can copy/paste into the dashboard's login form on the glasses.
+  // Never auto-submitted by the companion app or the glasses.
+  openClawDashboardUrl:      { key: 'openclaw_dashboard_url',      type: 'string' },
+  openClawDashboardUsername: { key: 'openclaw_dashboard_username', type: 'string' },
+  openClawDashboardPassword: { key: 'openclaw_dashboard_password', type: 'string' },
+  tapInsightCompanionUrl:    { key: 'tapinsight_companion_url',    type: 'string' }
+};
+
+// ── Config API ───────────────────────────────────────────────
+function apiHeaders() {
+  return { 'Content-Type': 'application/json' };
+}
+
+let _configCache = {};
+
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    if (r.ok) _configCache = await r.json();
+  } catch (e) { console.error('Load failed:', e); }
+}
+
+async function saveConfig(payload) {
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return r.ok;
+  } catch (e) { console.error('Save failed:', e); return false; }
+}
+
+// ── Load / Save All ──────────────────────────────────────────
+async function loadAll() {
+  await loadConfig();
+  for (const [id, cfg] of Object.entries(FIELDS)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const raw = _configCache[cfg.key];
+    if (raw == null) continue;
+    if (cfg.type === 'bool') {
+      el.value = (raw === true || raw === 'true') ? 'true' : 'false';
+    } else {
+      el.value = String(raw);
+    }
+  }
+  updateClawConnectionStatus();
+  updateHeartbeatIntervalReadout();
+}
+
+async function saveAll() {
+  const payload = {};
+  for (const [id, cfg] of Object.entries(FIELDS)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const v = el.value.trim();
+    if (cfg.type === 'bool') payload[cfg.key] = v === 'true';
+    else if (cfg.type === 'int') payload[cfg.key] = parseInt(v, 10) || 0;
+    else if (cfg.type === 'float') payload[cfg.key] = parseFloat(v) || 0;
+    else payload[cfg.key] = v;
+  }
+  const ok = await saveConfig(payload);
+  showToast(ok ? 'Configuration saved!' : 'Save failed.', ok ? 'ok' : 'err');
+}
+
+// ── Toast ────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  setTimeout(() => { el.className = 'toast'; }, 2500);
+}
+
+// ── Password Toggle ──────────────────────────────────────────
+function togglePw(id) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+// ── Connection Status ────────────────────────────────────────
+function updateClawConnectionStatus() {
+  const url = (document.getElementById('openClawEndpoint')?.value || '').trim();
+  const panel = document.getElementById('clawConnectionStatus');
+  const urlEl = document.getElementById('clawActiveUrl');
+  const typeEl = document.getElementById('clawConnectionType');
+  if (!panel || !urlEl || !typeEl) return;
+  if (!url) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  urlEl.textContent = url;
+  if (url.match(/^(wss:|https:)\/\//) && !url.match(/\d+\.\d+\.\d+\.\d+/)) {
+    typeEl.innerHTML = '🌐 Remote (Cloudflare Tunnel / public domain) — works over cell service';
+    typeEl.style.color = '#66bb6a';
+  } else if (url.match(/^(wss:|https:)/)) {
+    typeEl.innerHTML = '🔒 Secure WebSocket (wss) — encrypted connection';
+    typeEl.style.color = '#8fdfff';
+  } else {
+    typeEl.innerHTML = '🏠 Local network (ws) — same WiFi only';
+    typeEl.style.color = '#ffb14a';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ep = document.getElementById('openClawEndpoint');
+  if (ep) ep.addEventListener('input', updateClawConnectionStatus);
+  const heartbeat = document.getElementById('openClawHeartbeatIntervalSeconds');
+  if (heartbeat) heartbeat.addEventListener('input', updateHeartbeatIntervalReadout);
+
+  // Best-effort default for the Companion App URL: if the user hasn't
+  // saved one yet, prefill from window.location so the field is
+  // already correct the moment they land here. They can override
+  // later (e.g. with a public tunnel URL) and the saved value wins
+  // on reload.
+  const companionEl = document.getElementById('tapInsightCompanionUrl');
+  if (companionEl && !companionEl.value) {
+    try {
+      const origin = window.location.origin;
+      if (origin && !origin.startsWith('file:')) {
+        companionEl.placeholder = origin + '/  (auto-detected)';
+        // Don't write to the value — leave it blank so saveAll() doesn't
+        // persist a guess. The placeholder communicates the auto-guess
+        // visually; the user opts in by typing or hitting Save once.
+      }
+    } catch (_) {}
+  }
+});
+
+function updateHeartbeatIntervalReadout() {
+  const input = document.getElementById('openClawHeartbeatIntervalSeconds');
+  const readout = document.getElementById('openClawHeartbeatReadout');
+  if (!input || !readout) return;
+  const parsed = parseInt((input.value || '').trim(), 10);
+  const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : 20;
+  const rangeNote = seconds < 10 || seconds > 120
+    ? ' Recommended range is 10 to 120 seconds.'
+    : '';
+  readout.textContent = `Currently polling every ${seconds} second${seconds === 1 ? '' : 's'}.${rangeNote}`;
+}
+
+// ── Test Connection ──────────────────────────────────────────
+function renderClawStatus(html, scrollTargetId) {
+  const boxes = [
+    document.getElementById('qrClawResult'),
+    document.getElementById('clawTestResult')
+  ].filter(Boolean);
+  boxes.forEach(box => { box.style.display = 'block'; box.innerHTML = html; });
+  const target = document.getElementById(scrollTargetId || 'clawTestResult') || boxes[0];
+  target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function renderClawDebugDetails(debug) {
+  if (!debug || typeof debug !== 'object') return '';
+  const lines = [];
+  if (debug.gatewayErrorCode) lines.push('<b>Gateway code:</b> <code>' + String(debug.gatewayErrorCode).replace(/</g, '&lt;') + '</code>');
+  if (debug.closeCode || debug.closeReason) lines.push('<b>Socket close:</b> <code>' + String(debug.closeCode || '').replace(/</g, '&lt;') + '</code> ' + String(debug.closeReason || '').replace(/</g, '&lt;'));
+  if (debug.endpoint) lines.push('<b>Endpoint:</b> <code>' + String(debug.endpoint).replace(/</g, '&lt;') + '</code>');
+  if (debug.deviceId) lines.push('<b>Device ID:</b> <code>' + String(debug.deviceId).replace(/</g, '&lt;') + '</code>');
+  if (!lines.length) return '';
+  return '<details style="margin-top:8px;font-size:11px;color:#aaa"><summary style="cursor:pointer;color:#8fdfff">Debug details</summary><div style="margin-top:6px;padding:8px;background:#0a0a0a;border-radius:6px;border:1px solid #222">' + lines.join('<br>') + '</div></details>';
+}
+
+async function testClawConnection() {
+  renderClawStatus('<span style="color:#888">⏳ Testing connection from the glasses...</span>', 'clawTestResult');
+  const endpoint = document.getElementById('openClawEndpoint')?.value?.trim();
+  const token = document.getElementById('openClawToken')?.value?.trim();
+  const sessionId = document.getElementById('openClawSessionId')?.value?.trim() || 'main';
+  const timeoutSeconds = parseInt(document.getElementById('openClawTimeoutSeconds')?.value || '0', 10) || 0;
+  if (!endpoint) {
+    renderClawStatus('<span style="color:#f44336">⚠ No gateway URL configured.</span> Set it above.', 'clawTestResult');
+    return;
+  }
+  try {
+    const resp = await fetch('/api/verify/openclaw', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ endpoint, token, session_id: sessionId, timeout_seconds: timeoutSeconds })
+    });
+    const data = await resp.json().catch(() => ({}));
+    const endpointLabel = String(data.endpoint || endpoint).replace(/</g, '&lt;');
+    if (data.status === 'ok') {
+      renderClawStatus('<span style="color:#00e676">✓ TapClaw reachable from the glasses.</span><br>'
+        + '<b>Gateway:</b> ' + endpointLabel + '<br>'
+        + (data.httpStatus ? '<b>HTTP:</b> ' + data.httpStatus + '<br>' : '')
+        + (data.version ? '<b>Version:</b> ' + data.version + '<br>' : '')
+        + (data.model ? '<b>Model:</b> ' + data.model + '<br>' : ''),
+        'clawTestResult');
+      return;
+    }
+    if (data.status === 'auth_failed') {
+      renderClawStatus('<span style="color:#ff9800">⚠ TapClaw responded, but the bearer token was rejected.</span><br>'
+        + '<b>Gateway:</b> ' + endpointLabel + '<br>'
+        + '<span style="color:#aaa">Run <code>openclaw config get gateway.auth.token</code> and paste that value.</span>',
+        'clawTestResult');
+      return;
+    }
+    renderClawStatus('<span style="color:#f44336">⚠ TapClaw test failed.</span><br>'
+      + '<b>Gateway:</b> ' + endpointLabel + '<br>'
+      + (data.message ? '<span style="color:#aaa">' + String(data.message).replace(/</g, '&lt;') + '</span>' : ''),
+      'clawTestResult');
+  } catch (e) {
+    renderClawStatus('<span style="color:#f44336">⚠ TapClaw test failed.</span><br>'
+      + '<span style="color:#aaa">' + String(e.message || e).replace(/</g, '&lt;') + '</span>',
+      'clawTestResult');
+  }
+}
+
+// ── Pairing ──────────────────────────────────────────────────
+async function startClawPairing() {
+  const setupCode = document.getElementById('openClawSetupCode')?.value?.trim();
+  const endpoint = document.getElementById('openClawEndpoint')?.value?.trim();
+  if (!setupCode) {
+    renderClawStatus('<span style="color:#f44336">⚠ This QR did not include a TapClaw setup/bootstrap code.</span>');
+    return;
+  }
+  renderClawStatus('<span style="color:#888">⏳ Starting TapClaw pairing from the glasses...</span>');
+  try {
+    const resp = await fetch('/api/openclaw/pair', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ setup_code: setupCode, endpoint })
+    });
+    const rawText = await resp.text();
+    let data = {};
+    try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = { message: rawText || '' }; }
+    const endpointLabel = String(data.endpoint || endpoint || '').replace(/</g, '&lt;');
+    const debugHtml = renderClawDebugDetails(data.debug);
+    if (data.status === 'pending_approval') {
+      renderClawStatus('<span style="color:#ffb14a">⚠ Pairing request created.</span><br>'
+        + '<b>Gateway:</b> ' + endpointLabel + '<br>'
+        + (data.requestId ? '<b>Request ID:</b> <code>' + String(data.requestId).replace(/</g, '&lt;') + '</code><br>' : '')
+        + '<span style="color:#aaa">Approve it on your TapClaw server with <code>openclaw devices approve ' + String(data.requestId || '--latest').replace(/</g, '&lt;') + '</code></span>'
+        + debugHtml
+        + '<br><button onclick="startClawPairing()" style="margin-top:8px;background:#333;color:#8fdfff;padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid #2f5b70;cursor:pointer;width:100%">↻ Check Pairing Again</button>');
+      return;
+    }
+    if (data.status === 'approved') {
+      renderClawStatus('<span style="color:#00e676">✓ TapClaw pairing completed.</span><br>'
+        + '<b>Gateway:</b> ' + endpointLabel + '<br>'
+        + (data.deviceId ? '<b>Device ID:</b> <code>' + String(data.deviceId).replace(/</g, '&lt;') + '</code><br>' : '')
+        + debugHtml);
+      return;
+    }
+    const msg = String(data.message || 'Unknown pairing error.').replace(/</g, '&lt;');
+    renderClawStatus('<span style="color:#f44336">⚠ TapClaw pairing failed.</span><br>' + '<span style="color:#aaa">' + msg + '</span>' + debugHtml);
+  } catch (e) {
+    renderClawStatus('<span style="color:#f44336">⚠ TapClaw pairing failed.</span><br>'
+      + '<span style="color:#aaa">' + String(e.message || e).replace(/</g, '&lt;') + '</span>');
+  }
+}
+
+// ── QR Scanner ───────────────────────────────────────────────
+let qrStream = null;
+let qrScanInterval = null;
+
+function startQrScan() {
+  const modal = document.getElementById('qrModal');
+  modal.style.display = 'block';
+  const video = document.getElementById('qrVideo');
+  const canvas = document.getElementById('qrCanvas');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('qrStatus');
+  const fallback = document.getElementById('qrFallbackWrap');
+  const videoWrap = document.getElementById('qrVideoWrap');
+
+  if (typeof BarcodeDetector === 'undefined') {
+    videoWrap.style.display = 'none';
+    fallback.style.display = 'block';
+    statusEl.textContent = 'Camera QR scanning not supported. Use alternatives above.';
+    return;
+  }
+
+  fallback.style.display = 'none';
+  videoWrap.style.display = 'block';
+  statusEl.textContent = 'Starting camera...';
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => {
+      qrStream = stream;
+      video.srcObject = stream;
+      video.play();
+      statusEl.textContent = 'Scanning...';
+      const detector = new BarcodeDetector({ formats: ['qr_code'] });
+      qrScanInterval = setInterval(async () => {
+        if (video.readyState < 2) return;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        try {
+          const barcodes = await detector.detect(canvas);
+          if (barcodes.length > 0) {
+            stopQrScan();
+            applyClawQr(barcodes[0].rawValue);
+          }
+        } catch (_) {}
+      }, 300);
+    })
+    .catch(e => {
+      videoWrap.style.display = 'none';
+      fallback.style.display = 'block';
+      statusEl.textContent = 'Camera access denied. Use alternatives above.';
+    });
+}
+
+function stopQrScan() {
+  if (qrScanInterval) { clearInterval(qrScanInterval); qrScanInterval = null; }
+  if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+  document.getElementById('qrModal').style.display = 'none';
+}
+
+function handleQrPaste() {
+  const input = document.getElementById('qrPasteInput')?.value?.trim();
+  if (input) { stopQrScan(); applyClawQr(input); }
+}
+
+function applyClawSetupUrl() {
+  const input = document.getElementById('clawSetupUrl').value.trim();
+  if (!input) return;
+  applyClawQr(input);
+}
+
+function applyClawQr(data) {
+  let url = '', token = '', sessionId = '', setupCode = '';
+  try {
+    if (data.includes('tapinsight://openclaw')) {
+      const parsed = new URL(data.replace('tapinsight://', 'https://tapinsight/'));
+      url = parsed.searchParams.get('url') || '';
+      token = parsed.searchParams.get('token') || '';
+      sessionId = parsed.searchParams.get('session') || '';
+      setupCode = parsed.searchParams.get('setup_code') || '';
+    } else if (data.trim().startsWith('{')) {
+      const json = JSON.parse(data);
+      // TapClaw native format
+      url = json.gatewayUrl || json.url || json.endpoint || '';
+      token = json.auth?.token || json.token || '';
+      sessionId = json.sessionId || json.session || '';
+      setupCode = json.setupCode || json.setup_code || json.bootstrapToken || '';
+    } else if (data.startsWith('http://') || data.startsWith('https://') || data.startsWith('ws://') || data.startsWith('wss://')) {
+      url = data;
+    }
+  } catch (e) {
+    renderClawStatus('<span style="color:#f44336">⚠ Could not parse QR data.</span><br><span style="color:#aaa">' + String(e.message).replace(/</g, '&lt;') + '</span>');
+    return;
+  }
+
+  if (url) document.getElementById('openClawEndpoint').value = url;
+  if (token) document.getElementById('openClawToken').value = token;
+  if (sessionId) document.getElementById('openClawSessionId').value = sessionId;
+  if (setupCode) document.getElementById('openClawSetupCode').value = setupCode;
+  updateClawConnectionStatus();
+
+  let statusHtml = '<span style="color:#00e676">✓ QR data applied.</span>';
+  if (url) statusHtml += '<br><b>Gateway:</b> ' + url.replace(/</g, '&lt;');
+  if (token) statusHtml += '<br><b>Token:</b> •••' + token.slice(-6);
+  if (setupCode) {
+    statusHtml += '<br><b>Setup code detected</b> — <button onclick="startClawPairing()" style="background:#e91e63;color:#fff;padding:6px 14px;font-size:12px;border-radius:6px;border:none;cursor:pointer;margin-top:4px">Start Pairing</button>';
+  } else {
+    statusHtml += '<br>Tap <b>Test Connection</b> below to verify.';
+  }
+  renderClawStatus(statusHtml, 'qrClawResult');
+}
+
+// ── Vision Relay & Cloudflare ────────────────────────────────
+function getRelayBaseUrl() { return '/api/relay'; }
+
+async function checkRelayStatus() {
+  const el = document.getElementById('relayStatus');
+  el.style.display = 'block';
+  el.innerHTML = '<span style="color:#888">Checking relay...</span>';
+  try {
+    const resp = await fetch(getRelayBaseUrl() + '/status', { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.ok) {
+      const age = data.ageSeconds >= 0 ? data.ageSeconds + 's ago' : 'none';
+      const size = data.sizeBytes > 0 ? (data.sizeBytes / 1024).toFixed(0) + 'KB' : '—';
+      el.innerHTML = '<span style="color:#66bb6a">✓ Relay running</span>'
+        + '<br><span style="color:#aaa">Last frame: ' + size + ' (' + age + ')</span>';
+    } else {
+      el.innerHTML = '<span style="color:#f44336">Relay responded but reported an error.</span>';
+    }
+  } catch (e) {
+    el.innerHTML = '<span style="color:#f44336">⚠ Relay not reachable</span>'
+      + '<br><span style="color:#888">Make sure the image relay is running on your TapClaw/OpenClaw host computer (<code>python3 tools/image_relay.py</code> on Linux/macOS or <code>py -3 tools\\image_relay.py</code> on Windows).</span>';
+  }
+}
+
+async function checkCfTunnel() {
+  const el = document.getElementById('cfTunnelStatus');
+  el.style.display = 'block';
+  const url = (document.getElementById('openClawEndpoint')?.value || '').trim();
+  if (!url) { el.innerHTML = '<span style="color:#888">No gateway URL configured.</span>'; return; }
+  const isRemote = url.match(/^(wss:|https:)\/\//) && !url.match(/\d+\.\d+\.\d+\.\d+/);
+  if (isRemote) {
+    el.innerHTML = '<span style="color:#66bb6a">✓ Remote URL detected</span><br><span style="color:#aaa">' + url.replace(/</g,'&lt;') + '</span>';
+  } else if (url.match(/^(ws:|http:)/)) {
+    el.innerHTML = '<span style="color:#ffb14a">⚠ Local URL only</span><br><span style="color:#aaa">' + url.replace(/</g,'&lt;') + '</span>';
+  } else {
+    el.innerHTML = '<span style="color:#888">URL format not recognized.</span>';
+  }
+}
+
+async function viewSavedImages() {
+  const gallery = document.getElementById('imageGallery');
+  const grid = document.getElementById('imageGalleryGrid');
+  const empty = document.getElementById('imageGalleryEmpty');
+  gallery.style.display = 'block';
+  grid.innerHTML = '';
+  empty.style.display = 'none';
+  try {
+    const resp = await fetch(getRelayBaseUrl() + '/status', { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.ok && data.hasFrame) {
+      grid.innerHTML = '<div style="text-align:center">'
+        + '<img src="' + getRelayBaseUrl() + '/latest" onerror="this.style.display=\'none\'" style="max-width:100%;border-radius:6px;border:1px solid #333" />'
+        + '<div style="font-size:11px;color:#888;margin-top:4px">Latest frame (' + (data.sizeBytes/1024).toFixed(0) + 'KB, ' + data.ageSeconds + 's ago)</div></div>';
+    } else {
+      empty.style.display = 'block';
+    }
+  } catch (_) {
+    empty.style.display = 'block';
+    empty.textContent = 'Cannot reach the image relay. Is it running on your TapClaw/OpenClaw host computer?';
+  }
+  gallery.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Photo-based QR fallback ──────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const photoInput = document.getElementById('qrPhotoInput');
+  if (photoInput) {
+    photoInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (typeof BarcodeDetector === 'undefined') {
+        document.getElementById('qrStatus').textContent = 'QR detection not supported. Paste the URL instead.';
+        return;
+      }
+      try {
+        const bitmap = await createImageBitmap(file);
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        const barcodes = await detector.detect(bitmap);
+        if (barcodes.length > 0) {
+          stopQrScan();
+          applyClawQr(barcodes[0].rawValue);
+        } else {
+          document.getElementById('qrStatus').textContent = 'No QR code found in the photo. Try again or paste the URL.';
+        }
+      } catch (err) {
+        document.getElementById('qrStatus').textContent = 'Error reading photo: ' + err.message;
+      }
+    });
+  }
+});
+
+// ── Init ─────────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>

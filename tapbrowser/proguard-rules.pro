@@ -1,0 +1,1 @@
+# TapBrowser module proguard rules

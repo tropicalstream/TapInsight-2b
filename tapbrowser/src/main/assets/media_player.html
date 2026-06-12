@@ -1,0 +1,3303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>TapInsight Media Player</title>
+<style>
+/* ── Reset & Base ── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0a;color:#e8e8e8;
+  font-family:'Segoe UI','Roboto','Helvetica Neue',Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;user-select:none}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Text Reader — modern, warm, low-saturation reader theme.
+   Replaces the prior cyan/magenta neon palette (described as "80s style")
+   with a warm-amber + slate palette inspired by Instapaper/Readwise/
+   Kindle — the active spoken word gets a soft amber highlight, past
+   text fades to a quiet slate, and chrome is muted dark gray-blue.
+   ════════════════════════════════════════════════════════════════════════ */
+#textReader{display:none;position:absolute;inset:0;background:#14171c;
+  flex-direction:column;color:#d8dde4}
+#textReader.active{display:flex}
+
+#textHeader{flex-shrink:0;padding:14px 18px 12px;
+  background:linear-gradient(180deg,#1a1d23 0%,#16191f 100%);
+  border-bottom:1px solid #262d36;display:flex;flex-direction:column;gap:8px;z-index:10}
+#textHeaderRow,.text-header-row{display:flex;align-items:center;gap:12px;min-height:24px}
+.text-header-row--controls{justify-content:space-between}
+#textTitle{flex:1;font-size:15px;font-weight:600;color:#e0e3e8;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.005em}
+#textProgress{font-size:11px;color:#7a8390;flex-shrink:0;font-variant-numeric:tabular-nums}
+/* Engine + voice tag. Soft slate-blue pill (engine) + cool light text
+   (voice) — visible without screaming "TRON" the way the old neon
+   gradient did. The Fish variant gets a slightly warmer pink shift,
+   warn state gets amber. */
+#textEngineLbl{font-size:11px;color:#8a95a3;letter-spacing:.02em;line-height:1.3;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;
+  user-select:none}
+#textEngineLbl .eng-tag{background:#1f2a36;color:#92b1c5;padding:2px 9px;border-radius:11px;
+  font-size:10px;font-weight:700;letter-spacing:.06em;border:1px solid #2a3a4a;
+  text-transform:uppercase}
+#textEngineLbl .eng-voice{color:#c0c8d2;font-weight:500}
+#textEngineLbl.fish .eng-tag{background:#2a1f30;color:#d8a8c8;border-color:#3e2c44}
+#textEngineLbl.warn .eng-tag{background:#332618;color:#e6c08a;border-color:#4a3924}
+
+/* ── Header control row ──
+   The old floating bottom bar overlapped text and made the controls
+   feel disconnected from the document title. The buttons now live
+   inline in the header next to the engine label, so they're always
+   in the same fixed location and never cover prose. */
+#textCtrlRow{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;flex-shrink:0}
+.ctrl-btn{width:38px;height:38px;border-radius:9px;border:1px solid #2a3038;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:16px;background:#1f242c;color:#d8dde4;
+  transition:background .12s ease,border-color .12s ease,transform .08s ease,color .12s ease;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  flex-shrink:0;padding:0}
+.ctrl-btn:hover{background:#262c36;border-color:#363d48}
+.ctrl-btn:active,.ctrl-btn.pressed{transform:scale(.92);background:#2f3641;border-color:#3e4654}
+/* Active "playing" state — warm amber accent, same color as the
+   currently-spoken word so the link between the play button and what
+   the reader is doing is visually obvious. */
+.ctrl-btn.playing{background:#3a2c14;color:#f5b945;border-color:#5a4520}
+.ctrl-btn.primary{width:44px;height:44px;font-size:18px;
+  background:#1f3a4a;color:#92c5d8;border-color:#2a4a5c}
+.ctrl-btn.primary.playing{background:#3a2c14;color:#f5b945;border-color:#5a4520}
+.ctrl-btn.primary:hover{background:#243f54;border-color:#345268}
+#ttsSpeed{flex-shrink:0;font-size:10px;color:#8a95a3;min-width:38px;text-align:center;
+  font-variant-numeric:tabular-nums;font-weight:600;letter-spacing:.02em}
+
+/* ── Reader body ──
+   Best-practice typography:
+     * line-height ~1.7 for prose body text (Butterick/Chicago)
+     * letter-spacing .005em adds breathing room without looking spaced
+     * font-feature-settings turns on ligatures + smart punctuation
+     * max-width caps the column to ~680px so even on a wide AR display
+       lines stay short enough that the eye can saccade comfortably
+     * right padding leaves room for the custom scrollbar overlay
+       (positioned absolutely on the right edge of the wrap) */
+#textBodyWrap{flex:1;position:relative;display:flex;min-height:0}
+#textBody{flex:1;overflow-y:auto;overflow-x:hidden;padding:36px 36px 36px 28px;
+  line-height:1.75;font-size:17px;letter-spacing:.005em;
+  color:#d8dde4;-webkit-overflow-scrolling:touch;
+  font-family:ui-serif,Georgia,Cambria,'Times New Roman',serif;
+  font-feature-settings:"kern","liga","onum";
+  scroll-behavior:smooth;
+  /* Hide the native scrollbar — we render a custom one on the right
+     edge of #textBodyWrap that's reliably visible across WebViews
+     (the native ::-webkit-scrollbar pseudo-elements aren't honored by
+     RayNeo's WebView, so the user previously saw nothing). */
+  scrollbar-width:none}
+#textBody::-webkit-scrollbar{display:none;width:0;height:0}
+#textBody > .reader-column{max-width:680px;margin:0 auto;display:block}
+#textBody.large-font{font-size:21px;line-height:1.8}
+/* Word spans are tap-targets for the seek-to-here interaction.
+   `touch-action: manipulation` removes the 300ms synthetic-click
+   delay on touch devices; without it, the WebView waits to see if a
+   double-tap is coming, which is why tapping a word sometimes felt
+   like nothing happened. */
+#textBody .word{display:inline;cursor:pointer;border-radius:3px;padding:0 1px;
+  transition:background .12s ease,color .12s ease;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none}
+#textBody .word:hover{background:rgba(245,185,69,.10)}
+#textBody .word.spoken{background:rgba(245,185,69,.20);color:#f5b945}
+#textBody .word.past{color:#6f7681}
+/* Brief flash when a word is tapped — confirms to the user that the
+   tap registered, regardless of how long the synth + audio takes to
+   start. The animation is short so it doesn't interfere with the
+   subsequent .spoken state. */
+#textBody .word.tapped{animation:wordTapFlash .35s ease-out}
+@keyframes wordTapFlash{
+  0%   {background:rgba(245,185,69,.55);transform:scale(1.04)}
+  60%  {background:rgba(245,185,69,.30);transform:scale(1)}
+  100% {background:rgba(245,185,69,.20);transform:scale(1)}
+}
+#textBody .paragraph{margin-bottom:1.45em;display:block;text-indent:0}
+#textBody .paragraph:first-child{margin-top:0}
+#textBody .paragraph:last-child{margin-bottom:3em}
+
+/* ── Custom scrollbar overlay ──
+   Drawn by JS (see updateCustomScrollbar) instead of relying on
+   ::-webkit-scrollbar (which RayNeo's WebView ignores). Always
+   visible when content overflows — never auto-hides. The thumb
+   doubles as a position indicator: its size shows what fraction
+   of the document is visible, its top shows scroll position.
+   Drag the thumb or tap the track to seek. */
+#customScrollbar{position:absolute;top:14px;bottom:14px;right:6px;width:6px;
+  background:#1d212a;border-radius:3px;z-index:5;
+  pointer-events:auto;cursor:pointer;
+  transition:width .15s ease,background .15s ease}
+#customScrollbar:hover,#customScrollbar.dragging{width:10px;background:#252a35}
+#customScrollThumb{position:absolute;left:0;right:0;
+  background:#92b1c5;border-radius:3px;min-height:48px;
+  transition:background .15s ease;will-change:transform,height}
+#customScrollbar:hover #customScrollThumb,
+#customScrollbar.dragging #customScrollThumb{background:#b8d0e0}
+/* Reading position marker on the scrollbar — a small amber pip
+   showing where the TTS is currently speaking, separate from the
+   viewport position. Helps the user keep track of where audio is
+   even if they've scrolled ahead to peek. */
+#customScrollReadHead{position:absolute;left:-3px;right:-3px;height:3px;
+  background:#f5b945;border-radius:2px;pointer-events:none;
+  box-shadow:0 0 8px rgba(245,185,69,.6);
+  transition:top .25s ease}
+
+/* TTS status banner — repositioned to the BOTTOM of the body since
+   we no longer have a floating control bar to share space with. */
+#ttsStatus{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+  max-width:88%;padding:8px 14px;border-radius:18px;font-size:12px;z-index:25;
+  background:rgba(28,32,40,.95);border:1px solid #2a3038;color:#d8dde4;
+  display:none;text-align:center;box-shadow:0 6px 22px rgba(0,0,0,.5)}
+#ttsStatus.show{display:block}
+#ttsStatus.err{border-color:#7a3a3a;color:#f5b3b3;background:rgba(40,24,24,.95)}
+#ttsStatus.info{border-color:#3a4a5a;color:#9ec5d8;background:rgba(28,36,48,.95)}
+
+/* ── Audio Player Mode ── */
+#audioPlayer{display:none;position:absolute;inset:0;background:radial-gradient(ellipse at center,#141420 0%,#0a0a0a 70%);
+  flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#audioPlayer.active{display:flex}
+
+#audioArt{width:200px;height:200px;border-radius:20px;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);
+  display:flex;align-items:center;justify-content:center;margin-bottom:24px;
+  box-shadow:0 8px 40px rgba(0,229,255,.12)}
+#audioArt .icon{font-size:72px;opacity:.6}
+#audioTitle{font-size:18px;font-weight:600;color:#e0e0e0;margin-bottom:6px;text-align:center;max-width:90%}
+#audioArtist{font-size:13px;color:#888;margin-bottom:24px;text-align:center}
+#audioSeekWrap{width:90%;max-width:400px;margin-bottom:8px}
+#audioSeek{width:100%;height:6px;-webkit-appearance:none;appearance:none;background:#222;
+  border-radius:3px;outline:none;cursor:pointer}
+#audioSeek::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;
+  border-radius:50%;background:#00e5ff;cursor:pointer;box-shadow:0 0 8px rgba(0,229,255,.4)}
+#audioTimeRow{display:flex;justify-content:space-between;width:90%;max-width:400px;
+  font-size:11px;color:#666;margin-bottom:20px}
+#audioControls{display:flex;align-items:center;gap:20px}
+.audio-btn{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  background:#1a1a1a;color:#e0e0e0;font-size:22px;display:flex;align-items:center;
+  justify-content:center;transition:background .2s,transform .15s}
+.audio-btn:active{transform:scale(.9)}
+.audio-btn.play{width:64px;height:64px;background:#00e5ff;color:#000;font-size:26px}
+.audio-btn.play.playing{background:#ff5252}
+
+/* ── Video Player Mode ── */
+#videoPlayer{display:none;position:absolute;inset:0;background:#000;z-index:50}
+#videoPlayer.active{display:block}
+#videoEl{width:100%;height:100%;object-fit:contain;background:#000}
+
+/* Video Overlay Controls */
+#videoOverlay{position:absolute;inset:0;display:flex;flex-direction:column;
+  justify-content:flex-end;opacity:0;transition:opacity .3s;z-index:60;pointer-events:none}
+#videoOverlay.visible{opacity:1;pointer-events:auto}
+#videoOverlay.always{opacity:1;pointer-events:auto}
+
+#videoTopBar{position:absolute;top:0;left:0;right:0;padding:12px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,.7) 0%,transparent 100%);
+  display:flex;align-items:center;gap:12px}
+#videoTitle{flex:1;font-size:14px;font-weight:600;color:#fff;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+
+#videoBottomBar{padding:10px 16px 18px;
+  background:linear-gradient(0deg,rgba(0,0,0,.8) 0%,transparent 100%)}
+#videoSeek{width:100%;height:8px;-webkit-appearance:none;appearance:none;
+  background:rgba(255,255,255,.15);border-radius:4px;outline:none;cursor:pointer;margin-bottom:8px}
+#videoSeek::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;
+  border-radius:50%;background:#00e5ff;cursor:pointer;box-shadow:0 0 10px rgba(0,229,255,.5)}
+#videoSeek::-webkit-slider-runnable-track{border-radius:4px}
+#videoTimeRow{display:flex;justify-content:space-between;font-size:12px;color:#aaa;margin-bottom:10px}
+#videoControlRow{display:flex;align-items:center;justify-content:center;gap:24px}
+.vid-btn{width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(255,255,255,.1);color:#fff;font-size:20px;
+  display:flex;align-items:center;justify-content:center;transition:background .2s}
+.vid-btn:active{background:rgba(255,255,255,.25)}
+.vid-btn.play{width:56px;height:56px;background:#00e5ff;color:#000;font-size:24px}
+
+/* Captions */
+#captionOverlay{position:absolute;bottom:90px;left:5%;right:5%;text-align:center;
+  z-index:65;pointer-events:none}
+#captionText{display:inline-block;padding:6px 14px;border-radius:6px;
+  background:rgba(0,0,0,.75);color:#fff;font-size:16px;line-height:1.5;
+  max-width:90%;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+
+/* ── Loading / Error ── */
+#loadingOverlay{position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:100;transition:opacity .4s}
+#loadingOverlay.hidden{opacity:0;pointer-events:none}
+.spinner{width:40px;height:40px;border:3px solid #222;border-top-color:#00e5ff;
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loadingText{margin-top:14px;font-size:13px;color:#888}
+#errorMsg{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:#1a0000;border:1px solid #f44336;border-radius:10px;padding:20px;
+  text-align:center;color:#ef9a9a;font-size:14px;z-index:200;max-width:80%}
+
+/* ── Gesture Hint ── */
+#gestureHint{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.8);color:#aaa;padding:8px 16px;border-radius:20px;
+  font-size:11px;white-space:nowrap;z-index:80;opacity:0;transition:opacity .5s;pointer-events:none}
+#gestureHint.show{opacity:1}
+
+/* ── Playlist Mode ── */
+#plBar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:rgba(0,0,0,.7);
+  border-bottom:1px solid #1a1a1a;display:none;align-items:center;gap:8px;z-index:70}
+#plBar.active{display:flex}
+#plBar .track-info{flex:1;min-width:0;font-size:12px;color:#ccc;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+#plBar .track-info .idx{color:#00e5ff;font-weight:600;margin-right:6px}
+#plBar button{background:rgba(255,255,255,.08);color:#eee;border:none;border-radius:4px;
+  padding:4px 8px;font-size:12px;cursor:pointer;flex-shrink:0}
+/* :hover declared before .active so the toggled (active) state visually wins
+   even after tap — otherwise hover's lighter background lingers on touch
+   devices and makes shuffle/repeat look like they didn't toggle. */
+#plBar button:hover{background:rgba(255,255,255,.18)}
+#plBar button.active,
+#plBar button.active:hover{background:#00e5ff;color:#000;box-shadow:0 0 0 1px #00e5ff}
+
+#plDrawer{position:fixed;top:0;right:0;bottom:0;width:min(340px,90vw);background:#0d0d0d;
+  border-left:1px solid #222;transform:translateX(100%);transition:transform .25s;
+  z-index:75;display:flex;flex-direction:column;padding:14px}
+#plDrawer.open{transform:translateX(0)}
+#plDrawer h3{color:#00e5ff;font-size:14px;margin-bottom:10px;display:flex;
+  justify-content:space-between;align-items:center}
+#plDrawer h3 .close{background:none;border:none;color:#888;font-size:20px;cursor:pointer}
+#plQueueList{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.q-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#111;
+  border:1px solid #1a1a1a;border-radius:6px;cursor:pointer;font-size:12px;color:#bbb;
+  transition:background .15s,border-color .15s}
+.q-item:hover{background:#1a1a1a;border-color:#2a2a2a}
+.q-item.current{background:#002a33;border-color:#00e5ff;color:#00e5ff}
+.q-item .q-num{color:#555;width:22px;text-align:right;font-size:10px;flex-shrink:0}
+.q-item .q-icon{font-size:13px;flex-shrink:0}
+.q-item .q-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.pl-nav-btn{width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;
+  background:#1a1a1a;color:#e0e0e0;font-size:18px;display:flex;align-items:center;
+  justify-content:center;transition:background .2s,transform .15s}
+.pl-nav-btn:active{transform:scale(.9)}
+.pl-nav-btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* ── ‹ Back button ──
+   Pinned top-left in EVERY mode (text reader, audio, video, playlist).
+   Stops playback cleanly and returns to the library, deep-linked into
+   the exact folder the playing file lives in via
+   library_local.html?folder=… . Styled on the .vid-btn circular idiom
+   so it reads as player chrome in all three themes. z-index sits above
+   the mode panels AND the loading overlay (100) so a hung load is still
+   escapable, but below #errorMsg (200). */
+#backBtn{position:fixed;top:10px;left:10px;z-index:150;width:40px;height:40px;
+  border-radius:50%;border:none;cursor:pointer;
+  background:rgba(255,255,255,.1);color:#fff;font-size:22px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 2px 2px 0;transition:background .2s}
+#backBtn:hover{background:rgba(255,255,255,.18)}
+#backBtn:active{background:rgba(255,255,255,.25)}
+/* Each mode's own top chrome clears the pinned button instead of the
+   button floating over titles/controls. */
+#textHeader{padding-left:62px}
+#videoTopBar{padding-left:62px}
+#plBar{padding-left:60px}
+</style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div id="loadingText">Loading media...</div>
+  <div id="loadingDiag" style="margin-top:8px;font-size:10px;color:#555;max-width:80vw;text-align:center;word-break:break-all"></div>
+</div>
+
+<!-- Error Display -->
+<div id="errorMsg"></div>
+
+<!-- ‹ Back — pinned in every mode; stops playback and returns to the
+     library folder the playing file lives in. Button elements are
+     excluded from the document-level tap gesture handler, so the
+     double-tap-to-exit gesture keeps working unchanged. -->
+<button id="backBtn" title="Back to library" aria-label="Back to library">‹</button>
+
+<!-- Active caption line mirror for the native dim-mode scrape. Hidden
+     on-page; #captionText (inside the video overlay) is the visible
+     render target. This node carries the SAME line in audio mode too,
+     where the video overlay markup is display:none. -->
+<div id="dimCaptionLine" style="display:none" aria-hidden="true"></div>
+
+<!-- ═══ TEXT READER ═══ -->
+<div id="textReader">
+  <div id="textHeader">
+    <!-- Row 1: title + progress (always present, full width) -->
+    <div id="textHeaderRow">
+      <div id="textTitle">Document</div>
+      <div id="textProgress"></div>
+    </div>
+    <!-- Row 2: engine indicator (left) + control buttons (right).
+         Buttons live in the header so they're always in the same fixed
+         spot, never overlap text, and don't require a floating bottom
+         bar. Click handlers wired in initTextReader (with pointerdown
+         for instant tactile feedback on touch). -->
+    <div class="text-header-row text-header-row--controls" style="margin-top:2px">
+      <!-- Engine + voice indicator. Tap to refresh after changing the
+           engine in the companion app without reloading the page. -->
+      <div id="textEngineLbl" title="Tap to refresh engine info" onclick="refreshEngineLabel()">
+        <span class="eng-tag" id="engTag">…</span>
+        <span class="eng-voice" id="engVoice">checking…</span>
+      </div>
+      <div id="textCtrlRow">
+        <button class="ctrl-btn" id="ttsRewBtn" title="Previous page" aria-label="Previous page">⏮</button>
+        <button class="ctrl-btn primary" id="ttsPlayBtn" title="Read aloud" aria-label="Read aloud">▶</button>
+        <button class="ctrl-btn" id="ttsFwdBtn" title="Next page" aria-label="Next page">⏭</button>
+        <button class="ctrl-btn" id="ttsFasterBtn" title="Cycle reading speed" aria-label="Reading speed">⏩</button>
+        <span id="ttsSpeed">1.0×</span>
+        <button class="ctrl-btn" id="ttsFontBtn" title="Toggle large font" aria-label="Font size">Aa</button>
+      </div>
+    </div>
+  </div>
+  <!-- Body wrap holds the scrollable text + the custom scrollbar
+       overlay. Custom is required because RayNeo's WebView ignores
+       ::-webkit-scrollbar styling. -->
+  <div id="textBodyWrap">
+    <div id="textBody"><div class="reader-column" id="textColumn"></div></div>
+    <div id="customScrollbar" title="Drag to navigate, tap to jump">
+      <div id="customScrollThumb"></div>
+      <div id="customScrollReadHead" title="Reading position"></div>
+    </div>
+  </div>
+  <!-- Status banner (errors, "preparing audio", etc.) — hidden until set -->
+  <div id="ttsStatus"></div>
+</div>
+
+<!-- ═══ AUDIO PLAYER ═══ -->
+<div id="audioPlayer">
+  <div id="audioArt"><div class="icon">🎵</div></div>
+  <div id="audioTitle">Audio</div>
+  <div id="audioArtist">Unknown</div>
+  <div id="audioSeekWrap"><input type="range" id="audioSeek" min="0" max="100" value="0" step="0.1"></div>
+  <div id="audioTimeRow"><span id="audioTimeCur">0:00</span><span id="audioTimeDur">0:00</span></div>
+  <div id="audioControls">
+    <!-- ⏮ / ⏭ are hidden by default (single-file mode). They're
+         revealed when the player loads with a stashed queue from
+         the library, OR when the player is in full playlist mode.
+         Wired to the existing playPrev / playNext functions which
+         already understand playOrder + repeatMode + shuffle. -->
+    <button class="audio-btn" id="audioPrevTrack" title="Previous track" style="display:none">⏮</button>
+    <button class="audio-btn" id="audioRew" title="Rewind 15s">⏪</button>
+    <button class="audio-btn play" id="audioPlayBtn">▶</button>
+    <button class="audio-btn" id="audioFwd" title="Forward 15s">⏩</button>
+    <button class="audio-btn" id="audioNextTrack" title="Next track" style="display:none">⏭</button>
+  </div>
+</div>
+
+<!-- ═══ VIDEO PLAYER ═══ -->
+<div id="videoPlayer">
+  <video id="videoEl" playsinline></video>
+  <div id="captionOverlay"><span id="captionText"></span></div>
+  <div id="videoOverlay" class="always">
+    <div id="videoTopBar">
+      <div id="videoTitle">Video</div>
+    </div>
+    <div id="videoBottomBar">
+      <input type="range" id="videoSeek" min="0" max="100" value="0" step="0.01">
+      <div id="videoTimeRow"><span id="videoTimeCur">0:00</span><span id="videoTimeDur">0:00</span></div>
+      <div id="videoControlRow">
+        <button class="vid-btn" id="videoPrevTrack" title="Previous track" style="display:none">⏮</button>
+        <button class="vid-btn" id="videoRew">⏪</button>
+        <button class="vid-btn play" id="videoPlayBtn">▶</button>
+        <button class="vid-btn" id="videoFwd">⏩</button>
+        <button class="vid-btn" id="videoNextTrack" title="Next track" style="display:none">⏭</button>
+        <button class="vid-btn" id="videoCCBtn" title="Captions">CC</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PLAYLIST MODE OVERLAYS ═══ -->
+<div id="plBar">
+  <button id="plPrevBtn" class="pl-nav-btn" title="Previous" style="width:32px;height:32px;font-size:14px">⏮</button>
+  <button id="plNextBtn" class="pl-nav-btn" title="Next" style="width:32px;height:32px;font-size:14px">⏭</button>
+  <div class="track-info">
+    <span class="idx" id="plIdxLabel">1/1</span>
+    <span id="plTrackTitle">—</span>
+  </div>
+  <button id="plShuffleBtn" title="Shuffle">🔀</button>
+  <button id="plRepeatBtn" title="Repeat off">🔁</button>
+  <button id="plQueueBtn" title="Queue">☰</button>
+</div>
+
+<div id="plDrawer">
+  <h3>
+    <span id="plName">Playlist</span>
+    <button class="close" id="plDrawerClose">×</button>
+  </h3>
+  <div id="plQueueList"></div>
+</div>
+
+<!-- Gesture Hint -->
+<div id="gestureHint">Tap to pause · Double-tap to exit</div>
+
+<audio id="audioEl" preload="auto"></audio>
+
+<script>
+// ── URL Params ──
+var params = new URLSearchParams(window.location.search);
+var mediaUrl = params.get('url') || '';
+var mediaType = (params.get('type') || '').toLowerCase();  // text, audio, video
+var mediaTitle = params.get('title') || '';
+var captionUrl = params.get('srt') || params.get('captions') || '';
+
+// Compatibility for sessions/bookmarks created by older builds. Direct DCIM
+// videos used to route through shouldInterceptRequest at /local-video/, but
+// RayNeo's Chromium video pipeline rejects those intercepted 206 tail ranges.
+// Rewrite stale player URLs to the loopback HTTPS media server before the
+// <video> element sees them.
+try {
+  if (mediaUrl.indexOf('/local-video/') !== -1 &&
+      window.TapMedia &&
+      typeof TapMedia.resolveDcimVideoPlaybackUrl === 'function') {
+    var resolvedDcimVideoUrl = TapMedia.resolveDcimVideoPlaybackUrl(mediaUrl);
+    if (resolvedDcimVideoUrl) mediaUrl = resolvedDcimVideoUrl;
+  }
+} catch (_) {}
+
+// Stamp a tiny diagnostic trail onto the spinner so a blank hang is
+// actually debuggable from the glasses — we don't have console access
+// in production, so the only failure signal we've got is the overlay.
+function diag(msg) {
+  try {
+    var d = document.getElementById('loadingDiag');
+    if (!d) return;
+    var now = new Date();
+    var ts  = now.getMinutes() + ':' + String(now.getSeconds()).padStart(2,'0');
+    var line = '[' + ts + '] ' + msg;
+    d.textContent = d.textContent ? (d.textContent + '\n' + line) : line;
+  } catch(_){}
+}
+window.addEventListener('error', function(ev){
+  diag('JS error: ' + (ev.message || ev.error || 'unknown'));
+});
+diag('params: type=' + mediaType + ' urlLen=' + mediaUrl.length +
+     ' pl=' + (params.get('playlist') || '') +
+     ' src=' + (params.get('source') || ''));
+
+// ── Detect media type from URL if not explicit ──
+if (!mediaType && mediaUrl) {
+  var ext = mediaUrl.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+  var textExts = ['txt','md','log','csv','json','xml','html','htm','rtf','ini','cfg','conf','yaml','yml','toml'];
+  var audioExts = ['mp3','wav','ogg','m4a','aac','flac','wma','opus','webm'];
+  var videoExts = ['mp4','webm','mkv','avi','mov','m4v','ogv','3gp'];
+  if (textExts.indexOf(ext) !== -1) mediaType = 'text';
+  else if (audioExts.indexOf(ext) !== -1) mediaType = 'audio';
+  else if (videoExts.indexOf(ext) !== -1) mediaType = 'video';
+  else mediaType = 'text'; // Default fallback
+}
+
+if (!mediaTitle) {
+  try { mediaTitle = decodeURIComponent(mediaUrl.split('/').pop().split('?')[0]); } catch(e) { mediaTitle = 'Media'; }
+}
+
+// Surface the resolved track title via document.title so the Kotlin
+// dim-mode label resolver can read it via WebView.title /
+// evaluateJavascript('document.title'). Without this assignment the
+// document title stays as the static "TapInsight Media Player" markup
+// and the dim-mode HUD can't tell what's actually playing. We do this
+// before anything else paints so a fast dim-mode entry already finds
+// the correct title in place.
+try { if (mediaTitle) document.title = mediaTitle; } catch (_) {}
+
+// ── Utility ──
+function fmt(s) {
+  if (!s || !isFinite(s)) return '0:00';
+  var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+  return h > 0 ? h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')
+               : m+':'+String(sec).padStart(2,'0');
+}
+function showError(msg) {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+  var el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearError() {
+  var el = document.getElementById('errorMsg');
+  el.textContent = '';
+  el.style.display = 'none';
+}
+function showLoading(msg) {
+  clearError();
+  document.getElementById('loadingText').textContent = msg || ('Loading ' + mediaType + '...');
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
+function showGestureHint() {
+  var h = document.getElementById('gestureHint');
+  h.classList.add('show');
+  setTimeout(function(){ h.classList.remove('show'); }, 3000);
+}
+
+// The media player is an exclusive playback surface. When it opens or starts
+// reading/playing, ask native TapRadio and other WebViews to stand down so a
+// previous station, podcast, YouTube tab, or TTS chunk cannot keep talking
+// over the selected file.
+var exclusivePlaybackPrepared = false;
+function notifyMediaState(isPlaying) {
+  try {
+    if (window.AndroidInterface && typeof AndroidInterface.onMediaPlaying === 'function') {
+      AndroidInterface.onMediaPlaying(!!isPlaying);
+    }
+  } catch (_) {}
+  try {
+    if (window.MediaInterface && typeof MediaInterface.onMediaStateChanged === 'function') {
+      MediaInterface.onMediaStateChanged(!!isPlaying);
+    }
+  } catch (_) {}
+}
+function prepareExclusivePlayback() {
+  if (!exclusivePlaybackPrepared) {
+    exclusivePlaybackPrepared = true;
+    try {
+      if (window.AndroidInterface && typeof AndroidInterface.stopNativeRadioStream === 'function') {
+        AndroidInterface.stopNativeRadioStream();
+      }
+    } catch (_) {}
+  }
+  notifyMediaState(true);
+}
+
+// ══════════════════════════════════════════════
+// ══════ TEXT READER ══════════════════════════
+// ══════════════════════════════════════════════
+var ttsWords = [];
+var ttsIndex = 0;
+var ttsPlaying = false;
+var ttsRate = 1.0;
+var ttsUtterance = null;
+var ttsPaused = false;
+// Counts how many chunks have been synthesized in the current play
+// session. Used by speakNextChunk to ramp up chunk sizes — the first
+// chunk is deliberately small so the user doesn't wait long for audio
+// to start, and subsequent chunks are large enough that the synth for
+// chunk N+1 reliably finishes before chunk N's playback ends.
+var ttsChunkCount = 0;
+// Chunk-size ramp, in words. Index = nth chunk in session (0-based).
+// The last entry is the steady-state size used for every chunk after it.
+//
+// Sizing math (assumes ~150 WPM speech, ~2.5 words/sec):
+//   words   playback   Fish balanced synth   margin
+//      12        ~5s                ~2-3s     ~2s   (tight, use only for chunk 0)
+//      40       ~16s                ~5-7s    ~10s   (comfortable for chunk 1)
+//      80       ~32s               ~10-13s   ~20s   (comfortable for chunk 2)
+//     150       ~60s               ~18-23s   ~38s   (steady-state — handoff is rare)
+//
+// The previous ramp [12, 18, 24, 30] kept chunks tiny for fast first-byte
+// but produced a chunk handoff every ~10s. With cloud TTS that meant the
+// margin was always 0–3s, and any synth slowdown produced an audible
+// gap. Bigger chunks give a much wider margin, so handoffs are
+// imperceptible — and 150-word chunks mean ~60s between handoffs
+// instead of ~10s, so even a small remaining gap is barely noticeable.
+var TTS_CHUNK_RAMP = [12, 40, 80, 150];
+var largeFontOn = false;
+// Configurable via URL params from companion app preferences
+var preferredVoiceName = params.get('voice') || '';
+var underlineOn = params.get('underline') !== 'false'; // default on
+
+function initTextReader(text) {
+  document.getElementById('textReader').classList.add('active');
+  document.getElementById('textTitle').textContent = mediaTitle;
+  var body = document.getElementById('textBody');
+  // The inner .reader-column caps line length and centers the text;
+  // we render words into that, not directly into #textBody. The body
+  // owns scrolling; the column just holds prose.
+  var column = document.getElementById('textColumn');
+  column.innerHTML = '';
+  ttsWords = [];
+  // Split into paragraphs, then words
+  var paragraphs = text.split(/\n\s*\n|\r\n\s*\r\n/);
+  if (paragraphs.length <= 1) paragraphs = text.split(/\n|\r\n/);
+  var globalIdx = 0;
+  paragraphs.forEach(function(para) {
+    if (!para.trim()) return;
+    var pEl = document.createElement('span');
+    pEl.className = 'paragraph';
+    var words = para.trim().split(/(\s+)/);
+    words.forEach(function(w) {
+      if (!w.trim()) {
+        pEl.appendChild(document.createTextNode(w));
+        return;
+      }
+      var span = document.createElement('span');
+      span.className = 'word';
+      span.dataset.idx = globalIdx;
+      span.textContent = w;
+      // Click-to-resume: tapping any word jumps the reader there. If
+      // the reader is currently playing we tear down the in-flight
+      // synth and re-issue from the picked word so the spoken output
+      // re-syncs to where the user clicked. If paused, we just move
+      // the cursor so the next press of Play starts there.
+      bindWordTap(span);
+      pEl.appendChild(span);
+      ttsWords.push({ el: span, text: w, idx: globalIdx });
+      globalIdx++;
+      pEl.appendChild(document.createTextNode(' '));
+    });
+    column.appendChild(pEl);
+  });
+  updateTextProgress();
+  // Wire control buttons. We use pointerdown (with click as fallback)
+  // for instant tactile response — the WebView's click event has up to
+  // 300ms of synthetic delay on touch devices, which is exactly the
+  // "pause/play takes seconds to respond" the user reported. The
+  // pressed visual is applied synchronously so the button feels
+  // physical regardless of how slow the audio side actually is.
+  function wireBtn(id, handler) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var fired = false;
+    function fire(ev) {
+      if (fired) return;        // de-dupe pointerdown + click
+      fired = true;
+      setTimeout(function(){ fired = false; }, 250);
+      // Synchronous press feedback — visible BEFORE the handler returns.
+      el.classList.add('pressed');
+      setTimeout(function(){ el.classList.remove('pressed'); }, 140);
+      try { handler(ev); } catch (e) { console.warn(id + ' handler:', e); }
+    }
+    el.addEventListener('pointerdown', fire);
+    el.addEventListener('click', fire);
+  }
+  wireBtn('ttsRewBtn', function(){ jumpPage(-1); });
+  wireBtn('ttsPlayBtn', toggleTts);
+  wireBtn('ttsFwdBtn', function(){ jumpPage(1); });
+  wireBtn('ttsFasterBtn', cycleTtsSpeed);
+  wireBtn('ttsFontBtn', toggleFontSize);
+  // Reflect current speed in the label
+  document.getElementById('ttsSpeed').textContent = ttsRate.toFixed(2) + '×';
+  // Surface the active engine + voice in the header right away so the
+  // user sees what's about to read the document before they tap Play.
+  // Wrapped in try/catch because probeTts is only present on builds
+  // that include the engine-routing patch — older bridges silently
+  // fall through to the "Browser" tag.
+  try { refreshEngineLabel(); } catch(_){}
+  // Initialize the custom scrollbar overlay. Listens to scroll on
+  // #textBody and renders a thumb that's always visible (unlike the
+  // native scrollbar, which RayNeo's WebView doesn't honor styles for).
+  try { setupCustomScrollbar(); } catch(_){}
+  hideLoading();
+  showGestureHint();
+  if (ttsAutoplayRequested) {
+    setTimeout(function() {
+      if (!ttsPlaying && ttsWords.length > 0) startTtsFrom(0);
+    }, 350);
+  }
+}
+
+function updateTextProgress() {
+  var pct = ttsWords.length > 0 ? Math.round((ttsIndex / ttsWords.length) * 100) : 0;
+  document.getElementById('textProgress').textContent = pct + '% · ' + ttsWords.length + ' words';
+}
+
+function highlightWord(idx) {
+  // Performance note: this is O(n) over every word for each TTS tick.
+  // For long documents (thousands of words) this becomes the dominant
+  // cost in the rAF loop. We track which words were toggled last time
+  // and only flip the diff. The first call still walks every word.
+  if (typeof highlightWord._lastIdx === 'number' && highlightWord._lastIdx === idx) {
+    // Same word as last call — nothing to do. Skips a 1000+ word loop
+    // every animation frame during steady-state playback.
+    return;
+  }
+  var prev = highlightWord._lastIdx;
+  if (typeof prev !== 'number') {
+    // First call (or after a clear): full pass to set initial state.
+    ttsWords.forEach(function(w, i) {
+      w.el.classList.remove('spoken');
+      if (i < idx) w.el.classList.add('past');
+      else w.el.classList.remove('past');
+    });
+  } else {
+    // Diff path: only update words between prev and idx.
+    if (prev < ttsWords.length) ttsWords[prev].el.classList.remove('spoken');
+    if (idx > prev) {
+      // Moving forward: mark prev..idx-1 as past.
+      for (var i = prev; i < idx && i < ttsWords.length; i++) {
+        ttsWords[i].el.classList.add('past');
+      }
+    } else if (idx < prev) {
+      // Moving backward (manual seek): un-mark idx..prev as past.
+      for (var j = idx; j <= prev && j < ttsWords.length; j++) {
+        ttsWords[j].el.classList.remove('past');
+      }
+    }
+  }
+  if (idx < ttsWords.length) {
+    ttsWords[idx].el.classList.add('spoken');
+    // Auto-scroll: keep the current word in view inside the textBody
+    // container (which now owns the scrollbar). Only triggers when the
+    // word is near the edges of the viewport, so the page doesn't
+    // jitter on every word.
+    autoScrollToWord(ttsWords[idx].el);
+  }
+  highlightWord._lastIdx = idx;
+  updateTextProgress();
+  // Move the amber read-head pip on the custom scrollbar so the user
+  // can see where the audio is even when they've scrolled ahead. Wrapped
+  // in try/catch because highlightWord can fire during initialization
+  // before the scrollbar is wired up.
+  try { updateCustomScrollbar(); } catch(_){}
+}
+
+// Efficient page-style auto-scroll: scroll only when the current word is in the
+// bottom 20% of the container (or above the top, e.g. after a seek).  When
+// triggered, positions the word at ~25% from the top so the reader has context
+// of what was just read while seeing plenty of upcoming text.
+function autoScrollToWord(el) {
+  var container = document.getElementById('textBody');
+  if (!container) return;
+  var cRect = container.getBoundingClientRect();
+  var wRect = el.getBoundingClientRect();
+  // Position of word relative to the container viewport
+  var relTop = wRect.top - cRect.top;
+  var relBot = wRect.bottom - cRect.top;
+  var threshold = cRect.height * 0.80; // bottom 20% triggers scroll
+  var aboveView = relBot < 0;          // word scrolled above viewport (seek)
+  if (relTop > threshold || aboveView) {
+    // Target: place word at 25% from the top of the container
+    var targetOffset = cRect.height * 0.25;
+    var scrollTo = container.scrollTop + (relTop - targetOffset);
+    container.scrollTo({ top: scrollTo, behavior: 'smooth' });
+  }
+}
+
+function toggleTts() {
+  // Update button visuals SYNCHRONOUSLY before any audio work — the
+  // user gets immediate confirmation their tap registered, even if
+  // the underlying stop/start operation takes a moment to complete.
+  var btn = document.getElementById('ttsPlayBtn');
+  if (ttsPlaying) {
+    if (btn) {
+      btn.textContent = '▶';
+      btn.classList.remove('playing');
+      btn.title = 'Read aloud';
+    }
+    stopTts();
+  } else {
+    if (btn) {
+      btn.textContent = '⏸';
+      btn.classList.add('playing');
+      btn.title = 'Pause';
+    }
+    startTtsFrom(ttsIndex);
+  }
+}
+
+/**
+ * Jump forward (+1) or backward (-1) by approximately one viewport
+ * worth of text. Finds the first word visible at the top of the new
+ * viewport and starts reading from there. If the reader is paused,
+ * just moves the cursor.
+ */
+function jumpPage(direction) {
+  var body = document.getElementById('textBody');
+  if (!body || !ttsWords.length) return;
+  // 90% of viewport so the top line of the new page overlaps the
+  // bottom line of the old page — common reader UX (Kindle, iBooks).
+  var viewportH = body.clientHeight;
+  var step = Math.max(1, Math.round(viewportH * 0.9));
+  var newScrollTop = Math.max(0, Math.min(body.scrollHeight - body.clientHeight,
+                                          body.scrollTop + direction * step));
+  body.scrollTop = newScrollTop;
+  // Find the first word now visible in the body viewport.
+  var bRect = body.getBoundingClientRect();
+  var found = null;
+  for (var i = 0; i < ttsWords.length; i++) {
+    var rect = ttsWords[i].el.getBoundingClientRect();
+    if (rect.top >= bRect.top - 4 && rect.bottom <= bRect.bottom + 4) {
+      found = ttsWords[i].idx;
+      break;
+    }
+  }
+  // Edge case: at end-of-document with no fully-visible word; pick
+  // the last word in the doc.
+  if (found === null) found = (direction > 0) ? ttsWords.length - 1 : 0;
+  ttsIndex = found;
+  highlightWord(found);
+  if (ttsPlaying) {
+    stopTts();
+    // Re-show pressed visual on play button since stopTts cleared it.
+    var btn = document.getElementById('ttsPlayBtn');
+    if (btn) {
+      btn.textContent = '⏸';
+      btn.classList.add('playing');
+      btn.title = 'Pause';
+    }
+    startTtsFrom(found);
+  }
+  // Sync the custom scrollbar's read-head and thumb to the new spot.
+  try { updateCustomScrollbar(); } catch(_){}
+}
+
+/**
+ * Click-on-text handler. Resumes the reader from whatever word the
+ * user tapped — if currently playing, we abort the in-flight synth
+ * and re-issue from the new index so the spoken output re-syncs;
+ * if paused, we ALSO start reading from there. Tapping a word is
+ * an unambiguous "read from here" intent, regardless of pause state.
+ */
+function onWordClick(ev) {
+  var span = ev && ev.currentTarget;
+  if (!span) return;
+  var idx = parseInt(span.dataset.idx, 10);
+  if (isNaN(idx) || idx < 0 || idx >= ttsWords.length) return;
+  if (ev.preventDefault) ev.preventDefault();
+  if (ev.stopPropagation) ev.stopPropagation();
+  ttsIndex = idx;
+  highlightWord(idx);
+  // Visual flash on the tapped word — confirms the tap registered
+  // even before audio synth completes (which can take 1–3s on cloud
+  // TTS). Without this, taps that hit during a synth gap looked
+  // dead.
+  span.classList.remove('tapped');
+  // Force layout flush so the animation re-runs even if .tapped was
+  // already on the element from a prior rapid tap.
+  void span.offsetWidth;
+  span.classList.add('tapped');
+  setTimeout(function(){ span.classList.remove('tapped'); }, 360);
+  // Always (re)start reading from the tapped word — whether currently
+  // playing or paused. Tapping a word is an unambiguous "read from
+  // here" intent.
+  stopTts();
+  startTtsFrom(idx);
+}
+
+/**
+ * Wire a word span for reliable tap detection on touchscreens.
+ *
+ * Why not just `addEventListener('click', ...)`? On the RayNeo
+ * WebView (and other Chromium-based mobile WebViews), `click` is a
+ * SYNTHESIZED event derived from touchstart→touchend. The browser's
+ * gesture detector must decide whether the touch is a tap, a long
+ * press, the start of a scroll, or the start of a pinch. While it's
+ * deciding, the click event is held back — and if the touch ends up
+ * being interpreted as anything other than a clean tap (e.g., the
+ * finger drifted by a couple of pixels because of touchscreen noise),
+ * the click is suppressed entirely.
+ *
+ * This binder uses pointer events with a tap-vs-scroll heuristic:
+ * record pointerdown position, listen for pointermove on the document
+ * (NOT the span — touch movement can leave the span), and on pointerup
+ * fire the handler iff total movement is below ~10px. Plus we keep the
+ * native `click` handler as a belt-and-suspenders fallback for mouse
+ * input and for any taps the WebView happens to deliver cleanly.
+ */
+function bindWordTap(span) {
+  var startX = 0, startY = 0, maxMove = 0, tracking = false;
+  var moveHandler = null, upHandler = null;
+  // Per-span guard: prevents pointerup AND click from both firing the
+  // handler for the same tap. Reset on pointerdown.
+  var firedThisGesture = false;
+
+  function fireOnce(ev) {
+    if (firedThisGesture) return;
+    firedThisGesture = true;
+    onWordClick({
+      currentTarget: span,
+      preventDefault: function() { if (ev && ev.preventDefault) try { ev.preventDefault(); } catch(_){} },
+      stopPropagation: function() { if (ev && ev.stopPropagation) try { ev.stopPropagation(); } catch(_){} }
+    });
+  }
+  function cleanup() {
+    tracking = false;
+    if (moveHandler) document.removeEventListener('pointermove', moveHandler);
+    if (upHandler) document.removeEventListener('pointerup', upHandler);
+    moveHandler = null; upHandler = null;
+  }
+  span.addEventListener('pointerdown', function(ev) {
+    firedThisGesture = false;
+    startX = ev.clientX; startY = ev.clientY; maxMove = 0; tracking = true;
+    moveHandler = function(e) {
+      if (!tracking) return;
+      var dx = e.clientX - startX, dy = e.clientY - startY;
+      var d = Math.sqrt(dx*dx + dy*dy);
+      if (d > maxMove) maxMove = d;
+    };
+    upHandler = function(e) {
+      if (!tracking) { cleanup(); return; }
+      var wasTap = (maxMove < 10);     // 10px threshold — under this it's a tap
+      cleanup();
+      if (wasTap) fireOnce(e);
+    };
+    document.addEventListener('pointermove', moveHandler);
+    document.addEventListener('pointerup', upHandler);
+  });
+  // Reset gesture flag if the pointer is cancelled (e.g., scroll
+  // intercepted the touch).
+  span.addEventListener('pointercancel', function() { firedThisGesture = false; cleanup(); });
+  // Keep native click as a fallback for mouse + any taps the
+  // WebView delivers cleanly. Guarded by firedThisGesture so we
+  // don't double-fire when both the pointer path AND click fire.
+  span.addEventListener('click', function(ev) { fireOnce(ev); });
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Engine label — surfaces "what voice is about to read this" near
+// the top of the reader so the user always knows whether they're on
+// Gemini or Fish, and which voice is active.
+// ──────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+// Custom scrollbar overlay
+//
+// RayNeo's WebView ignores ::-webkit-scrollbar pseudo-element styling,
+// which is why the styled native scrollbar appeared invisible. We
+// render our own: a track <div> on the right edge of #textBodyWrap,
+// a thumb <div> inside it whose top + height mirror scrollTop +
+// (clientHeight / scrollHeight), and a small amber "read head" pip
+// showing where TTS is currently speaking (separate from where the
+// viewport is, since the user can scroll ahead to peek).
+//
+// Best-practice patterns (Material Design 3, Apple HIG):
+//   * thumb minimum height (so it's always tappable)
+//   * track grows wider on hover/drag so it's easier to grab
+//   * pointer events for unified mouse + touch + stylus
+//   * bisect-based scroll mapping so dragging is smooth, not jumpy
+// ──────────────────────────────────────────────────────────────────
+
+function setupCustomScrollbar() {
+  var body = document.getElementById('textBody');
+  var sb = document.getElementById('customScrollbar');
+  var thumb = document.getElementById('customScrollThumb');
+  if (!body || !sb || !thumb) return;
+  // Initial paint
+  updateCustomScrollbar();
+  // Re-render on scroll. Passive listener so we never block the scroll.
+  body.addEventListener('scroll', updateCustomScrollbar, { passive: true });
+  // Re-render on resize too — clientHeight changes when the OS keyboard
+  // opens, when the device rotates, etc.
+  window.addEventListener('resize', updateCustomScrollbar, { passive: true });
+
+  // Drag-to-scroll: convert pointer position on the scrollbar track
+  // into a scrollTop on the body. Same model as the native scrollbar,
+  // but works reliably on touchscreens since we own the events.
+  var dragging = false;
+  var dragOffset = 0;     // y-offset within the thumb where the drag started
+  function trackToScrollTop(clientY) {
+    var rect = sb.getBoundingClientRect();
+    var thumbH = thumb.offsetHeight;
+    var trackH = rect.height;
+    // y inside the track, with the drag offset accounted for so the
+    // thumb's grab point follows the cursor instead of jumping to the
+    // tap point on first move.
+    var y = clientY - rect.top - dragOffset;
+    var maxY = trackH - thumbH;
+    if (maxY <= 0) return 0;
+    var ratio = Math.max(0, Math.min(1, y / maxY));
+    var scrollable = body.scrollHeight - body.clientHeight;
+    return ratio * scrollable;
+  }
+  sb.addEventListener('pointerdown', function(ev) {
+    var thumbRect = thumb.getBoundingClientRect();
+    var insideThumb = ev.clientY >= thumbRect.top && ev.clientY <= thumbRect.bottom;
+    dragOffset = insideThumb ? (ev.clientY - thumbRect.top) : (thumbRect.height / 2);
+    dragging = true;
+    sb.classList.add('dragging');
+    try { sb.setPointerCapture(ev.pointerId); } catch (_) {}
+    body.scrollTop = trackToScrollTop(ev.clientY);
+    ev.preventDefault();
+  });
+  sb.addEventListener('pointermove', function(ev) {
+    if (!dragging) return;
+    body.scrollTop = trackToScrollTop(ev.clientY);
+    ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    sb.classList.remove('dragging');
+    try { sb.releasePointerCapture(ev.pointerId); } catch (_) {}
+  }
+  sb.addEventListener('pointerup', endDrag);
+  sb.addEventListener('pointercancel', endDrag);
+}
+
+function updateCustomScrollbar() {
+  var body = document.getElementById('textBody');
+  var sb = document.getElementById('customScrollbar');
+  var thumb = document.getElementById('customScrollThumb');
+  var head = document.getElementById('customScrollReadHead');
+  if (!body || !sb || !thumb) return;
+  var scrollH = body.scrollHeight;
+  var clientH = body.clientHeight;
+  var trackH = sb.clientHeight;
+  if (scrollH <= clientH || trackH <= 0) {
+    // Nothing to scroll — hide the overlay entirely so it doesn't
+    // imply a phantom "scrollable" affordance on short documents.
+    sb.style.opacity = '0.25';
+    thumb.style.height = trackH + 'px';
+    thumb.style.top = '0px';
+    if (head) head.style.display = 'none';
+    return;
+  }
+  sb.style.opacity = '';
+  // Thumb height = visible fraction of the document, with a minimum
+  // tap target of 48px (Material spec). Top = scrollTop's fractional
+  // position within the available track space.
+  var thumbH = Math.max(48, Math.floor(trackH * (clientH / scrollH)));
+  var scrollableH = scrollH - clientH;
+  var thumbTop = (body.scrollTop / scrollableH) * (trackH - thumbH);
+  thumb.style.height = thumbH + 'px';
+  thumb.style.top = thumbTop + 'px';
+  // Reading-position pip: small amber bar showing where the spoken
+  // word is, even if the user has scrolled ahead.
+  if (head && ttsWords && ttsWords.length > 0 && ttsIndex >= 0 && ttsIndex < ttsWords.length) {
+    head.style.display = 'block';
+    var fraction = ttsIndex / Math.max(1, ttsWords.length - 1);
+    head.style.top = Math.round(fraction * (trackH - 3)) + 'px';
+  } else if (head) {
+    head.style.display = 'none';
+  }
+}
+
+function refreshEngineLabel() {
+  var lbl = document.getElementById('textEngineLbl');
+  var tag = document.getElementById('engTag');
+  var voice = document.getElementById('engVoice');
+  if (!lbl || !tag || !voice) return;
+  var TM = window.TapMedia;
+  // No bridge → companion-app browser preview path. Browser TTS only.
+  if (!TM || typeof TM.probeTts !== 'function') {
+    lbl.classList.remove('fish', 'warn');
+    tag.textContent = 'Browser';
+    voice.textContent = 'system speech';
+    return;
+  }
+  try {
+    var raw = TM.probeTts();
+    var data = JSON.parse(raw);
+    if (data && data.error) throw new Error(data.error);
+    var engine = (data && data.engine) || 'gemini';
+    var voiceName = (data && data.voiceName) || '—';
+    var ready = data && (data.ready === true || data.ready === 'true');
+    // Sync Markdown-strip preference from the bridge — the user
+    // configures this in the companion app and it updates the
+    // shared pref the bridge reads here.
+    if (data && typeof data.cleanText !== 'undefined') {
+      ttsCleanForSynth = (data.cleanText === true || data.cleanText === 'true');
+    }
+    lbl.classList.remove('fish', 'warn');
+    if (engine === 'fish') {
+      lbl.classList.add('fish');
+      tag.textContent = 'Fish';
+      voice.textContent = voiceName || '(no voice picked)';
+      // Pass the voice into the existing browser-TTS preference path
+      // so the no-bridge fallback uses the same name as a hint.
+      preferredVoiceName = voiceName || '';
+    } else {
+      tag.textContent = 'Gemini';
+      voice.textContent = voiceName || 'Kore';
+      preferredVoiceName = voiceName || 'Kore';
+    }
+    if (!ready) {
+      lbl.classList.add('warn');
+      // Reason is shown via the title attribute so the indicator stays
+      // compact but the user can hover to learn why a fallback is in play.
+      lbl.title = (data && data.reason) || 'Engine not fully configured.';
+    } else {
+      lbl.title = 'Tap to refresh engine info';
+    }
+  } catch (e) {
+    lbl.classList.remove('fish');
+    lbl.classList.add('warn');
+    tag.textContent = 'Gemini';
+    voice.textContent = 'fallback';
+    lbl.title = 'Could not probe engine: ' + (e.message || e);
+  }
+}
+
+// ── TTS status banner ──
+// Shows a message below the text body to tell the user what TTS is doing
+// (preparing, idle) or why it failed (API key missing, network error).
+// Auto-fades info messages; error messages stick until cleared.
+var _ttsStatusTimer = null;
+function setTtsStatus(msg, variant) {
+  var el = document.getElementById('ttsStatus');
+  if (!el) return;
+  if (_ttsStatusTimer) { clearTimeout(_ttsStatusTimer); _ttsStatusTimer = null; }
+  if (!msg) { el.classList.remove('show','err','info'); el.textContent=''; return; }
+  el.textContent = msg;
+  el.classList.remove('err','info');
+  el.classList.add(variant === 'err' ? 'err' : 'info');
+  el.classList.add('show');
+  if (variant !== 'err') {
+    _ttsStatusTimer = setTimeout(function(){ setTtsStatus(''); }, 2200);
+  }
+}
+
+// Generation token incremented on every startTtsFrom AND every stopTts.
+// The deferred rAF callback inside startTtsFrom captures the current
+// token at call time and aborts if a newer call has happened since.
+// Without this, the FF→tap-word sequence could queue two rAFs that
+// both fire and race — see comment inside startTtsFrom.
+var ttsStartToken = 0;
+
+function startTtsFrom(startIdx) {
+  if (startIdx >= ttsWords.length) { startIdx = 0; ttsIndex = 0; }
+  prepareExclusivePlayback();
+  ttsPlaying = true;
+  // Reset the chunk counter so the ramp (12 → 40 → 80 → 150 words)
+  // restarts. This is what makes "Preparing audio…" clear quickly on
+  // each tap of Read, including after a Stop+Read cycle.
+  ttsChunkCount = 0;
+  // Generation token: every call to startTtsFrom (and every call to
+  // stopTts) increments this. The deferred rAF below captures the
+  // current token; if a *newer* startTtsFrom or stopTts has happened
+  // by the time the rAF fires, the captured token won't match and
+  // we abort. This is what was breaking the FF → tap-word sequence:
+  // FF's startTtsFrom queued an rAF, and before it fired, the word
+  // click ran stopTts + a second startTtsFrom queueing another rAF.
+  // BOTH rAFs eventually fired and called speakNextChunk with their
+  // respective startIdx values, racing each other on the same audio
+  // pool until both got cancelled and nothing played.
+  ttsStartToken++;
+  var myToken = ttsStartToken;
+  // Mirror the button-visual update that toggleTts() performed in
+  // case startTtsFrom is reached from a code path that didn't go
+  // through the button (e.g. jumpPage, scrub-bar resync, or click
+  // on a word). Guarded so this function never throws on a null
+  // element — that's what previously broke playback after the
+  // bottom-bar redesign removed the old `ttsPlayLbl` span.
+  var pBtn = document.getElementById('ttsPlayBtn');
+  if (pBtn) {
+    pBtn.textContent = '⏸';
+    pBtn.classList.add('playing');
+    pBtn.title = 'Pause';
+  }
+  setTtsStatus('Preparing audio…', 'info');
+  // Defer the synchronous bridge call by one animation frame so the status
+  // banner actually paints before `@JavascriptInterface speakText` blocks the
+  // JS thread on the HTTP round-trip. The token check below ensures only
+  // the most-recent startTtsFrom's deferred callback ever runs, so rapid
+  // taps (FF → word, scrub → tap, etc.) can't queue stale synthesis.
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      if (myToken !== ttsStartToken) return;     // superseded by newer call
+      if (ttsPlaying) speakNextChunk(startIdx);
+    });
+  });
+}
+
+// ─── Double-buffered audio pool ────────────────────────────────────────
+//
+// PROBLEM: With a single shared <audio> element, every chunk handoff
+// requires `a.src = newUrl` which forces a full media-element reset:
+// the previous decoder is torn down, the new source is fetched, the
+// header is parsed, the decoder is initialized, and only THEN can
+// playback start. Even with the audio bytes already cached in memory
+// (via the bridge's TtsCacheStore + MediaFileInterceptor), this
+// cycle adds ~500ms–1.5s of dead air at every chunk boundary.
+//
+// SOLUTION: Two <audio> elements (A, B). While A plays chunk N, the
+// next chunk's audio URL is preloaded into B (set src + load(), wait
+// for `canplaythrough`). When A's `ended` fires, B.play() resolves
+// immediately — the decoder is already warm. The roles then swap:
+// chunk N+2 preloads into A while B plays. This is the standard
+// gapless-playback pattern; see HTML5 audio gap-elimination patterns
+// used by Spotify Web, SoundCloud, etc.
+//
+// Each element is reusable across chunks (just set src + load()),
+// but we never have to wait for decode at the SWAP moment because
+// the inactive element has been preparing in parallel.
+var ttsAudioPool = null;          // [audioA, audioB]
+var ttsAudioActiveSlot = 0;       // which slot is currently playing
+function getTtsAudioPool() {
+  if (ttsAudioPool) return ttsAudioPool;
+  function mkAudio(slot) {
+    var a = document.createElement('audio');
+    a.id = 'ttsBridgeAudio_' + slot;
+    a.preload = 'auto';
+    a.style.display = 'none';
+    a.crossOrigin = 'anonymous';   // safe for our virtual /tts/ origin
+    document.body.appendChild(a);
+    return a;
+  }
+  ttsAudioPool = [mkAudio(0), mkAudio(1)];
+  return ttsAudioPool;
+}
+/**
+ * Return the audio element that should host the NEXT chunk to play.
+ * Increments the active slot so sequential chunks alternate between
+ * A and B; preload of chunk N+1 happens on the OTHER element while
+ * chunk N is still playing in this one.
+ */
+function getActiveTtsAudio() {
+  var pool = getTtsAudioPool();
+  return pool[ttsAudioActiveSlot & 1];
+}
+function getStandbyTtsAudio() {
+  var pool = getTtsAudioPool();
+  return pool[(ttsAudioActiveSlot + 1) & 1];
+}
+function rotateTtsAudio() { ttsAudioActiveSlot = (ttsAudioActiveSlot + 1) & 1; }
+// Backwards-compat shim: older parts of the file (and stopTts) reach
+// for `ttsBridgeAudio` to pause/clear. Always return the currently
+// active slot so those operations target the speaker the user hears.
+Object.defineProperty(window, 'ttsBridgeAudio', {
+  get: function() { return ttsAudioPool ? getActiveTtsAudio() : null; },
+  configurable: true
+});
+function getTtsBridgeAudio() { return getActiveTtsAudio(); }
+
+function hardStopTtsAudioElement(el) {
+  if (!el) return;
+  try { el.pause(); } catch(_){}
+  try {
+    el.onended = null;
+    el.onerror = null;
+    el.onloadedmetadata = null;
+    el.oncanplaythrough = null;
+    el.onplay = null;
+  } catch(_){}
+  try { el.currentTime = 0; } catch(_){}
+  try { el.srcObject = null; } catch(_){}
+  try { el.removeAttribute('src'); } catch(_){}
+  try { if (typeof el.load === 'function') el.load(); } catch(_){}
+  try { el._loadedUrl = null; } catch(_){}
+}
+
+// ─── Async TTS pipeline ────────────────────────────────────────────────
+//
+// The bridge has two entry points:
+//   * TM.speakText(...)         — synchronous; blocks the JS thread for the
+//                                 whole HTTP round-trip. Kept as a fallback
+//                                 for older bridge builds.
+//   * TM.startSpeakText(...)    — fire-and-forget; returns immediately with
+//                                 a requestId. When synth finishes, native
+//                                 posts `window.__ttsComplete(id, json)`.
+//
+// Using the async path lets us prefetch chunk N+1 while chunk N is still
+// playing, so the audio gap between chunks shrinks from "a full HTTP round
+// trip" to "whatever's left of N+1's synth after N finishes draining".
+//
+// The tail of `speakCurrentAndPrefetchNext` kicks off the prefetch for
+// chunk N+1 BEFORE awaiting the audio for chunk N, which is what actually
+// closes the gap.
+
+var ttsPending = Object.create(null); // requestId → { resolve, reject }
+var ttsReqCounter = 0;
+var nextChunkPrefetch = null;          // Promise<synthResult> | null
+var ttsAutoplayRequested = (function() {
+  var raw = (params.get('autoplay') || params.get('read') || '').toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes';
+})();
+
+window.__ttsComplete = function(requestId, jsonPayload) {
+  var entry = ttsPending[requestId];
+  if (!entry) return;
+  delete ttsPending[requestId];
+  var data;
+  try { data = JSON.parse(jsonPayload); }
+  catch (e) { entry.reject(new Error('bad-json')); return; }
+  if (!data || data.error || !data.audioUrl) {
+    entry.reject(new Error(data && data.error || 'no-audio'));
+    return;
+  }
+  entry.resolve(data);
+};
+
+function synthChunkSyncFallback(TM, chunkText, resolve, reject) {
+  Promise.resolve().then(function() {
+    var raw;
+    try { raw = TM.speakText(chunkText, preferredVoiceName || '', ttsRate || 1.0); }
+    catch (e) { reject(e); return; }
+    var data;
+    try { data = JSON.parse(raw); } catch (e) { reject(new Error('bad-json')); return; }
+    if (!data || data.error || !data.audioUrl) {
+      reject(new Error(data && data.error || 'no-audio'));
+      return;
+    }
+    resolve(data);
+  });
+}
+
+/**
+ * Fire-and-forget synth. Resolves with `{audioUrl, model, sampleRate}` when
+ * the native bridge posts back `__ttsComplete`. Rejects if the bridge is
+ * absent, refuses the call, or the synth errored out.
+ */
+function synthChunkAsync(chunkText) {
+  return new Promise(function(resolve, reject) {
+    var TM = window.TapMedia;
+    if (!TM) { reject(new Error('no-bridge')); return; }
+    var hasAsync = typeof TM.startSpeakText === 'function';
+    var hasSync = typeof TM.speakText === 'function';
+    if (!hasAsync && !hasSync) { reject(new Error('no-bridge')); return; }
+    if (hasAsync) {
+      var id = 'tts_' + (++ttsReqCounter) + '_' + Date.now();
+      var settled = false;
+      var timeoutMs = 25000;
+      var timeout = setTimeout(function() {
+        if (settled) return;
+        settled = true;
+        delete ttsPending[id];
+        console.warn('TTS async callback timed out for ' + id + '; falling back=' + hasSync);
+        if (hasSync) synthChunkSyncFallback(TM, chunkText, resolve, reject);
+        else reject(new Error('tts-timeout'));
+      }, timeoutMs);
+      ttsPending[id] = {
+        resolve: function(data) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          resolve(data);
+        },
+        reject: function(err) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          reject(err);
+        }
+      };
+      var raw;
+      try { raw = TM.startSpeakText(chunkText, preferredVoiceName || '', ttsRate || 1.0, id); }
+      catch (e) {
+        settled = true;
+        clearTimeout(timeout);
+        delete ttsPending[id];
+        if (hasSync) synthChunkSyncFallback(TM, chunkText, resolve, reject);
+        else reject(e);
+        return;
+      }
+      var data;
+      try { data = JSON.parse(raw); } catch (e) {
+        settled = true;
+        clearTimeout(timeout);
+        delete ttsPending[id];
+        if (hasSync) synthChunkSyncFallback(TM, chunkText, resolve, reject);
+        else reject(new Error('bad-json'));
+        return;
+      }
+      if (!data || data.error || data.status !== 'pending') {
+        settled = true;
+        clearTimeout(timeout);
+        delete ttsPending[id];
+        if (hasSync) synthChunkSyncFallback(TM, chunkText, resolve, reject);
+        else reject(new Error(data && data.error || 'start-failed'));
+      }
+      // else: resolution happens via __ttsComplete
+      return;
+    }
+    // Fall back to synchronous bridge (older builds). Runs inline on the JS
+    // thread; we wrap in a microtask so at least the caller's .then() chain
+    // keeps its Promise semantics.
+    synthChunkSyncFallback(TM, chunkText, resolve, reject);
+  });
+}
+
+/**
+ * Load + play one pre-synthesized audio URL and resolve when playback ends.
+ * Word highlighting is driven by requestAnimationFrame reading
+ * `audio.currentTime`, so timing self-corrects instead of drifting off a
+ * free-running interval. Pacing is weighted by character count so short
+ * words ("a", "to") pass faster than long ones ("transformation") —
+ * closer to how humans actually read.
+ */
+function playChunkAudio(audioUrl, fromIdx, endIdx) {
+  return new Promise(function(resolve, reject) {
+    // ── Gapless handoff ──
+    // If the OTHER pool element (the standby) was preloaded with this
+    // exact URL during the previous chunk's playback, promote it to
+    // active and play immediately — no decode delay. Otherwise load
+    // fresh into the current active element.
+    //
+    // The CRITICAL invariant: getStandbyTtsAudio() must return the
+    // element that's NOT currently playing. The previous version
+    // rotated the active slot at the top of this function, which made
+    // the prefetch handler's `getStandbyTtsAudio().src = nextUrl`
+    // write straight onto the playing element — killing audio about
+    // 10 words into chunk N. We only rotate now when we actually want
+    // to swap roles, never speculatively.
+    var standby = getStandbyTtsAudio();
+    if (standby._loadedUrl && standby._loadedUrl === audioUrl) {
+      // Standby has the right URL preloaded → swap. Stop the previous
+      // active first so its onended/handlers don't fire late on the
+      // new active element.
+      var prevActive = getActiveTtsAudio();
+      try { prevActive.pause(); } catch (_) {}
+      try { prevActive.removeAttribute('src'); } catch (_) {}
+      prevActive._loadedUrl = null;
+      ttsAudioActiveSlot = 1 - ttsAudioActiveSlot;
+    }
+    var a = getActiveTtsAudio();
+    if (a._loadedUrl !== audioUrl) {
+      // No preload available — load fresh.
+      a.src = audioUrl;
+      a._loadedUrl = audioUrl;
+    }
+    // Apply the user's current speed pick — both during initial load
+    // (so the chunk starts at the right speed) and any time the
+    // pipeline replays after a manual rate change.
+    a.playbackRate = (typeof ttsRate === 'number' && ttsRate > 0) ? ttsRate : 1.0;
+    try { if ('preservesPitch' in a) a.preservesPitch = true; } catch (_) {}
+    // Make sure the OTHER element (now the new standby) isn't still
+    // running stale handlers from a previous chunk. Pausing it is a
+    // no-op when it's already idle, but it cleans up reliably across
+    // edge cases.
+    var newStandby = getStandbyTtsAudio();
+    if (newStandby !== a) {
+      try { newStandby.pause(); } catch (_) {}
+    }
+
+    // Build cumulative-character-weight bins for each word in the chunk so
+    // highlight advances in proportion to speaking time rather than word
+    // count. `+1` per word avoids division-by-zero on punctuation-only tokens.
+    var wordCount = endIdx - fromIdx;
+    var weights = new Array(wordCount);
+    var totalWeight = 0;
+    for (var i = 0; i < wordCount; i++) {
+      var txt = (ttsWords[fromIdx + i] && ttsWords[fromIdx + i].text) || '';
+      var w = Math.max(1, txt.length);
+      weights[i] = w;
+      totalWeight += w;
+    }
+    var cumFraction = new Array(wordCount + 1);
+    cumFraction[0] = 0;
+    var acc = 0;
+    for (var j = 0; j < wordCount; j++) {
+      acc += weights[j];
+      cumFraction[j + 1] = acc / totalWeight;
+    }
+
+    var rafId = 0;
+    var finished = false;
+    function tick() {
+      if (finished) return;
+      if (!ttsPlaying) { cancelAnimationFrame(rafId); return; }
+      var dur = a.duration && isFinite(a.duration) && a.duration > 0 ? a.duration : 0;
+      var cur = a.currentTime || 0;
+      var progress = dur > 0 ? Math.min(cur / dur, 1) : 0;
+      // Binary search the word whose window contains `progress`.
+      var lo = 0, hi = wordCount - 1, idx = 0;
+      while (lo <= hi) {
+        var mid = (lo + hi) >> 1;
+        if (cumFraction[mid + 1] < progress) { idx = mid + 1; lo = mid + 1; }
+        else if (cumFraction[mid] > progress) { hi = mid - 1; }
+        else { idx = mid; break; }
+      }
+      if (idx >= wordCount) idx = wordCount - 1;
+      var globalIdx = fromIdx + idx;
+      // Monotonic-forward only during continuous playback. The rAF
+      // tick should never roll the highlight backwards — that previously
+      // caused the perceived "jumps to a previous word" at chunk
+      // boundaries when a stale tick fired with currentTime briefly
+      // reading lower than expected. Manual seeks (scroll-and-tap)
+      // bypass this code path entirely; they call highlightWord
+      // directly via onWordClick.
+      if (globalIdx > ttsIndex && globalIdx < ttsWords.length) {
+        ttsIndex = globalIdx;
+        highlightWord(globalIdx);
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    a.onloadedmetadata = function() { rafId = requestAnimationFrame(tick); };
+    a.onended = function() {
+      finished = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      resolve();
+    };
+    a.onerror = function() {
+      finished = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      reject(new Error('audio-load-failed'));
+    };
+    a.play().catch(function(err) {
+      finished = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      reject(err);
+    });
+  });
+}
+
+/** Compose: synth (or reuse prefetch) → play → resolve on ended. */
+function speakChunkViaGemini(chunkText, fromIdx, endIdx, prefetched) {
+  var synthPromise = prefetched || synthChunkAsync(chunkText);
+  return synthPromise.then(function(data) {
+    return playChunkAudio(data.audioUrl, fromIdx, endIdx);
+  });
+}
+
+function speakNextChunk(fromIdx) {
+  if (!ttsPlaying || fromIdx >= ttsWords.length) {
+    if (fromIdx >= ttsWords.length) stopTts();
+    return;
+  }
+  // Chunk sizing strategy: ramp from small (fast first-byte) to steady
+  // state (fewer round-trips) so no chunk's synth outruns the previous
+  // chunk's playback. See TTS_CHUNK_RAMP comment for reasoning.
+  function sizeForChunk(n) {
+    var i = Math.min(n, TTS_CHUNK_RAMP.length - 1);
+    return TTS_CHUNK_RAMP[i];
+  }
+  var chunkSize = sizeForChunk(ttsChunkCount);
+  var endIdx = Math.min(fromIdx + chunkSize, ttsWords.length);
+  // Build chunk text from the visible words, then optionally pass it
+  // through the Markdown/decoration cleanup. The visible word elements
+  // and their indices stay unchanged — only the TEXT we send to the
+  // TTS engine is sanitized. So highlighting still works word-by-word
+  // and the user still SEES the original "***" / "[Illustration]" /
+  // "_emphasis_" markers in the document, but Fish doesn't read them
+  // out as "asterisk asterisk" / "bracket Illustration bracket" /
+  // "underline emphasis underline".
+  var chunkText = cleanTextForSynth(
+    ttsWords.slice(fromIdx, endIdx).map(function(w){ return w.text; }).join(' ')
+  );
+  ttsChunkCount++;
+
+  // Pick up the prefetch from the previous iteration if present; otherwise
+  // kick off a fresh synth for the current chunk.
+  var currentPrefetch = nextChunkPrefetch;
+  nextChunkPrefetch = null;
+
+  // Start the NEXT chunk's synth now, BEFORE we await the current one —
+  // this is what makes playback feel continuous. By the time the current
+  // chunk's audio finishes draining, the next chunk's audio URL is usually
+  // already in memory. The next chunk uses its own step along the ramp:
+  // ramp[1] right after chunk 1, ramp[2] after chunk 2, etc.
+  var nextFromIdx = endIdx;
+  if (ttsPlaying && nextFromIdx < ttsWords.length) {
+    var nextChunkSize = sizeForChunk(ttsChunkCount);
+    var nextEndIdx = Math.min(nextFromIdx + nextChunkSize, ttsWords.length);
+    var nextChunkText = cleanTextForSynth(
+      ttsWords.slice(nextFromIdx, nextEndIdx).map(function(w){ return w.text; }).join(' ')
+    );
+    nextChunkPrefetch = synthChunkAsync(nextChunkText).then(function(data) {
+      // GAPLESS HANDOFF: as soon as the next chunk's audio URL is
+      // available, point the STANDBY <audio> element at it and call
+      // load(). The element decodes header + first packets in the
+      // background while the active element keeps playing. By the time
+      // the active chunk's `onended` fires, the standby element is
+      // already buffered and play() resolves instantly — eliminating
+      // the perceived 1–2 second "pause around every 10 seconds"
+      // between chunks.
+      try {
+        if (ttsPlaying && data && data.audioUrl) {
+          var standby = getStandbyTtsAudio();
+          standby.playbackRate = (typeof ttsRate === 'number' && ttsRate > 0) ? ttsRate : 1.0;
+          standby.src = data.audioUrl;
+          // Calling load() explicitly nudges the browser to start
+          // fetching/decoding right now instead of lazy-loading at
+          // play() time — that's where the chunk-boundary stall came
+          // from on the single-element pipeline.
+          if (typeof standby.load === 'function') standby.load();
+        }
+      } catch (e) {
+        // Don't fail the prefetch promise on a preload error — the
+        // .catch chain in the next chunk's playChunkAudio will handle
+        // any actual playback failures.
+      }
+      return data;
+    }).catch(function(e) {
+      // Swallow errors here — the next iteration will retry inline and
+      // surface the failure through the regular .catch path.
+      return Promise.reject(e);
+    });
+  }
+
+  // Primary: Gemini 3.1 via Android bridge (works on glasses WebView, which
+  // has no browser speechSynthesis). Fallback: browser SpeechSynthesis when
+  // available (companion-app browser viewer).
+  speakChunkViaGemini(chunkText, fromIdx, endIdx, currentPrefetch).then(function() {
+    setTtsStatus('');
+    ttsIndex = endIdx;
+    highlightWord(endIdx);
+    if (ttsPlaying) speakNextChunk(endIdx);
+  }).catch(function(err) {
+    // Prefetch we already kicked off is now orphaned — if it resolves later
+    // the audio URL just sits unused in the cache. Nothing to clean up on
+    // the JS side; TtsCacheStore's LRU will evict it.
+    nextChunkPrefetch = null;
+    var reason = (err && err.message) ? err.message : String(err || 'unknown');
+    var hasBrowserTts = (typeof window.speechSynthesis !== 'undefined' &&
+                        window.speechSynthesis &&
+                        typeof window.SpeechSynthesisUtterance !== 'undefined');
+    if (!hasBrowserTts) {
+      // On the glasses there is no fallback — surface the reason so the user
+      // knows to set the API key or check network. Most common: "no-bridge"
+      // (text mode loaded outside the trusted bridge) or "Gemini API key not
+      // configured…" from MediaLibraryBridge.
+      console.warn('TTS unavailable:', reason);
+      var shown = reason;
+      if (reason === 'no-bridge') shown = 'TTS bridge unavailable on this page.';
+      else if (reason === 'bad-json') shown = 'TTS returned invalid data.';
+      else if (reason === 'no-audio') shown = 'TTS produced no audio.';
+      else if (reason === 'audio-load-failed') shown = 'Could not play generated audio.';
+      setTtsStatus('Read aloud failed: ' + shown, 'err');
+      ttsPlaying = false;
+      var btn = document.getElementById('ttsPlayBtn');
+      if (btn) { btn.textContent = '▶'; btn.classList.remove('playing'); btn.title = 'Read aloud'; }
+      return;
+    }
+    // Browser Web Speech fallback (companion-app viewer)
+    setTtsStatus('');
+    speakChunkViaBrowser(chunkText, fromIdx, endIdx);
+  });
+}
+
+function speakChunkViaBrowser(chunkText, fromIdx, endIdx) {
+  var utter = new SpeechSynthesisUtterance(chunkText);
+  utter.rate = ttsRate;
+  utter.pitch = 1.0;
+  // Pick voice: user preference from companion app, or soothing fallback
+  var voices = window.speechSynthesis.getVoices();
+  var preferred = null;
+  if (preferredVoiceName) {
+    var pref = preferredVoiceName.toLowerCase();
+    preferred = voices.find(function(v){ return v.name.toLowerCase() === pref; })
+      || voices.find(function(v){ return v.name.toLowerCase().indexOf(pref) !== -1; });
+  }
+  if (!preferred) {
+    preferred = voices.find(function(v){
+      return v.name.indexOf('Samantha') !== -1 || v.name.indexOf('Google UK English Female') !== -1
+        || v.name.indexOf('Karen') !== -1 || v.name.indexOf('Moira') !== -1;
+    }) || voices.find(function(v){ return v.lang.startsWith('en') && v.name.indexOf('Female') !== -1; })
+       || voices.find(function(v){ return v.lang.startsWith('en'); });
+  }
+  if (preferred) utter.voice = preferred;
+
+  // Word boundary events for highlighting
+  var wordOffset = fromIdx;
+  utter.addEventListener('boundary', function(e) {
+    if (e.name === 'word') {
+      // Map character offset to word index within chunk
+      var spoken = chunkText.substring(0, e.charIndex);
+      var wordsSpoken = spoken.split(/\s+/).filter(function(w){ return w.length > 0; }).length;
+      var currentIdx = fromIdx + wordsSpoken;
+      if (currentIdx < ttsWords.length) {
+        ttsIndex = currentIdx;
+        highlightWord(currentIdx);
+      }
+    }
+  });
+
+  utter.addEventListener('end', function() {
+    ttsIndex = endIdx;
+    highlightWord(endIdx);
+    if (ttsPlaying) speakNextChunk(endIdx);
+  });
+
+  utter.addEventListener('error', function(e) {
+    if (e.error !== 'canceled') console.error('TTS error:', e.error);
+  });
+
+  ttsUtterance = utter;
+  window.speechSynthesis.speak(utter);
+}
+
+function stopTts() {
+  ttsPlaying = false;
+  // Drop any in-flight prefetch so its audio URL doesn't get picked up by
+  // the next startTtsFrom() call. Pending promises left in ttsPending will
+  // resolve into the void harmlessly (resolve/reject are no-ops once the
+  // entry is removed from the map — see __ttsComplete).
+  nextChunkPrefetch = null;
+  for (var k in ttsPending) { if (ttsPending.hasOwnProperty(k)) delete ttsPending[k]; }
+  // Invalidate any pending startTtsFrom rAF callback so it doesn't
+  // re-fire with a stale startIdx after we just cleaned up. Without
+  // this, a fast FF→word-tap sequence races: FF's startTtsFrom rAF
+  // could end up calling speakNextChunk with the FF position even
+  // though the user has since clicked a different word. See the
+  // matching counter in startTtsFrom.
+  if (typeof ttsStartToken === 'number') ttsStartToken++;
+  // Cloud-bridge path: stop BOTH pool elements (the active one that's
+  // currently speaking AND the standby one that may already have a
+  // preloaded next chunk) so neither continues talking after the user
+  // hits stop. Also wipe the `_loadedUrl` markers — the standby's
+  // stale URL would otherwise look like a valid preload to the next
+  // playChunkAudio call, but the actual src was just cleared, so
+  // play() would silently fail.
+  try {
+    var pool = ttsAudioPool;
+    if (pool) {
+      for (var i = 0; i < pool.length; i++) {
+        hardStopTtsAudioElement(pool[i]);
+        try { pool[i] && pool[i].remove(); } catch(_){}
+      }
+    }
+    document.querySelectorAll('audio[id^="ttsBridgeAudio_"]').forEach(function(el) {
+      hardStopTtsAudioElement(el);
+      try { el.remove(); } catch(_){}
+    });
+    ttsAudioPool = null;
+    ttsAudioActiveSlot = 0;
+  } catch (_) {}
+  // Reset the highlight diff cache so the next session starts with a
+  // clean full-pass rather than diffing against stale state.
+  try { highlightWord._lastIdx = undefined; } catch(_){}
+  try {
+    var TM = window.TapMedia;
+    if (TM && typeof TM.stopSpeaking === 'function') TM.stopSpeaking();
+  } catch (_) {}
+  // Browser speechSynthesis fallback path
+  try {
+    if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  } catch (_) {}
+  var btn = document.getElementById('ttsPlayBtn');
+  if (btn) {
+    btn.textContent = '▶';
+    btn.classList.remove('playing');
+    btn.title = 'Read aloud';
+  }
+  // Clear any "preparing…" spinner banner — but leave error banners alone so
+  // the user can still see why TTS failed after they tap stop.
+  var st = document.getElementById('ttsStatus');
+  if (st && !st.classList.contains('err')) setTtsStatus('');
+}
+
+// Underline toggle was removed from the UI in the modern-theme refresh
+// (the warm-amber spoken-word highlight reads cleanly without an extra
+// underline). The function is kept as a no-op for backwards compat in
+// case any external caller (URL params, Android bridge) still invokes
+// it; remove it entirely once we've confirmed nothing depends on it.
+function toggleUnderline() { /* no-op (UI removed) */ }
+
+// ──────────────────────────────────────────────────────────────────
+// Text cleanup for cloud TTS synthesis
+//
+// Fish.audio's voice models — especially the realistic ones — read
+// many decorative ASCII characters literally. So `***`, `_emphasis_`,
+// and `[Illustration]` get spoken as "asterisk asterisk asterisk",
+// "underline emphasis underline", and "open bracket Illustration
+// close bracket" respectively. Fish.audio's docs recommend
+// preprocessing user text to strip Markdown / decorative characters
+// before sending it to /v1/tts; their normalize parameter only
+// handles loudness, not text.
+//
+// We strip:
+//   * Markdown emphasis: **bold**, *italic*, _underline_, __bold__
+//   * Decorative runs: ***, ___, ---, === (pure formatting, not speech)
+//   * Bracketed metadata: [Illustration], [pause], [chapter] — these
+//     are Project Gutenberg / EPUB conventions for non-prose markers
+//   * Backtick code fences and inline code marks
+//   * Repeated/excess whitespace from the above strips
+//
+// Controlled by a Fish-only pref `fish_clean_text` (default true).
+// Pulled from URL param at page load; the companion app writes it.
+// ──────────────────────────────────────────────────────────────────
+var ttsCleanForSynth = (function() {
+  var raw = (params.get('clean') || '').toLowerCase();
+  if (raw === 'false' || raw === '0') return false;
+  return true;        // default on — most users want clean readout
+})();
+
+function cleanTextForSynth(s) {
+  if (!s || !ttsCleanForSynth) return s;
+  return s
+    // Bold/italic/underline emphasis. Order matters: capture bold (**…**
+    // and __…__) before single-mark italic (*…* and _…_) so we don't
+    // half-strip the inner markers and leave a stray * or _.
+    .replace(/\*\*([^*]+?)\*\*/g, '$1')
+    .replace(/__([^_]+?)__/g, '$1')
+    .replace(/\*([^*\n]+?)\*/g, '$1')
+    .replace(/_([^_\n]+?)_/g, '$1')
+    // Pure decorative runs (Project Gutenberg uses *** as section
+    // dividers; many docs use ====/---- as h1/h2 underlines). Replace
+    // with a sentence-pause-equivalent so the reader doesn't barrel
+    // through where the original document had a visual break.
+    .replace(/^[\s]*[*=_\-]{3,}[\s]*$/gm, '. ')
+    .replace(/[*_\-=]{3,}/g, ' ')
+    // Bracketed editorial metadata. Common Gutenberg / EPUB markers:
+    // [Illustration], [pause], [Chapter I], [Footnote 3]. Strip them
+    // so they don't get read out as nonsense.
+    .replace(/\s*\[[^\]\n]{1,80}\]\s*/g, ' ')
+    // Code fences (rare in plain text but common in Markdown) and
+    // inline code backticks.
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`+/g, '')
+    // Chunking can split Markdown pairs across synthesis boundaries,
+    // leaving raw markers like `**` or `*` inside an otherwise normal
+    // chunk. Strip every leftover emphasis marker before Fish can read
+    // it as "asterisk" or "underscore".
+    .replace(/(^|[\s([{])[*_]{1,3}(?=\S)/g, '$1')
+    .replace(/(\S)[*_]{1,3}(?=$|[\s.,;:!?)}\]])/g, '$1')
+    .replace(/[*_]+/g, ' ')
+    // Vertical bars (Markdown table separators, ASCII frames, etc.)
+    // and other decorative ASCII Fish reads literally. We strip
+    // these aggressively because they're almost never meant to be
+    // spoken — a column of text wrapped in `| ... |` is a layout
+    // hint, not part of the prose.
+    //
+    // Pipe RUNS: `|---|---|` table rows, `||` boundaries → space.
+    .replace(/\|+/g, ' ')
+    // Tildes (often used as decorative dividers like `~~~~~`) and
+    // carets (`^^^^`) and the "section sign" §. Single `~` inside
+    // text is rare and almost always decorative; we collapse all
+    // runs to whitespace.
+    .replace(/[~^§¦]+/g, ' ')
+    // Repeated whitespace gymnastics from "table-of-contents dots"
+    // like ".... 12" — collapse runs of 3+ dots to an ellipsis so
+    // Fish reads it as a pause rather than "dot dot dot".
+    .replace(/\.{3,}/g, '… ')
+    // Stray remaining Markdown markers and quote/list prefixes that
+    // should never be spoken literally in readout mode.
+    .replace(/[>#]+/g, ' ')
+    // Collapse runs of whitespace introduced by the strips above.
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*\n\s*\n\s*/g, '\n\n')
+    .trim();
+}
+
+function cycleTtsSpeed() {
+  var speeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+  var cur = speeds.indexOf(ttsRate);
+  ttsRate = speeds[(cur + 1) % speeds.length];
+  document.getElementById('ttsSpeed').textContent = ttsRate.toFixed(2) + '×';
+  // Apply rate to BOTH pool elements live — the active one (currently
+  // speaking) and the standby one (preloaded for the next chunk). The
+  // <audio> element's `playbackRate` change is instantaneous and
+  // pitch-preserving in modern WebKit/Blink, so no restart needed.
+  // This is what was broken before: the rate variable updated but the
+  // audio element never received it, so the speaker kept reading at 1×.
+  try {
+    var pool = ttsAudioPool;
+    if (pool) {
+      pool[0].playbackRate = ttsRate;
+      pool[1].playbackRate = ttsRate;
+      // preservesPitch is the W3C standard property; the older
+      // `mozPreservesPitch` / `webkitPreservesPitch` fallbacks are
+      // automatic when the standard is supported.
+      pool[0].preservesPitch = true;
+      pool[1].preservesPitch = true;
+    }
+  } catch (_) {}
+}
+
+function toggleFontSize() {
+  largeFontOn = !largeFontOn;
+  document.getElementById('textBody').classList.toggle('large-font', largeFontOn);
+  document.getElementById('ttsFontBtn').classList.toggle('on', largeFontOn);
+}
+
+// ══════════════════════════════════════════════
+// ══════ AUDIO PLAYER ════════════════════════
+// ══════════════════════════════════════════════
+var audioEl = document.getElementById('audioEl');
+var audioLoadSeq = 0;
+
+function handleAudioLoadFailure(url) {
+  var code = audioEl.error ? audioEl.error.code : '?';
+  var msg  = audioEl.error ? audioEl.error.message || '' : '';
+  var detail = 'code ' + code + (msg ? ': ' + msg : '');
+  if (handlePlaylistTrackFailure('audio', detail, url)) return;
+  showError('Could not load audio (' + detail + ').');
+}
+
+function initAudioPlayer(url) {
+  diag('initAudioPlayer  url=' + (url || '').slice(0, 120));
+  prepareExclusivePlayback();
+  document.getElementById('audioPlayer').classList.add('active');
+  document.getElementById('audioTitle').textContent = mediaTitle;
+  var loadSeq = ++audioLoadSeq;
+  audioEl.dataset.loadSeq = String(loadSeq);
+  audioEl.src = url;
+  audioEl.load();
+
+  var seek = document.getElementById('audioSeek');
+  var playBtn = document.getElementById('audioPlayBtn');
+
+  // Spinner-clear fallbacks: `loadedmetadata` is the ideal trigger, but some
+  // codec/header combinations never fire it on this WebView build — add
+  // `loadeddata` and `canplay` as secondary triggers so we don't sit on the
+  // spinner forever. Anything that dispatches one of these means audio is
+  // actually working.
+  function armedHide() {
+    if (!isFinite(audioEl.duration) || audioEl.duration <= 0) {
+      document.getElementById('audioTimeDur').textContent = '';
+      seek.max = 100;
+    } else {
+      document.getElementById('audioTimeDur').textContent = fmt(audioEl.duration);
+      seek.max = audioEl.duration;
+    }
+    hideLoading();
+    if (playlistMode) playlistConsecutiveFailures = 0;
+    showGestureHint();
+  }
+  audioEl.addEventListener('loadedmetadata', armedHide);
+  audioEl.addEventListener('loadeddata',     armedHide);
+  audioEl.addEventListener('canplay',        armedHide);
+  audioEl.addEventListener('playing',        armedHide);
+  audioEl.addEventListener('timeupdate', function() {
+    if (!seek._dragging) {
+      seek.value = audioEl.currentTime;
+      document.getElementById('audioTimeCur').textContent = fmt(audioEl.currentTime);
+    }
+    // Audio files get cue tracking too (sidecar lyrics/captions or
+    // embedded tracks) — rendered into the same #captionText node and
+    // published for the dim-mode caption slot.
+    updateCaptions(audioEl.currentTime);
+  });
+  audioEl.addEventListener('ended', function() {
+    playBtn.textContent = '▶';
+    playBtn.classList.remove('playing');
+    notifyMediaState(false);
+  });
+  audioEl.addEventListener('play', function() {
+    notifyMediaState(true);
+  });
+  audioEl.addEventListener('pause', function() {
+    if (!audioEl.ended) notifyMediaState(false);
+  });
+  audioEl.addEventListener('error', function(e) {
+    handleAudioLoadFailure(audioEl.currentSrc || audioEl.src || url);
+  });
+  // Belt-and-suspenders: if nothing fires in 15s, surface the failure
+  // visibly instead of leaving the user staring at a silent spinner.
+  setTimeout(function(){
+    if (audioEl.dataset.loadSeq === String(loadSeq) &&
+        !document.getElementById('loadingOverlay').classList.contains('hidden')) {
+      if (!handlePlaylistTrackFailure('audio', 'load timed out', url)) {
+        showError('Audio load timed out. URL: ' + url);
+      }
+    }
+  }, 15000);
+
+  seek.addEventListener('mousedown', function(){ seek._dragging = true; });
+  seek.addEventListener('touchstart', function(){ seek._dragging = true; });
+  seek.addEventListener('input', function() {
+    document.getElementById('audioTimeCur').textContent = fmt(parseFloat(this.value));
+  });
+  seek.addEventListener('change', function() {
+    audioEl.currentTime = parseFloat(this.value);
+    seek._dragging = false;
+  });
+
+  playBtn.addEventListener('click', function() { toggleAudio(); });
+  document.getElementById('audioRew').addEventListener('click', function() {
+    audioEl.currentTime = Math.max(0, audioEl.currentTime - 15);
+  });
+  document.getElementById('audioFwd').addEventListener('click', function() {
+    audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + 15);
+  });
+
+  // Caption source for this file (?srt= param > sidecar > embedded) —
+  // detection defers itself, so this never delays the play() below.
+  initCaptionsForTrack(url);
+
+  // Album cover art for this track (folder image via the bridge) —
+  // lookup defers itself too, so it never delays the play() below.
+  updateAudioCoverArt(url);
+
+  // Auto-play
+  audioEl.play().then(function(){ notifyMediaState(true); }).catch(function(){});
+  playBtn.textContent = '⏸';
+  playBtn.classList.add('playing');
+}
+
+function toggleAudio() {
+  var btn = document.getElementById('audioPlayBtn');
+  if (audioEl.paused) {
+    prepareExclusivePlayback();
+    audioEl.play().then(function(){ notifyMediaState(true); }).catch(function(){});
+    btn.textContent = '⏸'; btn.classList.add('playing');
+  } else {
+    audioEl.pause(); btn.textContent = '▶'; btn.classList.remove('playing');
+    notifyMediaState(false);
+  }
+}
+
+// ══════════════════════════════════════════════
+// ══════ VIDEO PLAYER ════════════════════════
+// ══════════════════════════════════════════════
+var videoEl = document.getElementById('videoEl');
+var videoOverlay = document.getElementById('videoOverlay');
+var overlayTimer = null;
+var captions = [];
+var captionsEnabled = true;
+var videoLoadSeq = 0;
+
+function handleVideoLoadFailure(url) {
+  var code = videoEl.error ? videoEl.error.code : '?';
+  var msg  = videoEl.error ? videoEl.error.message || '' : '';
+  var detail = 'code ' + code + (msg ? ': ' + msg : '');
+  if (handlePlaylistTrackFailure('video', detail, url)) return;
+  showError('Could not load video (' + detail + ').');
+}
+
+function initVideoPlayer(url) {
+  diag('initVideoPlayer  url=' + (url || '').slice(0, 120));
+  prepareExclusivePlayback();
+  document.getElementById('videoPlayer').classList.add('active');
+  document.getElementById('videoTitle').textContent = mediaTitle;
+  var loadSeq = ++videoLoadSeq;
+  videoEl.dataset.loadSeq = String(loadSeq);
+  videoEl.src = url;
+  videoEl.load();
+
+  var seek = document.getElementById('videoSeek');
+  var playBtn = document.getElementById('videoPlayBtn');
+
+  // Same spinner-clear fallback reasoning as audio (loadeddata / canplay
+  // as secondary triggers, plus a hard timeout that surfaces a diagnosable
+  // error instead of leaving us on the spinner forever).
+  function videoArmedHide() {
+    if (!isFinite(videoEl.duration) || videoEl.duration <= 0) {
+      document.getElementById('videoTimeDur').textContent = '';
+      seek.max = 100;
+    } else {
+      document.getElementById('videoTimeDur').textContent = fmt(videoEl.duration);
+      seek.max = videoEl.duration;
+    }
+    hideLoading();
+    if (playlistMode) playlistConsecutiveFailures = 0;
+    showGestureHint();
+    // Try to load track element captions
+    if (videoEl.textTracks && videoEl.textTracks.length > 0) {
+      videoEl.textTracks[0].mode = 'showing';
+    }
+  }
+  videoEl.addEventListener('loadedmetadata', videoArmedHide);
+  videoEl.addEventListener('loadeddata',     videoArmedHide);
+  videoEl.addEventListener('canplay',        videoArmedHide);
+  videoEl.addEventListener('playing',        videoArmedHide);
+  videoEl.addEventListener('timeupdate', function() {
+    if (!seek._dragging) {
+      seek.value = videoEl.currentTime;
+      document.getElementById('videoTimeCur').textContent = fmt(videoEl.currentTime);
+    }
+    updateCaptions(videoEl.currentTime);
+  });
+  videoEl.addEventListener('ended', function() {
+    playBtn.textContent = '▶';
+    playBtn.classList.remove('playing');
+    notifyMediaState(false);
+    showVideoOverlay();
+  });
+  videoEl.addEventListener('play', function() {
+    notifyMediaState(true);
+  });
+  videoEl.addEventListener('pause', function() {
+    if (!videoEl.ended) notifyMediaState(false);
+  });
+  videoEl.addEventListener('error', function() {
+    handleVideoLoadFailure(videoEl.currentSrc || videoEl.src || url);
+  });
+  setTimeout(function(){
+    if (videoEl.dataset.loadSeq === String(loadSeq) &&
+        !document.getElementById('loadingOverlay').classList.contains('hidden')) {
+      if (!handlePlaylistTrackFailure('video', 'load timed out', url)) {
+        showError('Video load timed out. URL: ' + url);
+      }
+    }
+  }, 15000);
+
+  // Seek bar
+  seek.addEventListener('mousedown', function(){ seek._dragging = true; });
+  seek.addEventListener('touchstart', function(){ seek._dragging = true; });
+  seek.addEventListener('input', function() {
+    document.getElementById('videoTimeCur').textContent = fmt(parseFloat(this.value));
+  });
+  seek.addEventListener('change', function() {
+    videoEl.currentTime = parseFloat(this.value);
+    seek._dragging = false;
+  });
+
+  // Mouse move to show scrub bar
+  document.getElementById('videoPlayer').addEventListener('mousemove', function() {
+    showVideoOverlay();
+  });
+
+  playBtn.addEventListener('click', function(e) { e.stopPropagation(); toggleVideo(); });
+  document.getElementById('videoRew').addEventListener('click', function(e) {
+    e.stopPropagation();
+    videoEl.currentTime = Math.max(0, videoEl.currentTime - 10);
+  });
+  document.getElementById('videoFwd').addEventListener('click', function(e) {
+    e.stopPropagation();
+    videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 10);
+  });
+  document.getElementById('videoCCBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    captionsEnabled = !captionsEnabled;
+    this.style.opacity = captionsEnabled ? 1 : 0.4;
+    if (!captionsEnabled) setCaptionLine('');  // clears render + dim publish
+  });
+
+  // Select the caption source for this file (?srt= param > sidecar
+  // .srt/.vtt next to the file > embedded subtitle track). Detection is
+  // deferred internally so playback start never waits on caption work.
+  initCaptionsForTrack(url);
+
+  // Auto-play fullscreen
+  videoEl.play().then(function() {
+    notifyMediaState(true);
+    playBtn.textContent = '⏸'; playBtn.classList.add('playing');
+    hideVideoOverlayDelayed();
+  }).catch(function(){});
+}
+
+function toggleVideo() {
+  var btn = document.getElementById('videoPlayBtn');
+  if (videoEl.paused) {
+    prepareExclusivePlayback();
+    videoEl.play().then(function(){ notifyMediaState(true); }).catch(function(){});
+    btn.textContent = '⏸'; btn.classList.add('playing');
+    hideVideoOverlayDelayed();
+  } else {
+    videoEl.pause(); btn.textContent = '▶'; btn.classList.remove('playing');
+    notifyMediaState(false);
+    showVideoOverlay();
+  }
+}
+
+function showVideoOverlay() {
+  videoOverlay.classList.add('visible');
+  clearTimeout(overlayTimer);
+  if (!videoEl.paused) hideVideoOverlayDelayed();
+}
+function hideVideoOverlayDelayed() {
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(function() {
+    if (!videoEl.paused) videoOverlay.classList.remove('visible');
+  }, 3500);
+}
+
+// ── Caption engine (SRT + VTT sidecars, ?srt= param, embedded tracks) ──
+//
+// Cue format everywhere: [{start, end, text}] with fractional seconds —
+// the exact shape the native EmbeddedCaptionExtractor produces, so all
+// three sources feed the single render path in updateCaptions().
+//
+// Source priority: ?srt=/&captions= URL param > sidecar file in the
+// playing file's folder (exact basename match first — Excalibur.srt next
+// to "Excalibur" — else the folder's ONLY .srt/.vtt) > subtitle track
+// embedded in the container via TapMedia.getEmbeddedCaptions().
+var captionSeq = 0;   // bumps on every track change; stale async loads no-op
+
+function loadSrtCaptions(url, seq, onFail) {
+  fetch(url).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  }).then(function(text) {
+    if (seq !== undefined && seq !== captionSeq) return;   // stale track
+    var cues = parseSrt(text);
+    if (cues.length) { captions = cues; return; }
+    if (onFail) onFail();
+  }).catch(function(e){
+    console.warn('Could not load captions:', e);
+    if ((seq === undefined || seq === captionSeq) && onFail) onFail();
+  });
+}
+
+// Parses BOTH SubRip (.srt) and WebVTT (.vtt). Same blank-line-separated
+// block structure; VTT differs by an optional numeric index line,
+// optional hours in timestamps, '.' millisecond separators, cue settings
+// after the arrow, and WEBVTT/NOTE/STYLE/REGION header blocks — which
+// contain no '-->' line and therefore fall through harmlessly.
+function parseSrt(text) {
+  var result = [];
+  var src = String(text || '').replace(/^\uFEFF/, '')
+              .replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var timeRe = /(?:(\d{1,2}):)?(\d{1,2}):(\d{2})[,.](\d{1,3})\s*-->\s*(?:(\d{1,2}):)?(\d{1,2}):(\d{2})[,.](\d{1,3})/;
+  function secs(h, m, s, ms) {
+    return parseInt(h || '0', 10)*3600 + parseInt(m, 10)*60 + parseInt(s, 10) +
+           parseInt((String(ms) + '00').slice(0, 3), 10)/1000;
+  }
+  src.split('\n\n').forEach(function(block) {
+    var lines = block.trim().split('\n');
+    // Timing line is line 1 (SRT index / VTT cue id above it) or line 0
+    // (VTT cues without an id).
+    var ti = -1;
+    for (var i = 0; i < lines.length && i < 2; i++) {
+      if (lines[i].indexOf('-->') !== -1) { ti = i; break; }
+    }
+    if (ti < 0) return;
+    var match = lines[ti].match(timeRe);
+    if (!match) return;
+    var start = secs(match[1], match[2], match[3], match[4]);
+    var end   = secs(match[5], match[6], match[7], match[8]);
+    var content = lines.slice(ti + 1).join('\n').replace(/<[^>]+>/g, '').trim();
+    if (!content || end <= start) return;
+    result.push({ start: start, end: end, text: content });
+  });
+  return result;
+}
+
+// Find a sidecar .srt/.vtt for a library-relative media path via the
+// bridge folder listing. Exact basename match wins (works for
+// extensionless media files too); otherwise a folder with exactly ONE
+// subtitle file is unambiguous enough to use. Returns the sidecar's
+// library-relative path, or ''.
+function findSidecarCaptionPath(relPath) {
+  var TM = window.TapMedia;
+  if (!relPath || !TM || typeof TM.listFolder !== 'function') return '';
+  var data;
+  try { data = JSON.parse(TM.listFolder(parentFolderOf(relPath))); }
+  catch (_) { return ''; }
+  if (!data || data.error || !data.entries) return '';
+  var base = relPath.split('/').pop().replace(/\.[^.]+$/, '').toLowerCase();
+  var subs = data.entries.filter(function(en) {
+    return !!en && /\.(srt|vtt)$/i.test(en.name || '');
+  });
+  if (!subs.length) return '';
+  for (var i = 0; i < subs.length; i++) {
+    if (subs[i].name.replace(/\.[^.]+$/, '').toLowerCase() === base) {
+      return subs[i].relativePath || '';
+    }
+  }
+  return subs.length === 1 ? (subs[0].relativePath || '') : '';
+}
+
+// Media URL for a library-relative path: bridge helper first, manual
+// fallback matching MediaFileInterceptor's /media/ route.
+function mediaUrlForRelPath(relPath) {
+  var TM = window.TapMedia;
+  try {
+    if (TM && typeof TM.getMediaUrl === 'function') {
+      var u = TM.getMediaUrl(relPath);
+      if (u) return u;
+    }
+  } catch (_) {}
+  return 'https://appassets.androidplatform.net/media/' +
+         relPath.split('/').map(encodeURIComponent).join('/');
+}
+
+// ── Audio cover art (#audioArt) ──────────────────────────────────────
+// When an audio track plays, look in its folder for a cover image —
+// cover/folder/front/album/art.* preferred, in that order, else ANY
+// image in the folder — via the same bridge folder listing the
+// sidecar-caption detector uses, and paint it into the #audioArt tile.
+// Falls back to the 🎵 placeholder when the folder has no image (or no
+// bridge). The lookup is cached per folder so prev/next inside an
+// album never re-hits the bridge.
+var coverArtSeq = 0;                            // bumps per track; stale lookups no-op
+var coverArtFolderCache = Object.create(null);  // folder relPath → image relPath ('' = none)
+var COVER_ART_BASENAMES = ['cover', 'folder', 'front', 'album', 'art'];
+var COVER_ART_IMG_RE = /\.(jpe?g|png|gif|webp|bmp)$/i;
+
+function findCoverArtPath(folderRel) {
+  if (folderRel in coverArtFolderCache) return coverArtFolderCache[folderRel];
+  var found = '';
+  var TM = window.TapMedia;
+  if (TM && typeof TM.listFolder === 'function') {
+    var data = null;
+    try { data = JSON.parse(TM.listFolder(folderRel)); } catch (_) {}
+    if (data && !data.error && data.entries) {
+      var images = data.entries.filter(function(en) {
+        return !!en && COVER_ART_IMG_RE.test(en.name || '');
+      });
+      // Preferred basenames win in priority order (cover.jpg beats
+      // front.png); failing all of those, any image in the folder is
+      // better than the placeholder.
+      for (var p = 0; p < COVER_ART_BASENAMES.length && !found; p++) {
+        for (var i = 0; i < images.length; i++) {
+          var base = images[i].name.replace(/\.[^.]+$/, '').toLowerCase();
+          if (base === COVER_ART_BASENAMES[p]) {
+            found = images[i].relativePath || '';
+            break;
+          }
+        }
+      }
+      if (!found && images.length) found = images[0].relativePath || '';
+    }
+  }
+  coverArtFolderCache[folderRel] = found;
+  return found;
+}
+
+// Paint (or clear) the art tile. '' restores the 🎵 placeholder and the
+// stylesheet's gradient background.
+function setAudioArtImage(imgUrl) {
+  var art = document.getElementById('audioArt');
+  if (!art) return;
+  var icon = art.querySelector('.icon');
+  if (imgUrl) {
+    art.style.backgroundImage = 'url("' + String(imgUrl).replace(/"/g, '%22') + '")';
+    art.style.backgroundSize = 'cover';
+    art.style.backgroundPosition = 'center';
+    if (icon) icon.style.display = 'none';
+  } else {
+    art.style.backgroundImage = '';
+    if (icon) icon.style.display = '';
+  }
+}
+
+// (Re)resolve cover art for the track now loading. Called from
+// initAudioPlayer and loadAudioTrack's fast swap path, so folder-queue
+// and playlist advances refresh the art per track. listFolder is a
+// synchronous bridge hop, so — like caption detection — the work is
+// deferred off the load path and guarded by a sequence token.
+function updateAudioCoverArt(url) {
+  var seq = ++coverArtSeq;
+  setTimeout(function() {
+    if (seq !== coverArtSeq) return;
+    // Same resolution chain the ‹ back button uses: queue/playlist
+    // entries carry relativePath (via currentLibraryRelPath); plain
+    // single-file mode derives it from the /media/ URL.
+    var relPath = libraryRelPathFromUrl(url) || currentLibraryRelPath();
+    var imgRel = relPath ? findCoverArtPath(parentFolderOf(relPath)) : '';
+    if (!imgRel) { setAudioArtImage(''); return; }
+    // Preload before painting so a missing/corrupt file falls back to
+    // the 🎵 tile instead of a blank square.
+    var imgUrl = mediaUrlForRelPath(imgRel);
+    var probe = new Image();
+    probe.onload  = function() { if (seq === coverArtSeq) setAudioArtImage(imgUrl); };
+    probe.onerror = function() { if (seq === coverArtSeq) setAudioArtImage(''); };
+    probe.src = imgUrl;
+  }, 250);
+}
+
+// (Re)select the caption source for the track now loading. Called from
+// initAudioPlayer/initVideoPlayer and the fast-path track loaders, so
+// folder-queue and playlist advances re-run detection per track.
+function initCaptionsForTrack(url) {
+  var seq = ++captionSeq;
+  captions = [];
+  setCaptionLine('');
+  // 1. Explicit ?srt=/&captions= param — applies to the originally
+  //    requested file only (queue advances get fresh detection). If the
+  //    param URL 404s (DualWebViewGroup guesses <basename>.srt for
+  //    intercepted web videos), fall through to sidecar/embedded.
+  if (captionUrl && url === mediaUrl) {
+    loadSrtCaptions(captionUrl, seq, function() {
+      detectSidecarOrEmbedded(url, seq);
+    });
+    return;
+  }
+  detectSidecarOrEmbedded(url, seq);
+}
+
+// Sidecar + embedded detection. The bridge calls are synchronous JS
+// bridge hops — and getEmbeddedCaptions can demux a whole MKV subtitle
+// track — so BOTH stages are deferred off the load path: the player UI
+// paints and playback starts before any caption work runs.
+function detectSidecarOrEmbedded(url, seq) {
+  setTimeout(function() {
+    if (seq !== captionSeq) return;
+    var relPath = libraryRelPathFromUrl(url);
+    // 2. Sidecar file next to the playing file.
+    var sidecar = findSidecarCaptionPath(relPath);
+    if (sidecar) {
+      loadSrtCaptions(mediaUrlForRelPath(sidecar), seq);
+      return;
+    }
+    // 3. Embedded subtitle track (MP4 mov_text, MKV/WebM-muxed SRT/VTT)
+    //    via the native extractor. Returns cue JSON or "[]".
+    var TM = window.TapMedia;
+    if (!TM || typeof TM.getEmbeddedCaptions !== 'function') return;
+    var source = relPath || url;
+    setTimeout(function() {
+      if (seq !== captionSeq) return;
+      var raw;
+      try { raw = TM.getEmbeddedCaptions(source); } catch (_) { return; }
+      if (seq !== captionSeq) return;
+      var cues;
+      try { cues = JSON.parse(raw || '[]'); } catch (_) { return; }
+      if (!Array.isArray(cues)) return;
+      cues = cues.filter(function(c) {
+        return c && typeof c.start === 'number' &&
+               typeof c.end === 'number' && c.text;
+      });
+      if (cues.length) captions = cues;
+    }, 350);
+  }, 250);
+}
+
+// ── Active-cue render + dim-mode publish ──
+// #captionText is the on-page render target (video overlay). The active
+// line is ALSO published for the native dim-mode mask so the caption can
+// carry into dim mode for audio AND video:
+//   • push channel: MediaInterface.onDimCaption(line) — same channel the
+//     YouTube dim-caption engine uses; native side gates it on masked
+//     state + media-control-WebView ownership, so pushing while undimmed
+//     is a harmless no-op.
+//   • scrape channel: window.__tapMediaActiveCaption (JS global) and the
+//     hidden #dimCaptionLine node, for evaluateJavascript polls.
+var lastPublishedCaptionLine = null;
+function setCaptionLine(line) {
+  line = line || '';
+  var el = document.getElementById('captionText');
+  if (el && el.textContent !== line) el.textContent = line;
+  if (line === lastPublishedCaptionLine) return;
+  lastPublishedCaptionLine = line;
+  window.__tapMediaActiveCaption = line;
+  var mirror = document.getElementById('dimCaptionLine');
+  if (mirror) mirror.textContent = line;
+  try {
+    if (window.MediaInterface && typeof MediaInterface.onDimCaption === 'function') {
+      MediaInterface.onDimCaption(line);
+    }
+  } catch (_) {}
+}
+
+function updateCaptions(time) {
+  if (!captionsEnabled || captions.length === 0) {
+    if (lastPublishedCaptionLine) setCaptionLine('');
+    return;
+  }
+  var active = captions.find(function(c){ return time >= c.start && time <= c.end; });
+  setCaptionLine(active ? active.text : '');
+}
+
+// ══════════════════════════════════════════════
+// ══════ GESTURE CONTROLS ════════════════════
+// ══════════════════════════════════════════════
+var lastTapTime = 0;
+var tapTimeout = null;
+
+document.addEventListener('click', function(e) {
+  // Don't intercept control button clicks
+  if (e.target.closest('.ctrl-btn,.audio-btn,.vid-btn,input[type="range"],button,a,select')) return;
+
+  var now = Date.now();
+  if (now - lastTapTime < 350) {
+    // Double tap → exit
+    clearTimeout(tapTimeout);
+    lastTapTime = 0;
+    exitPlayer();
+    return;
+  }
+  lastTapTime = now;
+  tapTimeout = setTimeout(function() {
+    // Single tap → pause/play
+    singleTapAction();
+  }, 350);
+});
+
+window.tapInsightTogglePlayback = function() {
+  if (mediaType === 'text') {
+    toggleTts();
+    return ttsPlaying ? 'text-playing' : 'text-paused';
+  }
+  else if (mediaType === 'audio' || (mediaType === 'playlist' && !videoPlayerActive())) {
+    toggleAudio();
+    return audioEl.paused ? 'audio-paused' : 'audio-playing';
+  }
+  else if (mediaType === 'video' || (mediaType === 'playlist' && videoPlayerActive())) {
+    toggleVideo();
+    return videoEl.paused ? 'video-paused' : 'video-playing';
+  }
+  return 'unsupported:' + mediaType;
+};
+
+function singleTapAction() {
+  if (mediaType === 'text') { toggleTts(); }
+  else if (mediaType === 'audio') { toggleAudio(); }
+  else if (mediaType === 'playlist') { window.tapInsightTogglePlayback(); }
+  else if (mediaType === 'video') {
+    if (videoOverlay.classList.contains('visible') || videoEl.paused) {
+      toggleVideo();
+    } else {
+      showVideoOverlay();
+    }
+  }
+}
+
+function exitPlayer() {
+  // Stop all media
+  stopTts();
+  audioEl.pause();
+  videoEl.pause();
+  notifyMediaState(false);
+  try { setCaptionLine(''); } catch(_){}
+  // Notify Android if interface exists
+  if (window.AndroidInterface && typeof AndroidInterface.exitMediaPlayer === 'function') {
+    AndroidInterface.exitMediaPlayer();
+  } else if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#888;font-size:16px">Double-tapped to exit. Close this tab.</div>';
+  }
+}
+
+// ══════════════════════════════════════════════
+// ══════ ‹ BACK TO LIBRARY ═══════════════════
+// ══════════════════════════════════════════════
+// The pinned top-left back button stops playback cleanly and returns to
+// library_local.html, deep-linked (?folder=…) into the EXACT folder the
+// playing file lives in. Distinct from double-tap exit (exitPlayer):
+// that hands control back to native; this is an in-WebView navigation
+// back into the library at the right spot. Same virtual https origin as
+// the library hand-off in the other direction.
+var LIBRARY_URL = 'https://appassets.androidplatform.net/assets/library_local.html';
+
+// Library-relative path of a /media/ URL served by the asset host
+// (https://appassets.androidplatform.net/media/<rel>); '' for anything
+// else (remote http(s) media, content: URIs, bridge-injected text).
+function libraryRelPathFromUrl(u) {
+  var m = String(u || '').match(/^https?:\/\/appassets\.androidplatform\.net\/media\/([^?#]+)/);
+  if (!m) return '';
+  try { return m[1].split('/').map(decodeURIComponent).join('/'); }
+  catch (_) { return m[1]; }
+}
+
+function parentFolderOf(rel) {
+  rel = String(rel || '').replace(/\/+$/, '');
+  var i = rel.lastIndexOf('/');
+  return i > 0 ? rel.slice(0, i) : '';
+}
+
+// Resolve the library-relative path of whatever is playing right now:
+// queue/playlist entries carry relativePath; single-file mode derives it
+// from the /media/ URL; full playlist mode can fall back to the .m3u's
+// own path so Back lands in the folder containing the playlist.
+function currentLibraryRelPath() {
+  try {
+    var entry = (playOrder && playOrder.length) ? currentEntry() : null;
+    if (entry && entry.relativePath) return entry.relativePath;
+    if (entry && entry.url) {
+      var fromEntry = libraryRelPathFromUrl(entry.url);
+      if (fromEntry) return fromEntry;
+    }
+  } catch (_) {}
+  var fromUrl = libraryRelPathFromUrl(mediaUrl);
+  if (fromUrl) return fromUrl;
+  return playlistPath || '';
+}
+
+function backToLibrary() {
+  // Stop everything the same way double-tap exit does, then navigate.
+  try { stopTts(); } catch (_) {}
+  try { audioEl.pause(); } catch (_) {}
+  try { videoEl.pause(); } catch (_) {}
+  notifyMediaState(false);
+  try { setCaptionLine(''); } catch (_) {}
+  var folder = parentFolderOf(currentLibraryRelPath());
+  window.location.href = LIBRARY_URL +
+    (folder ? '?folder=' + encodeURIComponent(folder) : '');
+}
+
+document.getElementById('backBtn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  backToLibrary();
+});
+
+// ══════════════════════════════════════════════
+// ══════ KEYBOARD SHORTCUTS ══════════════════
+// ══════════════════════════════════════════════
+document.addEventListener('keydown', function(e) {
+  var key = e.key;
+  if (key === ' ' || key === 'k') { e.preventDefault(); singleTapAction(); }
+  else if (key === 'Escape') { exitPlayer(); }
+  else if (key === 'ArrowLeft') {
+    if (mediaType === 'audio') audioEl.currentTime = Math.max(0, audioEl.currentTime - 15);
+    else if (mediaType === 'video') videoEl.currentTime = Math.max(0, videoEl.currentTime - 10);
+  }
+  else if (key === 'ArrowRight') {
+    if (mediaType === 'audio') audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + 15);
+    else if (mediaType === 'video') videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 10);
+  }
+  else if (key === 'f' && mediaType === 'video') {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else videoEl.requestFullscreen().catch(function(){});
+  }
+  else if (key === 'c' && mediaType === 'video') {
+    captionsEnabled = !captionsEnabled;
+    document.getElementById('videoCCBtn').style.opacity = captionsEnabled ? 1 : 0.4;
+    if (!captionsEnabled) setCaptionLine('');  // clears render + dim publish
+  }
+});
+
+// ══════════════════════════════════════════════
+// ══════ PLAYLIST MODE ═══════════════════════
+// ══════════════════════════════════════════════
+var playlistMode = false;
+var playlistEntries = [];       // [{title, url, kind, relativePath}]
+var playOrder = [];             // array of indexes into playlistEntries
+var currentOrderIdx = 0;        // index into playOrder
+var shuffleOn = false;
+var repeatMode = 'off';         // 'off' | 'all' | 'one'
+var playlistName = '';
+var playlistConsecutiveFailures = 0;
+var playlistFailureSkipPending = false;
+
+// URL parameters specific to playlist mode
+var playlistPath = params.get('playlist') || '';
+var sessionToken = params.get('token') || '';
+// "bridge" = load playlist via window.TapMedia (on-glasses, no server).
+// Anything else (including unset) = fall back to companion HTTP server.
+var playlistSource = (params.get('source') || '').toLowerCase();
+// Optional start index (0-based) into the playlist — lets the library hand off
+// to the player at the exact track the user clicked.
+var playlistStart = parseInt(params.get('start') || '0', 10);
+if (!isFinite(playlistStart) || playlistStart < 0) playlistStart = 0;
+// Companion server URL. On the glasses, the server binds to 127.0.0.1:19110.
+// Override via &server=https://…:19110 if the browser reaches it elsewhere.
+var companionBase = params.get('server') || 'https://127.0.0.1:19110';
+
+function restoreShuffleRepeat() {
+  try {
+    var s = sessionStorage.getItem('player_shuffle');
+    var r = sessionStorage.getItem('player_repeat');
+    if (s === '1') shuffleOn = true;
+    if (r === 'all' || r === 'one') repeatMode = r;
+  } catch(e){}
+}
+function saveShuffleRepeat() {
+  try {
+    sessionStorage.setItem('player_shuffle', shuffleOn ? '1' : '0');
+    sessionStorage.setItem('player_repeat', repeatMode);
+  } catch(e){}
+}
+
+function initPlaylistMode() {
+  playlistMode = true;
+  document.getElementById('plBar').classList.add('active');
+  restoreShuffleRepeat();
+
+  var shuffleBtn = document.getElementById('plShuffleBtn');
+  var repeatBtn = document.getElementById('plRepeatBtn');
+  shuffleBtn.addEventListener('click', function() {
+    shuffleOn = !shuffleOn;
+    shuffleBtn.classList.toggle('active', shuffleOn);
+    rebuildPlayOrder();
+    saveShuffleRepeat();
+    // Drop focus so :hover/:focus doesn't visually mask .active on touch.
+    try { shuffleBtn.blur(); } catch(_){}
+  });
+  repeatBtn.addEventListener('click', function() {
+    repeatMode = (repeatMode === 'off') ? 'all'
+               : (repeatMode === 'all') ? 'one' : 'off';
+    repeatBtn.textContent = (repeatMode === 'one') ? '🔂' : '🔁';
+    repeatBtn.classList.toggle('active', repeatMode !== 'off');
+    repeatBtn.title = 'Repeat ' + repeatMode;
+    saveShuffleRepeat();
+    try { repeatBtn.blur(); } catch(_){}
+  });
+  shuffleBtn.classList.toggle('active', shuffleOn);
+  repeatBtn.textContent = (repeatMode === 'one') ? '🔂' : '🔁';
+  repeatBtn.classList.toggle('active', repeatMode !== 'off');
+  repeatBtn.title = 'Repeat ' + repeatMode;
+
+  document.getElementById('plPrevBtn').addEventListener('click', playPrev);
+  document.getElementById('plNextBtn').addEventListener('click', playNext);
+  document.getElementById('plQueueBtn').addEventListener('click', toggleDrawer);
+  document.getElementById('plDrawerClose').addEventListener('click', closeDrawer);
+
+  // ALSO reveal + wire the bottom-bar ⏮/⏭ buttons that folder-queue
+  // mode uses. Playlist mode and folder-queue mode share the same
+  // playPrev / playNext functions, so the buttons are interchangeable;
+  // the only difference is whether the top plBar is shown. With the
+  // bottom buttons live in both modes the user gets a consistent
+  // place to skip tracks regardless of how they entered the queue.
+  ['audioPrevTrack', 'videoPrevTrack'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) { b.style.display = ''; b.addEventListener('click', function(){ playPrev(); }); }
+  });
+  ['audioNextTrack', 'videoNextTrack'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) { b.style.display = ''; b.addEventListener('click', function(){ playNext(); }); }
+  });
+  // Initial enabled-state pass; subsequent updates happen inside
+  // playAt() via updateFolderQueueButtons().
+  updateFolderQueueButtons();
+
+  fetchPlaylist();
+}
+
+/**
+ * Folder-queue mode: reuses the playlist navigation infrastructure
+ * (playlistEntries, playOrder, playPrev, playNext) without the full
+ * playlist UI (plBar, drawer, shuffle/repeat buttons). Triggered by
+ * library_local.html stashing a folder's playable siblings into
+ * sessionStorage('mediaPlayerQueue') and adding ?hasQueue=1 to the
+ * media_player.html URL.
+ *
+ * Difference from initPlaylistMode():
+ *   • playlistMode stays FALSE — keeps the audio panel layout simple
+ *     (no plBar at the top, no shuffle/repeat header).
+ *   • The new ⏮ / ⏭ buttons in #audioControls become visible and are
+ *     wired to the same playPrev / playNext as full playlist mode.
+ *   • playlistEntries + playOrder + currentOrderIdx are populated so
+ *     auto-advance, end-of-track handling, and prev/next math just
+ *     work with no special-casing.
+ */
+function initFolderQueueIfPresent() {
+  if (params.get('hasQueue') !== '1') return;
+  var raw;
+  try { raw = sessionStorage.getItem('mediaPlayerQueue'); } catch(_){ raw = null; }
+  if (!raw) return;
+  var stash;
+  try { stash = JSON.parse(raw); } catch(_){ return; }
+  if (!stash || !Array.isArray(stash.entries) || !stash.entries.length) return;
+
+  // Mirror applyPlaylist's entry shape so every downstream function
+  // (playAt, currentEntry, handlePlaylistTrackFailure, etc.) sees the
+  // exact fields it expects.
+  playlistEntries = stash.entries
+    .filter(function(e){ return !!e && !!e.url; })
+    .map(function(e){
+      return {
+        title: e.title || '',
+        url:   e.url,
+        kind:  (e.kind || 'audio').toLowerCase(),
+        relativePath: e.relativePath || ''
+      };
+    });
+  if (!playlistEntries.length) return;
+
+  // Find the entry that matches the URL we were asked to load — that's
+  // our current index. Falls back to stash.startIndex when the match
+  // misses (e.g., URL-encoding differences).
+  var targetUrl = mediaUrl || '';
+  var currentIdx = -1;
+  for (var i = 0; i < playlistEntries.length; i++) {
+    if (playlistEntries[i].url === targetUrl) { currentIdx = i; break; }
+  }
+  if (currentIdx < 0) {
+    currentIdx = (typeof stash.startIndex === 'number')
+      ? Math.max(0, Math.min(stash.startIndex, playlistEntries.length - 1))
+      : 0;
+  }
+
+  // Build a simple sequential play order — no shuffle in folder-queue
+  // mode; the user can still pick shuffle inside full playlist mode if
+  // they need it.
+  playOrder = [];
+  for (var j = 0; j < playlistEntries.length; j++) playOrder.push(j);
+  currentOrderIdx = currentIdx;
+  playlistName = stash.name || 'Folder';
+
+  // Reveal the prev / next buttons in BOTH the audio panel and the
+  // video bottom-bar, and wire them to playPrev / playNext. The
+  // queue can contain a mix of audio + video, so playAt's existing
+  // mode-switching logic handles the transition between them.
+  ['audioPrevTrack', 'videoPrevTrack'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) { b.style.display = ''; b.addEventListener('click', function(){ playPrev(); }); }
+  });
+  ['audioNextTrack', 'videoNextTrack'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) { b.style.display = ''; b.addEventListener('click', function(){ playNext(); }); }
+  });
+  // Refresh disabled-state for the buttons; updateFolderQueueButtons is
+  // also called every time playAt() runs to keep them in sync as the
+  // user moves through the queue.
+  updateFolderQueueButtons();
+
+  // Bump play order forward when the current track ends — folder-queue
+  // mode wants implicit auto-advance just like playlist mode. Idempotent
+  // guard prevents double-advance if both fire (audio + video both fire
+  // 'ended' if the user switches modes mid-queue).
+  function onTrackEnded() {
+    if (folderQueueAdvanceFired) return;
+    folderQueueAdvanceFired = true;
+    setTimeout(function(){ folderQueueAdvanceFired = false; }, 1000);
+    playNext();
+  }
+  audioEl.addEventListener('ended', onTrackEnded);
+  if (typeof videoEl !== 'undefined' && videoEl) {
+    videoEl.addEventListener('ended', onTrackEnded);
+  }
+
+  // Mark _audioInit / _videoInit so that the FIRST follow-up call to
+  // loadAudioTrack / loadVideoTrack (triggered by playAt → playNext or
+  // playPrev) takes the fast swap-src path instead of re-running
+  // initAudioPlayer / initVideoPlayer (which would double-register
+  // every listener: 'ended', 'error', 'loadedmetadata', etc.).
+  // initAudioPlayer(mediaUrl) is still called once by the main
+  // DOMContentLoaded path right after this function returns, so the
+  // listeners are guaranteed to exist before any track switch.
+  _audioInit = true;
+  _videoInit = true;
+}
+
+var folderQueueAdvanceFired = false;
+
+/**
+ * Keep the ⏮/⏭ button enabled-state in sync with our position in the
+ * queue. Called from initFolderQueueIfPresent and patched into playAt
+ * (see the small hook below).
+ */
+function updateFolderQueueButtons() {
+  var hasPrev = currentOrderIdx > 0 || repeatMode === 'all';
+  var hasNext = currentOrderIdx < (playOrder.length - 1) || repeatMode === 'all';
+  ['audioPrevTrack', 'videoPrevTrack'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (!b || b.style.display === 'none') return;
+    b.disabled = !hasPrev;
+    b.style.opacity = hasPrev ? '1' : '0.4';
+  });
+  ['audioNextTrack', 'videoNextTrack'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (!b || b.style.display === 'none') return;
+    b.disabled = !hasNext;
+    b.style.opacity = hasNext ? '1' : '0.4';
+  });
+}
+
+// Hand the parsed playlist into the player. Shared by bridge + HTTP loaders.
+function applyPlaylist(data) {
+  playlistName = (data && data.name) || 'Playlist';
+  playlistConsecutiveFailures = 0;
+  playlistEntries = ((data && data.entries) || []).map(function(e) {
+    // Two shapes are supported:
+    //   • HTTP /api/library/playlist   → { url, title, kind, relativePath }
+    //   • TapMedia.parsePlaylist()     → { playUrl, title, kind,
+    //                                      resolvedRelativePath, rawPath,
+    //                                      isAbsoluteUrl }
+    var absUrl = e.playUrl || e.url || '';
+    if (absUrl && absUrl.indexOf('/') === 0) {
+      // Companion-server relative path — make absolute against the companion.
+      absUrl = companionBase + absUrl;
+    }
+    return {
+      title: e.title || '',
+      url: absUrl,
+      kind: (e.kind || 'OTHER').toLowerCase(),
+      relativePath: e.resolvedRelativePath || e.relativePath || e.rawPath || ''
+    };
+  }).filter(function(e){ return !!e.url; });
+
+  if (playlistEntries.length === 0) {
+    showError('Playlist is empty.');
+    return;
+  }
+  document.getElementById('plName').textContent = playlistName;
+  rebuildPlayOrder();
+  // Clamp requested start index to the available queue and honor it.
+  var startIdx = playlistStart;
+  if (startIdx >= playOrder.length) startIdx = 0;
+  // When shuffle is on, rebuildPlayOrder already put the "current" entry at
+  // the front (index 0), so respecting playlistStart only matters in the
+  // non-shuffle case. In shuffle mode, playlistStart becomes the "seed"
+  // track — find its position in the shuffled order.
+  if (shuffleOn) {
+    var pos = playOrder.indexOf(startIdx);
+    currentOrderIdx = pos >= 0 ? pos : 0;
+  } else {
+    currentOrderIdx = startIdx;
+  }
+  renderQueue();
+  playAt(currentOrderIdx);
+}
+
+function fetchPlaylist() {
+  if (!playlistPath) { showError('No playlist specified.'); return; }
+  diag('fetchPlaylist  path=' + playlistPath + ' source=' + playlistSource);
+
+  // Prefer the on-glasses bridge when this page is opened from the library
+  // (source=bridge), or whenever the bridge is available and we have no
+  // companion session token. Falls back to the companion HTTP server
+  // otherwise — so the same page works from companion and on-glasses.
+  var bridge = window.TapMedia;
+  var useBridge = (playlistSource === 'bridge') ||
+                  (bridge && typeof bridge.parsePlaylist === 'function' && !sessionToken);
+  diag('bridge=' + (bridge ? 'yes' : 'no') + ' useBridge=' + useBridge);
+  if (useBridge) {
+    if (!bridge || typeof bridge.parsePlaylist !== 'function') {
+      showError('Media bridge unavailable.');
+      return;
+    }
+    var data;
+    try {
+      var raw = bridge.parsePlaylist(playlistPath);
+      diag('bridge.parsePlaylist returned ' + (raw ? raw.length : 0) + ' chars');
+      data = JSON.parse(raw);
+    } catch (e) {
+      showError('Could not load playlist: ' + (e && e.message || e));
+      return;
+    }
+    if (data && data.error) { showError(data.error); return; }
+    diag('playlist entries=' + (data && data.entries ? data.entries.length : 0));
+    applyPlaylist(data);
+    return;
+  }
+
+  var url = companionBase + '/api/library/playlist?path=' + encodeURIComponent(playlistPath) +
+            '&token=' + encodeURIComponent(sessionToken);
+  fetch(url, { headers: sessionToken ? { 'X-Session-Token': sessionToken } : {} })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(applyPlaylist)
+    .catch(function(e) { showError('Could not load playlist: ' + e.message); });
+}
+
+function rebuildPlayOrder() {
+  var order = [];
+  for (var i = 0; i < playlistEntries.length; i++) order.push(i);
+  if (shuffleOn) {
+    // Preserve the currently-playing entry at front, shuffle the rest
+    var cur = playOrder.length > 0 ? playOrder[currentOrderIdx] : 0;
+    order = order.filter(function(i){ return i !== cur; });
+    for (var j = order.length - 1; j > 0; j--) {
+      var k = Math.floor(Math.random() * (j + 1));
+      var t = order[j]; order[j] = order[k]; order[k] = t;
+    }
+    order.unshift(cur);
+    currentOrderIdx = 0;
+  } else {
+    // Unshuffle — keep current track, return to natural order starting from it
+    var curEntry = playOrder.length > 0 ? playOrder[currentOrderIdx] : 0;
+    currentOrderIdx = curEntry;
+  }
+  playOrder = order;
+  renderQueue();
+}
+
+function currentEntry() {
+  return playlistEntries[playOrder[currentOrderIdx]] || null;
+}
+
+function playAt(orderIdx) {
+  if (orderIdx < 0 || orderIdx >= playOrder.length) return;
+  currentOrderIdx = orderIdx;
+  var entry = currentEntry();
+  if (!entry) return;
+  playlistFailureSkipPending = false;
+  clearError();
+  showLoading('Loading ' + (entry.title || 'track') + '...');
+
+  // Update the top bar
+  document.getElementById('plIdxLabel').textContent =
+    (currentOrderIdx + 1) + '/' + playOrder.length;
+  document.getElementById('plTrackTitle').textContent = entry.title || 'Track';
+  document.getElementById('plPrevBtn').disabled =
+    (currentOrderIdx === 0 && repeatMode !== 'all');
+  document.getElementById('plNextBtn').disabled =
+    (currentOrderIdx >= playOrder.length - 1 && repeatMode !== 'all');
+
+  // Update per-track title displays
+  mediaTitle = entry.title || mediaTitle;
+  // Mirror the active track title onto document.title so the glasses'
+  // dim-mode label resolver can read it via WebView.title — same
+  // mechanism we use for YouTube. Without this update, advancing to
+  // the next track in a folder queue or playlist would leave the
+  // mask HUD stuck on the first track's name.
+  try { if (mediaTitle) document.title = mediaTitle; } catch (_) {}
+
+  // Switch mode + load track
+  if (entry.kind === 'video') {
+    switchToVideoMode();
+    loadVideoTrack(entry.url, entry.title);
+  } else {
+    // Default audio (works for audio + unknown)
+    switchToAudioMode();
+    loadAudioTrack(entry.url, entry.title);
+  }
+
+  renderQueue();
+  // Folder-queue mode (non-playlistMode) also uses the ⏮/⏭ buttons —
+  // refresh their enabled state so the user sees when they've hit
+  // an edge of the queue. No-op in single-file mode (buttons hidden).
+  try { updateFolderQueueButtons(); } catch(_){}
+}
+
+function handlePlaylistTrackFailure(kind, detail, url) {
+  if (!playlistMode || !playOrder.length) return false;
+  if (playlistFailureSkipPending) return true;
+  var entry = currentEntry();
+  var label = entry && (entry.title || entry.relativePath || entry.url) || url || 'track';
+  playlistConsecutiveFailures += 1;
+  if (playlistConsecutiveFailures >= playOrder.length) {
+    showError('Could not play any entries in this playlist. Last failed: ' + label + ' (' + detail + ').');
+    return true;
+  }
+
+  if (currentOrderIdx + 1 < playOrder.length) {
+    playlistFailureSkipPending = true;
+    document.getElementById('loadingText').textContent =
+      'Skipping unavailable stream: ' + label;
+    setTimeout(function() {
+      playAt(currentOrderIdx + 1);
+    }, 250);
+    return true;
+  }
+
+  showError('Could not load ' + label + ' (' + detail + ').');
+  return true;
+}
+
+function playNext() {
+  if (playOrder.length === 0) return;
+  if (currentOrderIdx + 1 < playOrder.length) {
+    playAt(currentOrderIdx + 1);
+  } else if (repeatMode === 'all') {
+    playAt(0);
+  }
+}
+function playPrev() {
+  if (playOrder.length === 0) return;
+  // If more than 3s into track, restart instead of prev — this is the
+  // button-UX heuristic (matches what most music apps do when you tap
+  // the ⏮ button mid-track). Glasses swipes use gesturePrevTrack()
+  // below to bypass this and always navigate.
+  var el = videoPlayerActive() ? videoEl : audioEl;
+  if (el && el.currentTime > 3) {
+    el.currentTime = 0;
+    return;
+  }
+  if (currentOrderIdx > 0) {
+    playAt(currentOrderIdx - 1);
+  } else if (repeatMode === 'all') {
+    playAt(playOrder.length - 1);
+  } else {
+    el.currentTime = 0;
+  }
+}
+
+// ── Gesture entry points (called from glasses swipes) ─────────────────
+//
+// Distinct from the button playNext/playPrev because:
+//
+//   * They always navigate to the next/prev TRACK, never restart the
+//     current one. The "restart if >3s in" rule that lives in playPrev
+//     is right for a thumb on a button, wrong for a wrist swipe — the
+//     user wants the same outcome whether they swipe at 0:02 or 2:00.
+//
+//   * They wrap around at queue boundaries even when repeatMode is
+//     "off" — a swipe past the end of the queue shouldn't be a no-op,
+//     it should land you on the first track.
+//
+//   * They return a small status string the Kotlin caller logs, so we
+//     can tell from logcat whether a gesture fired through, was a
+//     no-op (no queue), or hit an exception.
+//
+// Exposed on window so DualWebViewGroup can reach them via
+// evaluateJavascript without needing a JS bridge.
+window.gestureNextTrack = function() {
+  if (!playOrder || playOrder.length === 0) return 'no-queue';
+  var n = playOrder.length;
+  var nextIdx = (currentOrderIdx + 1) % n;
+  playAt(nextIdx);
+  return 'gesture-next';
+};
+window.gesturePrevTrack = function() {
+  if (!playOrder || playOrder.length === 0) return 'no-queue';
+  var n = playOrder.length;
+  // (currentOrderIdx - 1 + n) % n handles 0 → last cleanly without
+  // negative-modulo gotchas.
+  var prevIdx = (currentOrderIdx - 1 + n) % n;
+  playAt(prevIdx);
+  return 'gesture-prev';
+};
+
+// ── Mode switching ───────────────────────────────────────────────────
+function switchToAudioMode() {
+  document.getElementById('videoPlayer').classList.remove('active');
+  videoEl.pause();
+  document.getElementById('audioPlayer').classList.add('active');
+}
+function switchToVideoMode() {
+  document.getElementById('audioPlayer').classList.remove('active');
+  audioEl.pause();
+  document.getElementById('videoPlayer').classList.add('active');
+}
+function videoPlayerActive() {
+  return document.getElementById('videoPlayer').classList.contains('active');
+}
+
+// ── Track load helpers (re-use listeners set up by init* functions) ──
+var _audioInit = false, _videoInit = false;
+
+function loadAudioTrack(url, title) {
+  prepareExclusivePlayback();
+  document.getElementById('audioTitle').textContent = title || 'Audio';
+  if (!_audioInit) {
+    initAudioPlayer(url);  // sets up listeners + loads (+ captions)
+    _audioInit = true;
+    return;
+  }
+  // Fast swap-src path skips initAudioPlayer, so re-run caption
+  // detection AND cover-art resolution for the new track here.
+  initCaptionsForTrack(url);
+  updateAudioCoverArt(url);
+  var loadSeq = ++audioLoadSeq;
+  audioEl.dataset.loadSeq = String(loadSeq);
+  audioEl.src = url;
+  audioEl.load();
+  audioEl.play().then(function() {
+    notifyMediaState(true);
+    var btn = document.getElementById('audioPlayBtn');
+    btn.textContent = '⏸'; btn.classList.add('playing');
+  }).catch(function(){});
+  setTimeout(function(){
+    if (audioEl.dataset.loadSeq === String(loadSeq) &&
+        !document.getElementById('loadingOverlay').classList.contains('hidden')) {
+      if (!handlePlaylistTrackFailure('audio', 'load timed out', url)) {
+        showError('Audio load timed out. URL: ' + url);
+      }
+    }
+  }, 15000);
+}
+function loadVideoTrack(url, title) {
+  prepareExclusivePlayback();
+  document.getElementById('videoTitle').textContent = title || 'Video';
+  if (!_videoInit) {
+    initVideoPlayer(url);  // sets up listeners + loads (+ captions)
+    _videoInit = true;
+    return;
+  }
+  // Fast swap-src path skips initVideoPlayer, so re-run caption
+  // detection for the new track here.
+  initCaptionsForTrack(url);
+  var loadSeq = ++videoLoadSeq;
+  videoEl.dataset.loadSeq = String(loadSeq);
+  videoEl.src = url;
+  videoEl.load();
+  videoEl.play().then(function() {
+    notifyMediaState(true);
+    var btn = document.getElementById('videoPlayBtn');
+    btn.textContent = '⏸'; btn.classList.add('playing');
+    hideVideoOverlayDelayed();
+  }).catch(function(){});
+  setTimeout(function(){
+    if (videoEl.dataset.loadSeq === String(loadSeq) &&
+        !document.getElementById('loadingOverlay').classList.contains('hidden')) {
+      if (!handlePlaylistTrackFailure('video', 'load timed out', url)) {
+        showError('Video load timed out. URL: ' + url);
+      }
+    }
+  }, 15000);
+}
+
+// ── Auto-advance hooks (installed after the regular 'ended' handlers) ──
+function installPlaylistEndHooks() {
+  audioEl.addEventListener('ended', function() {
+    if (!playlistMode) return;
+    if (repeatMode === 'one') { audioEl.currentTime = 0; audioEl.play(); return; }
+    playNext();
+  });
+  videoEl.addEventListener('ended', function() {
+    if (!playlistMode) return;
+    if (repeatMode === 'one') { videoEl.currentTime = 0; videoEl.play(); return; }
+    playNext();
+  });
+}
+
+// ── Queue drawer ─────────────────────────────────────────────────────
+function toggleDrawer() {
+  document.getElementById('plDrawer').classList.toggle('open');
+}
+function closeDrawer() {
+  document.getElementById('plDrawer').classList.remove('open');
+}
+
+function renderQueue() {
+  var list = document.getElementById('plQueueList');
+  list.innerHTML = '';
+  playOrder.forEach(function(origIdx, orderIdx) {
+    var entry = playlistEntries[origIdx];
+    if (!entry) return;
+    var row = document.createElement('div');
+    row.className = 'q-item' + (orderIdx === currentOrderIdx ? ' current' : '');
+    var kindIcon = entry.kind === 'video' ? '▶' : (entry.kind === 'audio' ? '♪' : '•');
+    row.innerHTML =
+      '<span class="q-num"></span>' +
+      '<span class="q-icon">' + kindIcon + '</span>' +
+      '<span class="q-title"></span>';
+    row.querySelector('.q-num').textContent = (orderIdx + 1);
+    row.querySelector('.q-title').textContent = entry.title || entry.relativePath || 'Track';
+    row.addEventListener('click', function() { playAt(orderIdx); closeDrawer(); });
+    list.appendChild(row);
+  });
+}
+
+// ══════════════════════════════════════════════
+// ══════ INIT ════════════════════════════════
+// ══════════════════════════════════════════════
+// TTS on the glasses is routed through Gemini 3.1 via window.TapMedia.speakText().
+// The browser SpeechSynthesis API is used only as a fallback when the bridge
+// isn't present (e.g., the companion-app web viewer). Never reference the
+// speechSynthesis global directly at parse time — RayNeo's WebView doesn't
+// expose it and a bare reference throws ReferenceError at script-load, halting
+// all subsequent init (including the DOMContentLoaded listener that assigns
+// the media <audio>/<video> src).
+try {
+  if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis &&
+      typeof window.speechSynthesis.getVoices === 'function' &&
+      window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.addEventListener('voiceschanged', function(){}, { once: true });
+  }
+} catch (e) { /* speechSynthesis unavailable on this WebView — Gemini bridge handles TTS */ }
+
+function initFromTextContent() {
+  // Check the window variable (legacy injection path)
+  if (window._textContent && typeof window._textContent === 'string') {
+    if (!window._textContent.trim()) { showError('File is empty.'); return true; }
+    initTextReader(window._textContent);
+    return true;
+  }
+  return false;
+}
+
+function tryPullFromBridge() {
+  // Pull text from Android bridge (preferred — no race conditions).
+  // The bridge stores text before loading this page, so it's always ready.
+  var bridge = window.AndroidInterface || window.MediaInterface;
+  if (bridge && typeof bridge.getPendingText === 'function') {
+    try {
+      var text = bridge.getPendingText();
+      if (text && text.trim().length > 0) {
+        initTextReader(text);
+        return true;
+      }
+    } catch(e) { console.warn('Bridge getPendingText failed:', e); }
+  }
+  return false;
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('loadingText').textContent = 'Loading ' + mediaType + '...';
+  diag('DOMContentLoaded  type=' + mediaType);
+  if (mediaType === 'playlist' || mediaType === 'text' || mediaType === 'audio' || mediaType === 'video') {
+    prepareExclusivePlayback();
+  }
+
+  if (mediaType === 'playlist') {
+    installPlaylistEndHooks();
+    initPlaylistMode();
+    return;
+  }
+
+  if (mediaType === 'text') {
+    // 1. Try pulling text from Android bridge (best — always ready)
+    if (tryPullFromBridge()) return;
+    // 2. Check if text was already injected into window._textContent
+    if (initFromTextContent()) return;
+    // 3. If we have a URL (library flow), fetch directly — no need to wait
+    //    for a bridge that isn't coming.
+    if (mediaUrl) {
+      diag('text: fetching ' + mediaUrl.substring(0, 60));
+      fetch(mediaUrl).then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      }).then(function(text) {
+        if (!text.trim()) { showError('File is empty.'); return; }
+        initTextReader(text);
+      }).catch(function(e) { showError('Could not load file: ' + e.message); });
+      return;
+    }
+    // 4. No URL and no bridge text yet — poll briefly for injected text
+    //    (covers legacy paths that call loadUrl() + inject on load).
+    var waitCount = 0;
+    var waitTimer = setInterval(function() {
+      if (tryPullFromBridge()) { clearInterval(waitTimer); return; }
+      if (initFromTextContent()) { clearInterval(waitTimer); return; }
+      waitCount++;
+      if (waitCount > 30) {
+        clearInterval(waitTimer);
+        showError('No text content available.');
+      }
+    }, 100);
+    return;
+
+  } else if (!mediaUrl) {
+    showError('No media URL provided.');
+    return;
+
+  } else if (mediaType === 'audio') {
+    initFolderQueueIfPresent();
+    initAudioPlayer(mediaUrl);
+
+  } else if (mediaType === 'video') {
+    initFolderQueueIfPresent();
+    initVideoPlayer(mediaUrl);
+
+  } else {
+    showError('Unknown media type: ' + mediaType);
+  }
+});
+</script>
+</body>
+</html>

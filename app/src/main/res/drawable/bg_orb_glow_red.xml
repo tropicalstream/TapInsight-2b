@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Warm ember-red halo drawn behind the earth orb while the microphone
+  is recording.  Built as a layer-list of two stacked radial gradients
+  so the glow feels like firelight on the sphere rather than a solid
+  red disc:
+
+    1) Outer diffuse ember halo — very wide gradientRadius (105%) with
+       a translucent mid-stop so the edge of the glow dissolves into
+       the panel.  This is what gives the halo its "dithered" feel
+       rather than a flat ring with a hard boundary.
+
+    2) Inner ember body — tighter radius (55%) with a warmer but never
+       fully-opaque highlight so the halo has colour depth near the
+       orb.  Alpha tops out at 0xB3 (~70%) in the core rather than
+       0xFF, so the glow never reads as a solid fill — it breathes.
+
+  android:dither="true" enables hardware dithering on both layers,
+  smoothing the gradient across low-bit displays so the colour
+  transitions don't band into concentric rings.
+
+  Radii, alphas, and layer topology mirror the blue variant so the two
+  halos feel like the same object in different moods.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape
+            android:dither="true"
+            android:shape="oval">
+            <gradient
+                android:centerColor="#3DFF4B52"
+                android:centerX="0.5"
+                android:centerY="0.5"
+                android:endColor="#00FF4B52"
+                android:gradientRadius="105%"
+                android:startColor="#66FF8844"
+                android:type="radial" />
+        </shape>
+    </item>
+    <item>
+        <shape
+            android:dither="true"
+            android:shape="oval">
+            <gradient
+                android:centerColor="#66FF4B52"
+                android:centerX="0.5"
+                android:centerY="0.5"
+                android:endColor="#00FF4B52"
+                android:gradientRadius="55%"
+                android:startColor="#B3FF8844"
+                android:type="radial" />
+        </shape>
+    </item>
+</layer-list>

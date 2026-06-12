@@ -1,0 +1,2224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=720,height=960,initial-scale=1,user-scalable=no">
+<title>AR Nav</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:720px;height:960px;overflow:hidden;background:#000;font-family:'SF Pro','Helvetica Neue',Arial,sans-serif;color:#fff}
+
+/* ── Nuke Google Maps alpha developer warning overlay ── */
+.dismissButton,
+div[class*="dismissButton"],
+div[class*="alpha"] > button,
+div[style*="z-index"][style*="position: absolute"] > div > button,
+.gm-style > div[style*="z-index: 1"] > div[style*="background-color: white"],
+.gm-style > div[style*="z-index: 1"] > div[style*="background-color: rgb(255"],
+div[style*="z-index"][style*="background-color: white"][style*="position"],
+div[style*="z-index"][style*="background-color: rgb(255, 255, 255)"][style*="position"] {
+  display:none !important;
+  visibility:hidden !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+  height:0 !important;
+  width:0 !important;
+  overflow:hidden !important;
+}
+
+/* ── 3D Map fills the viewport ── */
+#map3d-container{width:100%;height:100%;position:absolute;top:0;left:0}
+gmp-map-3d{width:100%;height:100%}
+#streetview-container{
+  position:absolute;top:0;left:0;width:100%;height:100%;z-index:7;
+  display:none;background:#000;
+}
+#streetview-container.visible{display:block}
+#streetview-label{
+  position:absolute;left:50%;bottom:88px;transform:translateX(-50%);
+  z-index:24;max-width:86%;display:none;
+  padding:10px 16px;border-radius:16px;
+  background:rgba(0,0,0,0.82);border:1px solid rgba(0,255,255,0.35);
+  color:#fff;text-align:center;box-shadow:0 8px 22px rgba(0,0,0,0.45);
+  text-shadow:0 1px 3px rgba(0,0,0,0.9),0 0 10px rgba(0,255,255,0.25);
+}
+#streetview-label.visible{display:block}
+#streetview-label .sv-title{font-size:18px;font-weight:800;color:#00FFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#streetview-label .sv-address{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── HUD overlay ── */
+#hud{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+
+/* Top bar — AR legibility: big bold text, strong glow */
+#hud-top{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0) 100%);
+}
+#hud-time{
+  font-size:22px;font-weight:700;color:#00FFFF;
+  text-shadow:0 0 10px rgba(0,255,255,0.8),0 0 20px rgba(0,255,255,0.4);
+}
+#hud-weather{
+  font-size:18px;font-weight:600;color:#fff;
+  text-shadow:0 0 8px rgba(255,255,255,0.5),0 1px 3px rgba(0,0,0,1);
+}
+#hud-aqi{
+  font-size:15px;font-weight:700;padding:4px 12px;border-radius:10px;
+  background:rgba(0,255,255,0.2);color:#00FFFF;
+  text-shadow:0 0 8px rgba(0,255,255,0.6);
+  border:1px solid rgba(0,255,255,0.3);
+}
+
+/* Destination bar with dismiss X */
+#hud-dest{display:none !important}
+#hud-dest.dismissed{opacity:0;transform:translateY(-20px);pointer-events:none}
+
+/* Landmark banner — shown only in landmark / fly-over mode */
+#landmark-banner{
+  position:absolute;top:54px;left:50%;transform:translateX(-50%);
+  padding:7px 18px;border-radius:20px;
+  background:rgba(0,0,0,0.72);
+  border:1px solid rgba(255,157,66,0.45);
+  color:#fff;font-size:16px;font-weight:700;letter-spacing:0.3px;
+  text-shadow:0 0 8px rgba(255,157,66,0.35),0 1px 3px rgba(0,0,0,1);
+  max-width:86%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:none;z-index:12;
+  box-shadow:0 4px 14px rgba(0,0,0,0.5);
+  pointer-events:none;
+}
+#landmark-banner.visible{display:block}
+#landmark-banner::before{
+  content:'';display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:#FF9D42;margin-right:8px;vertical-align:1px;
+  box-shadow:0 0 8px rgba(255,157,66,0.9);
+}
+#dest-icon{
+  flex-shrink:0;width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;color:#FF6D00;
+}
+#dest-text{
+  flex:1;font-size:18px;font-weight:700;color:#fff;
+  line-height:1.3;
+  text-shadow:0 0 6px rgba(255,255,255,0.3),0 1px 3px rgba(0,0,0,1);
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+}
+#dest-dismiss{
+  flex-shrink:0;width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:700;color:rgba(255,255,255,0.6);
+  cursor:pointer;
+  border-radius:50%;
+  background:rgba(255,255,255,0.1);
+  border:1px solid rgba(255,255,255,0.2);
+  transition:background 0.2s;
+}
+#dest-dismiss:active{background:rgba(255,255,255,0.3)}
+
+/* ETA bar at bottom — AR legibility */
+#hud-bottom{
+  position:absolute;bottom:0;left:0;right:0;
+  display:flex;justify-content:space-around;align-items:center;
+  padding:14px 16px;
+  background:linear-gradient(0deg,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0) 100%);
+}
+.eta-box{text-align:center}
+.eta-label{
+  font-size:13px;font-weight:600;color:rgba(255,255,255,0.6);
+  text-transform:uppercase;letter-spacing:1.5px;
+  text-shadow:0 1px 3px rgba(0,0,0,1);
+}
+.eta-value{
+  font-size:26px;font-weight:800;color:#fff;margin-top:2px;
+  text-shadow:0 0 8px rgba(255,255,255,0.4),0 1px 4px rgba(0,0,0,1);
+}
+.eta-value.drive{
+  color:#00FFFF;
+  text-shadow:0 0 12px rgba(0,255,255,0.7),0 0 24px rgba(0,255,255,0.3);
+}
+
+/* Parking list — AR legibility */
+#hud-parking{
+  position:absolute;bottom:68px;right:12px;
+  max-width:220px;
+  font-size:14px;font-weight:600;color:rgba(0,255,255,0.9);
+  text-align:right;
+  line-height:1.8;
+  text-shadow:0 0 6px rgba(0,255,255,0.5),0 1px 3px rgba(0,0,0,1);
+}
+#hud-parking .parking-title{
+  font-size:12px;font-weight:700;color:rgba(255,255,255,0.5);
+  text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;
+}
+#candidate-list{
+  position:absolute;left:calc(12px + 10%);bottom:82px;width:155px;max-width:155px;max-height:125px;overflow-y:auto;
+  padding:4px;background:rgba(0,0,0,0.84);border:1px solid rgba(0,255,255,0.22);
+  border-radius:8px;pointer-events:auto;display:none;
+  box-shadow:0 5px 12px rgba(0,0,0,0.35);
+}
+#candidate-list.visible{display:block}
+body.streetview-active #candidate-list{display:none !important}
+#candidate-list .candidate-title{
+  color:rgba(255,255,255,0.65);font-size:8px;font-weight:700;letter-spacing:0.8px;
+  text-transform:uppercase;padding:1px 3px 4px;
+}
+#candidate-list .candidate-item{
+  display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:6px;cursor:pointer;
+  border:1px solid transparent;transition:background 0.15s,border-color 0.15s;
+}
+#candidate-list .candidate-item + .candidate-item{margin-top:2px}
+#candidate-list .candidate-item.active{background:rgba(0,255,255,0.12);border-color:rgba(0,255,255,0.25)}
+#candidate-list .candidate-item:active{background:rgba(0,255,255,0.18)}
+#candidate-list .candidate-index{
+  width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,255,255,0.2);color:#00FFFF;font-size:8px;font-weight:700;flex-shrink:0;
+}
+#candidate-list .candidate-copy{min-width:0;flex:1}
+#candidate-list .candidate-name{font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#candidate-list .candidate-address{font-size:8px;color:rgba(255,255,255,0.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+
+/* ── Edge/corner tap zones ── */
+#quadrant-overlay{
+  position:absolute;top:0;left:0;width:100%;height:100%;z-index:8;
+  pointer-events:none;
+}
+.quad-zone,.corner-zone{
+  position:absolute;pointer-events:auto;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.15s;
+}
+.quad-zone:active,.corner-zone:active{background:rgba(0,255,255,0.08)}
+.quad-zone .quad-arrow,.corner-zone .quad-arrow{
+  font-size:28px;color:rgba(0,255,255,0.15);
+  text-shadow:0 0 10px rgba(0,255,255,0.1);
+  pointer-events:none;
+  transition:color 0.15s;
+}
+.quad-zone:active .quad-arrow,.corner-zone:active .quad-arrow{color:rgba(0,255,255,0.5)}
+body.streetview-active .quad-zone{display:none;pointer-events:none}
+#quad-up{top:0;left:26%;width:48%;height:26%}
+#quad-down{bottom:0;left:26%;width:48%;height:26%}
+#quad-left{top:26%;left:0;width:26%;height:48%}
+#quad-right{top:26%;right:0;width:26%;height:48%}
+#corner-tl{top:0;left:0;width:26%;height:26%}
+#corner-tr{top:0;right:0;width:26%;height:26%}
+#corner-bl{bottom:0;left:0;width:26%;height:26%}
+#corner-br{bottom:0;right:0;width:26%;height:26%}
+
+/* ── Map controls ── */
+#map-controls{
+  position:absolute;top:105px;right:12px;z-index:15;
+  display:flex;align-items:flex-start;gap:10px;
+  pointer-events:auto;
+}
+
+/* ── Night/Dark mode toggle button ── */
+#mode-toggle{
+  position:static;
+  width:40px;height:40px;
+  border-radius:50%;
+  border:1.5px solid rgba(0,255,255,0.4);
+  background:rgba(0,0,0,0.7);
+  color:#00FFFF;
+  font-size:22px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  text-shadow:0 0 8px rgba(0,255,255,0.6);
+  transition:background 0.2s, border-color 0.2s;
+}
+
+/* ── Fly-over toggle button ── */
+#flyover-toggle{
+  position:static;
+  width:40px;height:40px;
+  border-radius:50%;
+  border:1.5px solid rgba(255,109,0,0.5);
+  background:rgba(0,0,0,0.7);
+  color:#FF9D42;
+  font-size:20px;font-weight:700;
+  display:none;align-items:center;justify-content:center;
+  cursor:pointer;
+  text-shadow:0 0 10px rgba(255,109,0,0.55);
+  transition:background 0.2s, border-color 0.2s, transform 0.2s;
+}
+#flyover-toggle.visible{display:flex}
+#flyover-toggle.active{
+  background:rgba(255,109,0,0.25);
+  border-color:rgba(255,157,66,0.9);
+  animation:flyPulse 1.6s ease-in-out infinite;
+}
+@keyframes flyPulse{
+  0%,100%{ box-shadow:0 0 0 0 rgba(255,109,0,0.35); }
+  50%    { box-shadow:0 0 0 8px rgba(255,109,0,0.05); }
+}
+#flyover-toggle:active{ transform:scale(0.94); }
+#mode-toggle:active{background:rgba(0,255,255,0.25)}
+#mode-toggle.night-active{
+  background:rgba(30,30,60,0.85);
+  border-color:rgba(100,100,255,0.5);
+  color:#aab;
+}
+#mode-toggle.dark-active{
+  background:rgba(0,0,0,0.9);
+  border-color:rgba(255,100,0,0.5);
+  color:#FF6D00;
+}
+
+/* Google-like zoom control stack */
+#zoom-controls{
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border-radius:12px;
+  background:rgba(255,255,255,0.96);
+  box-shadow:0 2px 8px rgba(0,0,0,0.35);
+  border:1px solid rgba(0,0,0,0.12);
+}
+#zoom-controls button{
+  width:40px;
+  height:40px;
+  border:0;
+  background:transparent;
+  color:#202124;
+  font-size:24px;
+  font-weight:500;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:background 0.15s,color 0.15s;
+}
+#zoom-controls button + button{
+  border-top:1px solid rgba(32,33,36,0.14);
+}
+#zoom-controls button:active{
+  background:rgba(60,64,67,0.12);
+}
+#zoom-controls button:disabled{
+  color:rgba(95,99,104,0.45);
+  background:rgba(255,255,255,0.78);
+  cursor:default;
+}
+
+/* Map filter modes */
+#map3d-container.night-mode{
+  filter:brightness(0.55) saturate(0.3) hue-rotate(15deg);
+}
+#map3d-container.dark-mode{
+  filter:invert(1) hue-rotate(180deg) brightness(0.9) saturate(0.4) contrast(1.1);
+}
+/* Keep HUD readable in dark/night mode — applied to HUD overlay */
+body.night-mode-body #hud{ filter:none; }
+body.dark-mode-body #hud{ filter:none; }
+
+/* Loading overlay */
+#loading{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:#000;z-index:100;
+  transition:opacity 0.5s;
+}
+#loading.hidden{opacity:0;pointer-events:none}
+#loading p{color:#00FFFF;font-size:18px;font-weight:600;margin-top:12px;text-shadow:0 0 10px rgba(0,255,255,0.5)}
+.spinner{width:44px;height:44px;border:3px solid rgba(0,255,255,0.2);border-top-color:#00FFFF;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="map3d-container"></div>
+<div id="streetview-container"></div>
+<div id="streetview-label" aria-live="polite"></div>
+
+<!-- Quadrant tap zones for panning -->
+<div id="quadrant-overlay">
+  <div class="corner-zone" id="corner-tl" onclick="rotateMap('left')"><span class="quad-arrow">↺</span></div>
+  <div class="corner-zone" id="corner-tr" onclick="rotateMap('right')"><span class="quad-arrow">↻</span></div>
+  <div class="corner-zone" id="corner-bl" onclick="rotateMap('left')"><span class="quad-arrow">↺</span></div>
+  <div class="corner-zone" id="corner-br" onclick="rotateMap('right')"><span class="quad-arrow">↻</span></div>
+  <div class="quad-zone" id="quad-up" onclick="panMap('up')"><span class="quad-arrow">▲</span></div>
+  <div class="quad-zone" id="quad-down" onclick="panMap('down')"><span class="quad-arrow">▼</span></div>
+  <div class="quad-zone" id="quad-left" onclick="panMap('left')"><span class="quad-arrow">◀</span></div>
+  <div class="quad-zone" id="quad-right" onclick="panMap('right')"><span class="quad-arrow">▶</span></div>
+</div>
+
+<div id="map-controls">
+  <div id="flyover-toggle" aria-label="Start fly-over" role="button" onclick="toggleFlyOver()">↻</div>
+  <div id="mode-toggle" onclick="cycleMapMode()">☀</div>
+  <div id="zoom-controls" aria-label="Map zoom controls">
+    <button id="zoom-in" type="button" aria-label="Zoom in" onclick="zoomMap('in')">+</button>
+    <button id="zoom-out" type="button" aria-label="Zoom out" onclick="zoomMap('out')">−</button>
+  </div>
+</div>
+
+<!-- Landmark/fly-over mode banner — shows the focused landmark name. -->
+<div id="landmark-banner" aria-hidden="true"></div>
+
+<div id="hud">
+  <div id="hud-top">
+    <div id="hud-time">--:--</div>
+    <div id="hud-weather">--</div>
+    <div id="hud-aqi">AQI --</div>
+  </div>
+  <div id="hud-dest">
+    <div id="dest-icon">📍</div>
+    <div id="dest-text">Loading route…</div>
+    <div id="dest-dismiss" onclick="closeNavToDashboard()">✕</div>
+  </div>
+  <div id="hud-bottom">
+    <div class="eta-box"><div class="eta-label">Drive</div><div class="eta-value drive" id="eta-drive">--</div></div>
+    <div class="eta-box"><div class="eta-label">Distance</div><div class="eta-value" id="eta-distance">--</div></div>
+    <div class="eta-box"><div class="eta-label">Walk</div><div class="eta-value" id="eta-walk">--</div></div>
+  </div>
+  <div id="candidate-list"></div>
+  <div id="hud-parking"></div>
+</div>
+<div id="loading"><div class="spinner"></div><p>Loading 3D route…</p></div>
+
+<script>
+// ── Parse URL params ──
+var params  = new URLSearchParams(window.location.search);
+var destAddr = params.get('dest') || '1600 Amphitheatre Parkway, Mountain View, CA';
+var searchTopic = params.get('search') || '';
+var apiKey   = params.get('gkey') || '';
+var userLat  = params.get('lat') !== null ? parseFloat(params.get('lat')) : null;
+var userLng  = params.get('lng') !== null ? parseFloat(params.get('lng')) : null;
+// Reject (0, 0) as valid — it's in the Gulf of Guinea, not a real user location.
+// Also reject coordinates where both are exactly zero (default/missing values).
+var hasUserLocation = Number.isFinite(userLat) && Number.isFinite(userLng)
+                      && !(userLat === 0 && userLng === 0);
+var originLocked = params.get('origin_locked') === '1';
+var returnUrl = params.get('return_url') || '';
+var locationsRaw = params.get('locations') || '[]';
+var pinsRaw = params.get('pins') || '[]';
+var allowGenericPOIs = params.get('generic_pois') === '1';
+var activeLocationIndex = parseInt(params.get('selected') || '-1', 10);
+var candidateLocations = [];
+try { candidateLocations = JSON.parse(locationsRaw); } catch (e) {
+  try { candidateLocations = JSON.parse(decodeURIComponent(locationsRaw)); } catch (e2) {}
+}
+var keywordPins = [];
+try { keywordPins = JSON.parse(pinsRaw); } catch (e) {
+  try { keywordPins = JSON.parse(decodeURIComponent(pinsRaw)); } catch (e2) {}
+}
+keywordPins = (Array.isArray(keywordPins) ? keywordPins : []).filter(function(pin) {
+  return pin && Number.isFinite(parseFloat(pin.lat)) && Number.isFinite(parseFloat(pin.lng));
+}).slice(0, 16).map(function(pin) {
+  return {
+    name: String(pin.name || 'Place').trim() || 'Place',
+    address: String(pin.address || '').trim(),
+    type: String(pin.type || '').trim(),
+    lat: parseFloat(pin.lat),
+    lng: parseFloat(pin.lng)
+  };
+});
+var hasKeywordPins = keywordPins.length > 0;
+
+// View mode:
+//   'route'    (default) — driving route from user to destination (existing behavior)
+//   'landmark' — photorealistic preview of the destination only (no route)
+//   'flyover'  — photorealistic preview + automatic cinematic orbit
+var viewMode = (params.get('mode') || 'route').toLowerCase();
+if (viewMode !== 'landmark' && viewMode !== 'flyover' && viewMode !== 'route') {
+  viewMode = 'route';
+}
+var flyoverActive = false;       // true while the camera is orbiting
+var flyoverTimer = null;         // handle for the orbit chain
+var FLYOVER_ROUND_MS = 45000;    // one full lap in ms
+var FLYOVER_MIN_RANGE = 650;     // Maps 3D fly-over needs room to orbit
+var FLYOVER_SETTLE_MS = 560;     // camera settle before starting orbit
+
+var map3d, userCoords, destCoords;
+var authFailed = false;
+var currentRange = 500;    // current camera range (meters)
+var currentHeading = 0;    // current camera heading (degrees)
+var currentTilt = 55;      // current camera tilt
+var currentCenter = null;  // current camera center {lat, lng}
+var cachedRoute = null;         // stored route object for re-rendering labels on zoom
+var cachedRouteCoords = [];     // stored route polyline coords
+var roadLabelMarkers = [];      // current road label markers on map
+var poiMarkers = [];            // current POI markers on map
+var keywordPinMarkers = [];     // explicit search result pushpins
+var Marker3DElement = null;     // stored reference to Marker3DElement constructor
+var PinElement = null;          // stored reference to PinElement (styled pins for origin/dest)
+var mapDisplayMode = 'day';     // 'day' | 'night' | 'dark'
+var MIN_RANGE = 80;
+var KEYWORD_PIN_HIDE_RANGE = 450;
+var STREET_VIEW_RANGE = 95;
+var streetViewOpened = false;
+var streetViewPanorama = null;
+// No hard MAX_RANGE — lets the user zoom all the way out to globe view.
+
+// ── Cycle map display mode: Day → Night → Dark → Day ──
+function cycleMapMode() {
+  var container = document.getElementById('map3d-container');
+  var btn = document.getElementById('mode-toggle');
+  container.classList.remove('night-mode', 'dark-mode');
+  document.body.classList.remove('night-mode-body', 'dark-mode-body');
+  btn.classList.remove('night-active', 'dark-active');
+
+  if (mapDisplayMode === 'day') {
+    mapDisplayMode = 'night';
+    container.classList.add('night-mode');
+    document.body.classList.add('night-mode-body');
+    btn.classList.add('night-active');
+    btn.textContent = '🌙';
+  } else if (mapDisplayMode === 'night') {
+    mapDisplayMode = 'dark';
+    container.classList.add('dark-mode');
+    document.body.classList.add('dark-mode-body');
+    btn.classList.add('dark-active');
+    btn.textContent = '🌑';
+  } else {
+    mapDisplayMode = 'day';
+    btn.textContent = '☀';
+  }
+  console.log('[ARNav] Map mode:', mapDisplayMode);
+}
+
+function updateZoomButtons() {
+  var zoomIn = document.getElementById('zoom-in');
+  var zoomOut = document.getElementById('zoom-out');
+  if (!zoomIn || !zoomOut) return;
+  zoomIn.disabled = currentRange <= MIN_RANGE + 0.01;
+  zoomOut.disabled = false;
+}
+
+function extractDestinationSearchTopic(raw) {
+  var clean = String(raw || '').replace(/\s+/g, ' ').trim();
+  clean = clean.replace(/^→\s*/, '');
+  var firstAddressIdx = clean.search(/\b\d{1,5}\s+[A-Za-z0-9.'#\- ]+\s(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Pl|Place|Ct|Court|Pkwy|Parkway|Ter|Terrace)\b/i);
+  if (firstAddressIdx > 0) {
+    clean = clean.substring(0, firstAddressIdx).trim();
+  }
+  clean = clean
+    .replace(/\baddress:\s*/i, '')
+    .replace(/(?:is\s+)?(?:located|location)\s+at\s+.*$/i, '')
+    .replace(/\bis\s+at\s+.*$/i, '')
+    .replace(/[—|-].*$/, '')
+    .trim();
+  return clean || cleanDestinationQuery(raw);
+}
+
+function buildCandidateDestination(loc) {
+  var name = String((loc && loc.name) || '').trim();
+  var address = String((loc && loc.address) || '').trim();
+  if (name && address && address.toLowerCase().indexOf(name.toLowerCase()) === -1) {
+    return name + ', ' + address;
+  }
+  return address || name;
+}
+
+function getRequestedPoiItems() {
+  if (candidateLocations && candidateLocations.length) return candidateLocations;
+  if (keywordPins && keywordPins.length) {
+    return keywordPins.map(function(pin) {
+      return {
+        name: pin.name,
+        address: pin.address || '',
+        lat: pin.lat,
+        lng: pin.lng,
+        type: pin.type || ''
+      };
+    });
+  }
+  return [];
+}
+
+function renderCandidateList() {
+  var panel = document.getElementById('candidate-list');
+  if (!panel) return;
+  var items = getRequestedPoiItems();
+  if ((!hasKeywordPins && (!candidateLocations || candidateLocations.length <= 1)) ||
+      (hasKeywordPins && !items.length)) {
+    panel.classList.remove('visible');
+    panel.innerHTML = '';
+    return;
+  }
+  var html = '<div class="candidate-title">' + (hasKeywordPins ? 'Requested POIs' : 'Other Locations') + '</div>';
+  items.forEach(function(loc, index) {
+    var name = String((loc && loc.name) || ('Location ' + (index + 1))).trim();
+    var address = String((loc && loc.address) || '').trim();
+    var active = index === activeLocationIndex ? ' active' : '';
+    html += '<div class="candidate-item' + active + '" onclick="switchToCandidate(' + index + ')">' +
+      '<div class="candidate-index">' + (index + 1) + '</div>' +
+      '<div class="candidate-copy">' +
+        '<div class="candidate-name">' + escHtml(name) + '</div>' +
+        (address ? '<div class="candidate-address">' + escHtml(address) + '</div>' : '') +
+      '</div>' +
+    '</div>';
+  });
+  panel.innerHTML = html;
+  panel.classList.add('visible');
+}
+
+function switchToCandidate(index) {
+  var items = getRequestedPoiItems();
+  if (!items || !items[index]) return;
+  var loc = items[index];
+  var dest = buildCandidateDestination(loc);
+  if (!dest) return;
+  if (hasKeywordPins && Number.isFinite(parseFloat(loc.lat)) && Number.isFinite(parseFloat(loc.lng))) {
+    activeLocationIndex = index;
+    currentCenter = { lat: parseFloat(loc.lat), lng: parseFloat(loc.lng) };
+    renderCandidateList();
+    if (streetViewOpened) exitStreetView({ keepRange: true });
+    try {
+      map3d.flyCameraTo({
+        endCamera: {
+          center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+          range: currentRange,
+          heading: currentHeading,
+          tilt: currentTilt
+        },
+        durationMillis: 550
+      });
+    } catch(e) {
+      try { map3d.center = { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 }; } catch(e2) {}
+    }
+    updateKeywordPinsVisibility();
+    return;
+  }
+  var search = String((loc.name || searchTopic || dest) || '').trim();
+  var nextUrl = 'file:///android_asset/ar_nav.html' +
+    '?dest=' + encodeURIComponent(dest) +
+    '&search=' + encodeURIComponent(search) +
+    '&gkey=' + encodeURIComponent(apiKey) +
+    '&mode=' + encodeURIComponent(viewMode) +
+    '&lat=' + encodeURIComponent(String(userLat || 0)) +
+    '&lng=' + encodeURIComponent(String(userLng || 0)) +
+    '&origin_locked=' + (originLocked ? '1' : '0') +
+    '&return_url=' + encodeURIComponent(returnUrl || '') +
+    '&locations=' + encodeURIComponent(JSON.stringify(candidateLocations)) +
+    '&pins=' + encodeURIComponent(JSON.stringify(keywordPins)) +
+    '&selected=' + index;
+  try {
+    window.location.replace(nextUrl);
+  } catch (e) {
+    window.location.href = nextUrl;
+  }
+}
+
+// ── Close AR nav and search for the destination topic ──
+function closeNavToDashboard() {
+  var topic = '';
+  if (activeLocationIndex >= 0 && candidateLocations && candidateLocations[activeLocationIndex]) {
+    var selectedLocation = candidateLocations[activeLocationIndex];
+    topic = String((selectedLocation.name || buildCandidateDestination(selectedLocation)) || '').trim();
+  }
+  if (!topic) topic = (searchTopic || '').trim();
+  if (!topic) topic = extractDestinationSearchTopic(destAddr);
+  var target = 'https://www.google.com/search?q=' + encodeURIComponent(topic || cleanDestinationQuery(destAddr));
+  try {
+    window.location.replace(target);
+  } catch (e) {
+    window.location.href = target;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// ── QUADRANT TAP → PAN ──
+// ══════════════════════════════════════════════════
+var PAN_FRACTION = 0.25; // pan 25% of current view per tap
+
+function panMap(direction) {
+  if (!map3d || !currentCenter) return;
+  // User is taking control — stop orbit so the pan is sticky.
+  if (flyoverActive) stopFlyOver();
+  // Calculate pan distance in degrees based on range
+  // At range R meters, roughly R * 0.000009 degrees per meter at equator
+  var panDeg = currentRange * 0.0000045 * PAN_FRACTION;
+
+  var lat = currentCenter.lat;
+  var lng = currentCenter.lng;
+  var headingRad = toRad(currentHeading);
+
+  switch(direction) {
+    case 'up':
+      lat += panDeg * Math.cos(headingRad);
+      lng += panDeg * Math.sin(headingRad);
+      break;
+    case 'down':
+      lat -= panDeg * Math.cos(headingRad);
+      lng -= panDeg * Math.sin(headingRad);
+      break;
+    case 'left':
+      lat += panDeg * Math.sin(headingRad);
+      lng -= panDeg * Math.cos(headingRad);
+      break;
+    case 'right':
+      lat -= panDeg * Math.sin(headingRad);
+      lng += panDeg * Math.cos(headingRad);
+      break;
+  }
+
+  currentCenter = { lat: lat, lng: lng };
+  try {
+    map3d.flyCameraTo({
+      endCamera: {
+        center: { lat: lat, lng: lng, altitude: 0 },
+        range: currentRange,
+        heading: currentHeading,
+        tilt: currentTilt
+      },
+      durationMillis: 600
+    });
+  } catch(e) {
+    // Direct fallback
+    try {
+      map3d.center = { lat: lat, lng: lng, altitude: 0 };
+    } catch(e2) {}
+  }
+  // Refresh POIs for new view center
+  setTimeout(function() { refreshPOIs(); }, 700);
+}
+
+function rotateMap(direction) {
+  if (streetViewOpened && streetViewPanorama) {
+    var pov = streetViewPanorama.getPov ? streetViewPanorama.getPov() : { heading: currentHeading, pitch: 0 };
+    var svDelta = direction === 'left' ? -30 : 30;
+    var nextSvHeading = ((pov.heading || 0) + svDelta + 360) % 360;
+    try {
+      streetViewPanorama.setPov({
+        heading: nextSvHeading,
+        pitch: pov.pitch || 0
+      });
+    } catch(e) {}
+    currentHeading = nextSvHeading;
+    return;
+  }
+  if (!map3d || !currentCenter) return;
+  if (flyoverActive) stopFlyOver();
+  var delta = direction === 'left' ? -30 : 30;
+  currentHeading = (currentHeading + delta + 360) % 360;
+  try {
+    map3d.flyCameraTo({
+      endCamera: {
+        center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+        range: currentRange,
+        heading: currentHeading,
+        tilt: currentTilt
+      },
+      durationMillis: 450
+    });
+  } catch(e) {
+    try { map3d.heading = currentHeading; } catch(e2) {}
+  }
+}
+
+function keywordPinsCenter() {
+  if (!keywordPins.length) return null;
+  var lat = 0;
+  var lng = 0;
+  keywordPins.forEach(function(pin) {
+    lat += pin.lat;
+    lng += pin.lng;
+  });
+  return { lat: lat / keywordPins.length, lng: lng / keywordPins.length };
+}
+
+function clearKeywordPins() {
+  for (var i = 0; i < keywordPinMarkers.length; i++) {
+    try { keywordPinMarkers[i].remove(); } catch(e) {}
+  }
+  keywordPinMarkers = [];
+}
+
+function renderKeywordPins() {
+  if (!map3d || !Marker3DElement || !hasKeywordPins) return;
+  clearKeywordPins();
+  if (currentRange <= KEYWORD_PIN_HIDE_RANGE) return;
+  for (var i = 0; i < keywordPins.length; i++) {
+    try {
+      var pin = keywordPins[i];
+      var label = getPOIEmoji((pin.type || '') + ' ' + pin.name) + ' ' + pin.name;
+      var marker = new Marker3DElement({
+        position: { lat: pin.lat, lng: pin.lng, altitude: 35 },
+        altitudeMode: 'RELATIVE_TO_GROUND',
+        label: label
+      });
+      map3d.append(marker);
+      keywordPinMarkers.push(marker);
+    } catch(e) {}
+  }
+}
+
+function updateKeywordPinsVisibility() {
+  if (!hasKeywordPins) return;
+  if (currentRange <= KEYWORD_PIN_HIDE_RANGE) {
+    clearKeywordPins();
+  } else if (!keywordPinMarkers.length) {
+    renderKeywordPins();
+  }
+}
+
+function selectedRequestedPoi() {
+  if (hasKeywordPins && keywordPins.length) {
+    if (activeLocationIndex >= 0 && keywordPins[activeLocationIndex]) {
+      return keywordPins[activeLocationIndex];
+    }
+    if (currentCenter) {
+      var best = keywordPins[0];
+      var bestDist = distanceM(currentCenter, best);
+      for (var i = 1; i < keywordPins.length; i++) {
+        var d = distanceM(currentCenter, keywordPins[i]);
+        if (d < bestDist) {
+          best = keywordPins[i];
+          bestDist = d;
+        }
+      }
+      return best;
+    }
+    return keywordPins[0];
+  }
+  if (destCoords) {
+    return {
+      name: (destAddr || 'Requested POI').split(',')[0] || 'Requested POI',
+      address: destAddr || '',
+      lat: destCoords.lat,
+      lng: destCoords.lng,
+      type: 'destination'
+    };
+  }
+  return currentCenter ? {
+    name: (searchTopic || destAddr || 'Requested POI').split(',')[0] || 'Requested POI',
+    address: destAddr || '',
+    lat: currentCenter.lat,
+    lng: currentCenter.lng,
+    type: 'destination'
+  } : null;
+}
+
+function compactBannerText(text) {
+  var label = String(text || '').trim();
+  if (!label) return '';
+  return label.length > 64 ? label.slice(0, 61) + '…' : label;
+}
+
+function setMapBanner(text) {
+  var bannerEl = document.getElementById('landmark-banner');
+  if (!bannerEl) return;
+  var label = compactBannerText(text);
+  if (!label) {
+    bannerEl.textContent = '';
+    bannerEl.setAttribute('aria-hidden', 'true');
+    bannerEl.classList.remove('visible');
+    return;
+  }
+  bannerEl.textContent = label;
+  bannerEl.setAttribute('aria-hidden', 'false');
+  bannerEl.classList.add('visible');
+}
+
+function defaultMapBannerText() {
+  if (hasKeywordPins) return searchTopic || destAddr || 'Requested POIs';
+  if (viewMode === 'landmark' || viewMode === 'flyover') {
+    return ((destAddr || '').split(',')[0].trim()) || destAddr || '3D View';
+  }
+  return '';
+}
+
+function restoreMapBanner() {
+  setMapBanner(defaultMapBannerText());
+}
+
+function showStreetViewTopBanner(target) {
+  if (!target) return;
+  var name = String(target.name || '').trim() || 'Requested POI';
+  var address = String(target.address || '').trim();
+  var text = name;
+  if (address && address.toLowerCase().indexOf(name.toLowerCase()) === -1) {
+    text += ' — ' + address;
+  } else if (address && name === 'Requested POI') {
+    text = address;
+  }
+  setMapBanner(text);
+}
+
+function showStreetViewLabel(target, detail) {
+  // The Street View POI identity is shown in the top landmark pill. Keeping
+  // a second bottom label duplicated the same POI name and crowded the view.
+  var label = document.getElementById('streetview-label');
+  if (!label) return;
+  label.classList.remove('visible');
+  label.innerHTML = '';
+}
+
+function showStreetViewUnavailable(target) {
+  var container = document.getElementById('streetview-container');
+  if (container) {
+    container.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#00FFFF;font-size:18px;font-weight:700;text-align:center;padding:32px">Street View is not available at this exact spot.</div>';
+    container.classList.add('visible');
+  }
+  document.body.classList.add('streetview-active');
+  showStreetViewTopBanner(target);
+  showStreetViewLabel(target, 'Street View unavailable nearby');
+}
+
+function maybeEnterStreetView(direction) {
+  if (direction !== 'in' || streetViewOpened || !currentCenter) return;
+  if (currentRange > STREET_VIEW_RANGE) return;
+  var target = selectedRequestedPoi();
+  if (!target) return;
+  streetViewOpened = true;
+  setLoading('Opening Street View…');
+  var loading = document.getElementById('loading');
+  if (loading) loading.classList.remove('hidden');
+  openStreetView(target);
+}
+
+function openStreetView(target) {
+  var container = document.getElementById('streetview-container');
+  if (!container || !target || !window.google || !google.maps || !google.maps.StreetViewService) {
+    showStreetViewUnavailable(target);
+    hideLoading();
+    return;
+  }
+  var position = { lat: target.lat, lng: target.lng };
+  var service = new google.maps.StreetViewService();
+  // Search the TIGHTEST radius first so we land on the panorama CLOSEST to the
+  // destination. getPanorama returns Google's single "best" pano within the
+  // radius, so a wide search (the old flat 90m) often snapped to a nearby
+  // intersection instead of the destination frontage — which is why pressing +
+  // dropped the user a block away rather than at the place itself. Step the
+  // radius up only if nothing closer exists, and fall back to any source
+  // (not just OUTDOOR) before giving up.
+  var attempts = [
+    { radius: 30,  source: google.maps.StreetViewSource.OUTDOOR },
+    { radius: 75,  source: google.maps.StreetViewSource.OUTDOOR },
+    { radius: 160, source: google.maps.StreetViewSource.DEFAULT }
+  ];
+  function tryPano(i) {
+    if (i >= attempts.length) {
+      showStreetViewUnavailable(target);
+      hideLoading();
+      return;
+    }
+    service.getPanorama({
+      location: position,
+      radius: attempts[i].radius,
+      source: attempts[i].source
+    }, function(data, status) {
+      if (status !== google.maps.StreetViewStatus.OK || !data || !data.location || !data.location.latLng) {
+        tryPano(i + 1);
+        return;
+      }
+      var panoLatLng = data.location.latLng;
+      var panoPoint = { lat: panoLatLng.lat(), lng: panoLatLng.lng() };
+      var heading = bearingDeg(panoPoint, position);
+      container.innerHTML = '';
+      container.classList.add('visible');
+      document.body.classList.add('streetview-active');
+      showStreetViewTopBanner(target);
+      try {
+        streetViewPanorama = new google.maps.StreetViewPanorama(container, {
+          pano: data.location.pano,
+          pov: { heading: heading, pitch: 0 },
+          zoom: 1,
+          addressControl: false,
+          fullscreenControl: false,
+          linksControl: true,
+          motionTracking: false,
+          motionTrackingControl: false,
+          panControl: false,
+          zoomControl: false,
+          visible: true
+        });
+        showStreetViewLabel(target, data.location.description || '');
+      } catch(e) {
+        console.warn('[ARNav] Street View render failed:', e);
+        showStreetViewUnavailable(target);
+      }
+      hideLoading();
+    });
+  }
+  tryPano(0);
+}
+
+function exitStreetView(options) {
+  if (!streetViewOpened) return;
+  var opts = options || {};
+  streetViewOpened = false;
+  if (streetViewPanorama) {
+    try { streetViewPanorama.setVisible(false); } catch(e) {}
+  }
+  streetViewPanorama = null;
+  var container = document.getElementById('streetview-container');
+  if (container) {
+    container.classList.remove('visible');
+    container.innerHTML = '';
+  }
+  var label = document.getElementById('streetview-label');
+  if (label) {
+    label.classList.remove('visible');
+    label.innerHTML = '';
+  }
+  document.body.classList.remove('streetview-active');
+  restoreMapBanner();
+  if (!opts.keepRange) {
+    currentRange = Math.max(currentRange * 1.55, KEYWORD_PIN_HIDE_RANGE + 80);
+  }
+  try {
+    map3d.flyCameraTo({
+      endCamera: {
+        center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+        range: currentRange,
+        heading: currentHeading,
+        tilt: currentTilt
+      },
+      durationMillis: 450
+    });
+  } catch(e) {}
+  renderCandidateList();
+  updateKeywordPinsVisibility();
+  updateZoomButtons();
+}
+
+// ══════════════════════════════════════════════════
+// ── FLY-OVER (cinematic orbit using Map3DElement) ──
+// ══════════════════════════════════════════════════
+// Uses flyCameraAround when available (Maps 3D alpha API), and falls back to a
+// heading-sweep implemented via flyCameraTo for older / different builds.
+function beginFlyOverOrbit() {
+  if (!map3d || !currentCenter || flyoverActive) return;
+  flyoverActive = true;
+  var btn = document.getElementById('flyover-toggle');
+  if (btn) { btn.classList.add('active'); btn.textContent = '❚❚'; btn.setAttribute('aria-label', 'Stop fly-over'); }
+
+  function orbit() {
+    if (!flyoverActive) return;
+    // Prefer the native flyCameraAround (smoother, hardware-accelerated).
+    var usedNative = false;
+    try {
+      if (typeof map3d.flyCameraAround === 'function') {
+        map3d.flyCameraAround({
+          camera: {
+            center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+            range: currentRange,
+            tilt: currentTilt,
+            heading: currentHeading
+          },
+          durationMillis: FLYOVER_ROUND_MS,
+          rounds: 1
+        });
+        usedNative = true;
+      }
+    } catch(e) { console.warn('[ARNav] flyCameraAround failed, falling back:', e); }
+
+    if (usedNative) {
+      // Chain the next lap when this one completes.
+      flyoverTimer = setTimeout(function() {
+        if (flyoverActive) orbit();
+      }, FLYOVER_ROUND_MS + 50);
+    } else {
+      // Fallback: increment heading by 60° at a time with flyCameraTo.
+      var nextHeading = (currentHeading + 60) % 360;
+      try {
+        map3d.flyCameraTo({
+          endCamera: {
+            center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+            range: currentRange,
+            heading: nextHeading,
+            tilt: currentTilt
+          },
+          durationMillis: Math.round(FLYOVER_ROUND_MS / 6)
+        });
+      } catch(e) {}
+      currentHeading = nextHeading;
+      flyoverTimer = setTimeout(function() {
+        if (flyoverActive) orbit();
+      }, Math.round(FLYOVER_ROUND_MS / 6) + 50);
+    }
+  }
+  orbit();
+}
+
+function startFlyOver() {
+  if (!map3d || !currentCenter || flyoverActive) return;
+
+  var needsSettle = false;
+  if (streetViewOpened) {
+    exitStreetView({ keepRange: true });
+    needsSettle = true;
+  }
+
+  var safeRange = Math.max(currentRange, FLYOVER_MIN_RANGE, KEYWORD_PIN_HIDE_RANGE + 160);
+  if (Math.abs(safeRange - currentRange) > 0.1) {
+    currentRange = safeRange;
+    needsSettle = true;
+  }
+  if (currentTilt < 55) {
+    currentTilt = 58;
+    needsSettle = true;
+  }
+
+  if (needsSettle) {
+    try {
+      map3d.flyCameraTo({
+        endCamera: {
+          center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+          range: currentRange,
+          heading: currentHeading,
+          tilt: currentTilt
+        },
+        durationMillis: 500
+      });
+    } catch(e) {
+      try { map3d.range = currentRange; } catch(e2) {}
+    }
+    updateZoomButtons();
+    updateKeywordPinsVisibility();
+    setTimeout(beginFlyOverOrbit, FLYOVER_SETTLE_MS);
+    return;
+  }
+
+  beginFlyOverOrbit();
+}
+
+function stopFlyOver() {
+  flyoverActive = false;
+  if (flyoverTimer) { clearTimeout(flyoverTimer); flyoverTimer = null; }
+  var btn = document.getElementById('flyover-toggle');
+  if (btn) { btn.classList.remove('active'); btn.textContent = '↻'; btn.setAttribute('aria-label', 'Start fly-over'); }
+  // Stop any in-flight camera animation by flying to the current pose.
+  try {
+    map3d.flyCameraTo({
+      endCamera: {
+        center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+        range: currentRange,
+        heading: currentHeading,
+        tilt: currentTilt
+      },
+      durationMillis: 200
+    });
+  } catch(e) {}
+}
+
+function toggleFlyOver() {
+  if (flyoverActive) stopFlyOver(); else startFlyOver();
+}
+
+// Expose for external TapBrowser side-menu button if needed
+window.__arNavFlyOver = toggleFlyOver;
+
+// ══════════════════════════════════════════════════
+// ── ZOOM (called from TapBrowser side-menu buttons) ──
+// ══════════════════════════════════════════════════
+window.__arNavZoom = function(direction) {
+  if (!map3d || !currentCenter) return;
+  if (streetViewOpened) {
+    if (direction === 'out') {
+      exitStreetView();
+      return;
+    }
+    if (direction === 'in' && streetViewPanorama) {
+      try {
+        var currentZoom = streetViewPanorama.getZoom ? streetViewPanorama.getZoom() : 1;
+        streetViewPanorama.setZoom(Math.min((currentZoom || 1) + 1, 4));
+      } catch(e) {}
+      return;
+    }
+  }
+  // User is taking control — stop any running orbit so the zoom sticks.
+  if (flyoverActive) stopFlyOver();
+  if (direction === 'in') {
+    currentRange = Math.max(MIN_RANGE, currentRange * 0.65);
+  } else {
+    currentRange = currentRange * 1.55;
+  }
+  try {
+    map3d.flyCameraTo({
+      endCamera: {
+        center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+        range: currentRange,
+        heading: currentHeading,
+        tilt: currentTilt
+      },
+      durationMillis: 500
+    });
+  } catch(e) {
+    try { map3d.range = currentRange; } catch(e2) {}
+  }
+  updateZoomButtons();
+  updateKeywordPinsVisibility();
+  maybeEnterStreetView(direction);
+  // Re-render road labels and POIs after zoom settles
+  setTimeout(function() { refreshRoadLabels(); refreshPOIs(); updateKeywordPinsVisibility(); }, 700);
+};
+
+function zoomMap(direction) {
+  window.__arNavZoom(direction);
+}
+
+// ── Re-render road labels at current zoom level ──
+function refreshRoadLabels() {
+  if (!map3d || !Marker3DElement || !cachedRoute) return;
+  // Remove old road label markers
+  for (var i = 0; i < roadLabelMarkers.length; i++) {
+    try { roadLabelMarkers[i].remove(); } catch(e) {}
+  }
+  roadLabelMarkers = [];
+  try {
+    var labels = extractRoadLabels(cachedRoute);
+    // At close zoom (<1km range), show ALL labels; at far zoom filter to major roads
+    var filtered = labels;
+    if (currentRange > 3000) {
+      // Only show highways/freeways/major roads at far zoom
+      filtered = labels.filter(function(l) {
+        return /\b(I-|US-|CA-|SR-|Hwy|Interstate|Fwy|Freeway|Blvd|Ave|Highway)\b/i.test(l.name);
+      });
+      if (filtered.length < 2) filtered = labels; // fallback if no major roads
+    }
+    for (var rl = 0; rl < filtered.length; rl++) {
+      try {
+        var rlabel = filtered[rl];
+        var marker = new Marker3DElement({
+          position: { lat: rlabel.lat, lng: rlabel.lng, altitude: 45 },
+          altitudeMode: 'RELATIVE_TO_GROUND',
+          label: rlabel.name
+        });
+        map3d.append(marker);
+        roadLabelMarkers.push(marker);
+      } catch(e) {}
+    }
+    console.log('[ARNav] Refreshed road labels:', roadLabelMarkers.length);
+  } catch(e) { console.warn('[ARNav] refreshRoadLabels failed:', e); }
+}
+
+// ── Fetch and render POIs along the route based on Google Places ──
+function refreshPOIs() {
+  if (!map3d || !Marker3DElement || !currentCenter) return;
+  if (!allowGenericPOIs || hasKeywordPins) return;
+  // Remove old POI markers
+  for (var i = 0; i < poiMarkers.length; i++) {
+    try { poiMarkers[i].remove(); } catch(e) {}
+  }
+  poiMarkers = [];
+  // Only show POIs at closer zoom levels
+  if (currentRange > 5000) return;
+  // Determine POI types based on zoom
+  var poiTypes = ['gas_station', 'restaurant', 'coffee_shop', 'grocery_store', 'pharmacy'];
+  if (currentRange < 1000) {
+    poiTypes.push('bank', 'atm', 'convenience_store', 'shopping_mall');
+  }
+  var searchRadius = Math.min(Math.max(currentRange * 0.5, 200), 2000);
+  fetchPOIs(currentCenter.lat, currentCenter.lng, searchRadius, poiTypes).then(function(pois) {
+    for (var p = 0; p < pois.length; p++) {
+      try {
+        var poi = pois[p];
+        var poiEmoji = getPOIEmoji(poi.type);
+        var m = new Marker3DElement({
+          position: { lat: poi.lat, lng: poi.lng, altitude: 20 },
+          altitudeMode: 'RELATIVE_TO_GROUND',
+          label: poiEmoji + ' ' + poi.name
+        });
+        map3d.append(m);
+        poiMarkers.push(m);
+      } catch(e) {}
+    }
+    console.log('[ARNav] Rendered POIs:', poiMarkers.length);
+  }).catch(function(e) { console.warn('[ARNav] POI fetch failed:', e); });
+}
+
+function getPOIEmoji(type) {
+  var cleanType = String(type || '').toLowerCase();
+  if (cleanType.indexOf('pizza') !== -1) return '🍕';
+  if (cleanType.indexOf('restaurant') !== -1) return '🍽';
+  if (cleanType.indexOf('coffee') !== -1 || cleanType.indexOf('cafe') !== -1) return '☕';
+  if (cleanType.indexOf('gas') !== -1) return '⛽';
+  if (cleanType.indexOf('parking') !== -1) return '🅿';
+  if (cleanType.indexOf('hotel') !== -1 || cleanType.indexOf('lodging') !== -1) return '🏨';
+  if (cleanType.indexOf('pharmacy') !== -1 || cleanType.indexOf('drug') !== -1) return '💊';
+  if (cleanType.indexOf('bank') !== -1) return '🏦';
+  if (cleanType.indexOf('atm') !== -1) return '🏧';
+  var map = {
+    'gas_station': '⛽', 'restaurant': '🍽', 'meal_takeaway': '🥡', 'coffee_shop': '☕', 'cafe': '☕',
+    'grocery_store': '🛒', 'pharmacy': '💊', 'bank': '🏦', 'atm': '🏧',
+    'convenience_store': '🏪', 'shopping_mall': '🛍', 'hospital': '🏥',
+    'parking': '🅿', 'hotel': '🏨'
+  };
+  return map[cleanType] || '📍';
+}
+
+async function fetchPOIs(lat, lng, radius, types) {
+  var pois = [];
+  try {
+    var r = await fetchWithTimeout('https://places.googleapis.com/v1/places:searchNearby', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'places.displayName,places.location,places.primaryType'
+      },
+      body: JSON.stringify({
+        includedTypes: types,
+        locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: radius } },
+        maxResultCount: 10
+      })
+    });
+    var data = await r.json();
+    if (data.places) {
+      for (var i = 0; i < data.places.length; i++) {
+        var p = data.places[i];
+        pois.push({
+          name: (p.displayName && p.displayName.text) || 'Place',
+          lat: p.location.latitude,
+          lng: p.location.longitude,
+          type: p.primaryType || ''
+        });
+      }
+    }
+  } catch(e) { console.warn('[ARNav] fetchPOIs error:', e); }
+  return pois;
+}
+
+// Watch for Google Maps error overlays
+var _authObserver = new MutationObserver(function(mutations) {
+  if (authFailed) return;
+  for (var i = 0; i < mutations.length; i++) {
+    var added = mutations[i].addedNodes;
+    for (var j = 0; j < added.length; j++) {
+      var node = added[j];
+      if (node.nodeType !== 1) continue;
+      if ((node.classList && (node.classList.contains('gm-err-container') || node.classList.contains('gm-style-pbc'))) ||
+          (node.querySelector && node.querySelector('.gm-err-container'))) {
+        authFailed = true;
+        _authObserver.disconnect();
+        showFatal('Google Maps API error.<br><br>Enable:<br>• Maps JavaScript API<br>• Directions API<br>• Places API');
+        return;
+      }
+    }
+  }
+});
+_authObserver.observe(document.body, { childList: true, subtree: true });
+
+// ── Clock ──
+function updateClock() {
+  var d = new Date();
+  var h = d.getHours(), m = d.getMinutes();
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12 || 12;
+  document.getElementById('hud-time').textContent =
+    h12 + ':' + String(m).padStart(2,'0') + ' ' + ampm;
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// ── Geo utilities ──
+function toRad(deg) { return deg * Math.PI / 180; }
+function toDeg(rad) { return rad * 180 / Math.PI; }
+
+function distanceM(a, b) {
+  var R = 6371000;
+  var dLat = toRad(b.lat - a.lat);
+  var dLng = toRad(b.lng - a.lng);
+  var sin1 = Math.sin(dLat/2), sin2 = Math.sin(dLng/2);
+  var h = sin1*sin1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*sin2*sin2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
+}
+
+function bearingDeg(a, b) {
+  var dLng = toRad(b.lng - a.lng);
+  var y = Math.sin(dLng) * Math.cos(toRad(b.lat));
+  var x = Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) -
+          Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function formatDist(meters) {
+  if (meters < 160) return Math.round(meters) + ' ft';
+  if (meters < 1609) return Math.round(meters * 3.281 / 100) * 100 + ' ft';
+  return (meters / 1609.34).toFixed(1) + ' mi';
+}
+
+function formatDuration(seconds) {
+  if (seconds < 60) return '< 1 min';
+  if (seconds < 3600) return Math.round(seconds/60) + ' min';
+  return (seconds/3600).toFixed(1) + ' hr';
+}
+
+// ── Compute bounding box center and range from a set of route coords ──
+function computeRouteBounds(coords) {
+  if (!coords || coords.length === 0) return null;
+  var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  for (var i = 0; i < coords.length; i++) {
+    var c = coords[i];
+    if (c.lat < minLat) minLat = c.lat;
+    if (c.lat > maxLat) maxLat = c.lat;
+    if (c.lng < minLng) minLng = c.lng;
+    if (c.lng > maxLng) maxLng = c.lng;
+  }
+  // Also include origin and destination
+  if (userCoords) {
+    if (userCoords.lat < minLat) minLat = userCoords.lat;
+    if (userCoords.lat > maxLat) maxLat = userCoords.lat;
+    if (userCoords.lng < minLng) minLng = userCoords.lng;
+    if (userCoords.lng > maxLng) maxLng = userCoords.lng;
+  }
+  if (destCoords) {
+    if (destCoords.lat < minLat) minLat = destCoords.lat;
+    if (destCoords.lat > maxLat) maxLat = destCoords.lat;
+    if (destCoords.lng < minLng) minLng = destCoords.lng;
+    if (destCoords.lng > maxLng) maxLng = destCoords.lng;
+  }
+  var centerLat = (minLat + maxLat) / 2;
+  var centerLng = (minLng + maxLng) / 2;
+  // Calculate the diagonal distance of the bounding box
+  var diagDist = distanceM({lat: minLat, lng: minLng}, {lat: maxLat, lng: maxLng});
+  return {
+    center: { lat: centerLat, lng: centerLng },
+    diag: diagDist
+  };
+}
+
+// ── Timeout-wrapped fetch ──
+function fetchWithTimeout(url, opts, ms) {
+  ms = ms || 8000;
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, ms);
+  return fetch(url, Object.assign({}, opts, { signal: ctrl.signal })).finally(function(){ clearTimeout(timer); });
+}
+
+function setLoading(message) {
+  var el = document.getElementById('loading');
+  var label = el ? el.querySelector('p') : null;
+  if (label) label.textContent = message;
+}
+function escHtml(value) {
+  var d = document.createElement('div');
+  d.textContent = String(value == null ? '' : value);
+  return d.innerHTML;
+}
+function hideLoading() {
+  var el = document.getElementById('loading');
+  if (el) el.classList.add('hidden');
+}
+function showFatal(message) {
+  var el = document.getElementById('loading');
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.innerHTML = '<p style="color:#ff5252;text-align:center;max-width:80%;font-size:18px;font-weight:600">' + message + '</p>';
+}
+
+// ── Destination query cleaning ──
+function cleanDestinationQuery(raw) {
+  var clean = String(raw || '').replace(/\s+/g, ' ').replace(/^→\s*/, '').trim();
+  var addressPattern = /\b\d{1,5}\s+[A-Za-z0-9.'#\- ]+\s(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Pl|Place|Ct|Court|Pkwy|Parkway|Ter|Terrace)\b(?:,\s*[A-Za-z .'-]+){0,3}/i;
+  var directAddress = clean.match(addressPattern);
+  if (directAddress) return directAddress[0].trim().replace(/[.,;:\s]+$/, '');
+  var prefixedPatterns = [/\baddress:\s*(.+)/i, /(?:is\s+)?(?:located|location)\s+at\s+(.+)/i, /\bis\s+at\s+(.+)/i];
+  for (var i=0; i<prefixedPatterns.length; i++) {
+    var match = clean.match(prefixedPatterns[i]);
+    if (match && match[1]) { clean = match[1].trim(); break; }
+  }
+  var imperative = clean.match(/^(?:find|visit|go\s+to|head\s+to|navigate\s+to|directions?\s+to)\s+(.+)$/i);
+  if (imperative && imperative[1]) clean = imperative[1].trim();
+  clean = clean
+    .replace(/\b(?:currently\s+)?(?:open\s*now|openow|closed|closednow)\b.*$/i, '')
+    .replace(/\b(?:clear|cloudy|overcast|rain|showers|fog|drizzle|snow|storm)\b.*$/i, '')
+    .replace(/\bAQI\s*\d+.*$/i, '').replace(/\b\d{1,3}°\s*[FC]\b.*$/i, '')
+    .replace(/\b(?:walk|drive|transit|eta|parking|traffic|weather|temperature)\b.*$/i, '')
+    .replace(/\s+which\s+is\s+.*$/i, '').replace(/\s+in\s+/gi, ', ').trim();
+  [' — ', ' - ', ' | ', '. '].forEach(function(sep) {
+    var idx = clean.indexOf(sep);
+    if (idx > 5) clean = clean.substring(0, idx);
+  });
+  var addressAfterTrim = clean.match(addressPattern);
+  if (addressAfterTrim) return addressAfterTrim[0].trim().replace(/[.,;:\s]+$/, '');
+  return clean.replace(/[.,;:\s]+$/, '');
+}
+
+// ── Geocode via Places API textSearch ──
+async function geocode(address) {
+  console.log('[ARNav] geocode input:', address);
+  var clean = cleanDestinationQuery(address);
+  console.log('[ARNav] geocode cleaned:', clean);
+
+  // Extract language code from navigator.language (e.g. "ja-JP" → "ja")
+  var langCode = (navigator.language || '').split('-')[0] || 'en';
+  var regionCode = (navigator.language || '').split('-')[1] || '';
+
+  try {
+    var r = await fetchWithTimeout('https://places.googleapis.com/v1/places:searchText', {
+      method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':apiKey,'X-Goog-FieldMask':'places.location,places.displayName'},
+      body: JSON.stringify({textQuery:clean,maxResultCount:1,languageCode:langCode,regionCode:regionCode})
+    });
+    var d = await r.json();
+    if (d.places && d.places.length && d.places[0].location) {
+      var loc = d.places[0].location;
+      var nm = (d.places[0].displayName && d.places[0].displayName.text) || '';
+      console.log('[ARNav] geocode OK:', loc.latitude, loc.longitude, 'name=', nm);
+      return {lat:loc.latitude, lng:loc.longitude, name: nm};
+    }
+  } catch(e) { console.error('[ARNav] geocode error:', e); }
+  if (clean !== address) {
+    try {
+      var r2 = await fetchWithTimeout('https://places.googleapis.com/v1/places:searchText', {
+        method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':apiKey,'X-Goog-FieldMask':'places.location'},
+        body: JSON.stringify({textQuery:address,maxResultCount:1,languageCode:langCode,regionCode:regionCode})
+      });
+      var d2 = await r2.json();
+      if (d2.places && d2.places.length && d2.places[0].location) {
+        var loc2 = d2.places[0].location;
+        return {lat:loc2.latitude, lng:loc2.longitude};
+      }
+    } catch(e2) {}
+  }
+  return null;
+}
+
+// ── Weather via Open-Meteo ──
+async function getWeather(lat, lng) {
+  try {
+    var r = await fetchWithTimeout('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lng+'&current=temperature_2m,weather_code&temperature_unit=fahrenheit');
+    var d = await r.json();
+    if (d.current) {
+      var t = Math.round(d.current.temperature_2m);
+      var codes = {0:'Clear',1:'Clear',2:'Cloudy',3:'Overcast',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',61:'Rain',63:'Rain',65:'Rain',71:'Snow',73:'Snow',75:'Snow',80:'Showers',81:'Showers',95:'Storm'};
+      document.getElementById('hud-weather').textContent = t + '°F ' + (codes[d.current.weather_code]||'');
+    }
+  } catch(e) {}
+}
+
+// ── AQI via Google Air Quality API ──
+async function getAQI(lat, lng) {
+  try {
+    var r = await fetchWithTimeout('https://airquality.googleapis.com/v1/currentConditions:lookup?key='+apiKey, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({location:{latitude:lat,longitude:lng}})
+    });
+    var d = await r.json();
+    if (d.indexes && d.indexes[0]) {
+      var aqi = d.indexes[0].aqi;
+      var el = document.getElementById('hud-aqi');
+      el.textContent = 'AQI ' + aqi;
+      if (aqi > 100) el.style.background = 'rgba(255,100,0,0.2)';
+      if (aqi > 150) el.style.background = 'rgba(255,0,0,0.2)';
+    }
+  } catch(e) {}
+}
+
+// ── Get parking near destination ──
+async function getParking(destLat, destLng) {
+  // Extract language code from navigator.language (e.g. "ja-JP" → "ja")
+  var langCode = (navigator.language || '').split('-')[0] || 'en';
+  var regionCode = (navigator.language || '').split('-')[1] || '';
+
+  try {
+    var r = await fetchWithTimeout('https://places.googleapis.com/v1/places:searchNearby', {
+      method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':apiKey,'X-Goog-FieldMask':'places.displayName,places.location'},
+      body: JSON.stringify({includedTypes:['parking'],locationRestriction:{circle:{center:{latitude:destLat,longitude:destLng},radius:800}},maxResultCount:3,languageCode:langCode,regionCode:regionCode})
+    });
+    var data = await r.json();
+    if (data.places) return data.places.map(function(p){return{name:(p.displayName&&p.displayName.text)||'Parking',lat:p.location.latitude,lng:p.location.longitude};});
+  } catch(e) {}
+  return [];
+}
+
+// ── Fetch route via Routes API (traffic-aware + step instructions for road names) ──
+async function fetchRoute(origin, destination) {
+  console.log('[ARNav] fetchRoute from', JSON.stringify(origin), 'to', JSON.stringify(destination));
+  var r = await fetchWithTimeout('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'routes.legs.duration,routes.legs.distanceMeters,routes.legs.polyline,routes.legs.steps.navigationInstruction,routes.legs.steps.startLocation,routes.legs.steps.endLocation,routes.legs.travelAdvisory,routes.polyline,routes.travelAdvisory'
+    },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+      destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+      travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_AWARE',
+      polylineEncoding: 'GEO_JSON_LINESTRING',
+      extraComputations: ['TRAFFIC_ON_POLYLINE']
+    })
+  });
+  var data = await r.json();
+  if (!data.routes || !data.routes[0]) throw new Error('No route returned');
+  return data.routes[0];
+}
+
+// ── Extract unique road/highway names from route steps and place as 3D labels ──
+// Snap a point to the nearest point on the route polyline
+function snapToRoute(lat, lng) {
+  if (!cachedRouteCoords || cachedRouteCoords.length === 0) return { lat: lat, lng: lng };
+  var bestDist = Infinity;
+  var bestPoint = cachedRouteCoords[0];
+  for (var i = 0; i < cachedRouteCoords.length - 1; i++) {
+    var p = closestPointOnSegment(lat, lng, cachedRouteCoords[i], cachedRouteCoords[i + 1]);
+    var d = (p.lat - lat) * (p.lat - lat) + (p.lng - lng) * (p.lng - lng);
+    if (d < bestDist) { bestDist = d; bestPoint = p; }
+  }
+  return bestPoint;
+}
+
+// Find closest point on line segment A→B to point P
+function closestPointOnSegment(pLat, pLng, a, b) {
+  var dx = b.lng - a.lng, dy = b.lat - a.lat;
+  if (dx === 0 && dy === 0) return { lat: a.lat, lng: a.lng };
+  var t = ((pLng - a.lng) * dx + (pLat - a.lat) * dy) / (dx * dx + dy * dy);
+  t = Math.max(0, Math.min(1, t));
+  return { lat: a.lat + t * dy, lng: a.lng + t * dx };
+}
+
+function extractRoadLabels(route) {
+  var labels = [];
+  if (!route || !route.legs) return labels;
+  var seen = {};
+  for (var li = 0; li < route.legs.length; li++) {
+    var steps = route.legs[li].steps;
+    if (!steps) continue;
+    for (var si = 0; si < steps.length; si++) {
+      var step = steps[si];
+      var nav = step.navigationInstruction;
+      if (!nav || !nav.instructions) continue;
+      var roads = extractRoadNamesFromText(nav.instructions);
+      for (var ri = 0; ri < roads.length; ri++) {
+        var road = roads[ri];
+        if (seen[road.toLowerCase()]) continue;
+        seen[road.toLowerCase()] = true;
+        // Get the step midpoint then snap it to the nearest point on the route polyline
+        var rawLoc = null;
+        if (step.startLocation && step.endLocation) {
+          rawLoc = {
+            lat: (step.startLocation.latLng.latitude + step.endLocation.latLng.latitude) / 2,
+            lng: (step.startLocation.latLng.longitude + step.endLocation.latLng.longitude) / 2
+          };
+        } else if (step.startLocation) {
+          rawLoc = { lat: step.startLocation.latLng.latitude, lng: step.startLocation.latLng.longitude };
+        }
+        if (rawLoc) {
+          var snapped = snapToRoute(rawLoc.lat, rawLoc.lng);
+          labels.push({ name: road, lat: snapped.lat, lng: snapped.lng });
+        }
+      }
+    }
+  }
+  return labels;
+}
+
+function extractRoadNamesFromText(text) {
+  var names = [];
+  // Match road names: "onto X", "on X", "Continue on X", also highway patterns
+  var patterns = [
+    /\b(?:onto|on)\s+(.+?)(?:\s+toward|\s+for|\s*\/|\s*$)/gi,
+    /\b(?:Take)\s+(.+?)(?:\s+toward|\s+to|\s+exit|\s*$)/gi,
+    /\b(?:Merge onto)\s+(.+?)(?:\s+toward|\s+via|\s*$)/gi,
+    /\b((?:I|US|CA|SR|Hwy|Interstate|Route)\s*[-–]?\s*\d+[A-Z]?(?:\s+[NSEW](?:orth|outh|ast|est)?)?)/gi
+  ];
+  for (var pi = 0; pi < patterns.length; pi++) {
+    var m;
+    while ((m = patterns[pi].exec(text)) !== null) {
+      var name = m[1].trim()
+        .replace(/\s*toward\s.*$/i, '')
+        .replace(/\s*for\s.*$/i, '')
+        .replace(/[.,;]+$/, '')
+        .trim();
+      if (name.length >= 2 && name.length <= 50) names.push(name);
+    }
+  }
+  return names;
+}
+
+// ── Fetch walk ETA ──
+async function fetchWalkEta(origin, destination) {
+  try {
+    var r = await fetchWithTimeout('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method:'POST', headers:{'Content-Type':'application/json','X-Goog-Api-Key':apiKey,'X-Goog-FieldMask':'routes.legs.duration'},
+      body: JSON.stringify({origin:{location:{latLng:{latitude:origin.lat,longitude:origin.lng}}},destination:{location:{latLng:{latitude:destination.lat,longitude:destination.lng}}},travelMode:'WALK'})
+    });
+    var d = await r.json();
+    if (d.routes && d.routes[0] && d.routes[0].legs && d.routes[0].legs[0]) {
+      var sec = parseInt(d.routes[0].legs[0].duration.replace('s',''));
+      document.getElementById('eta-walk').textContent = formatDuration(sec);
+    }
+  } catch(e) {}
+}
+
+// ── Decode GeoJSON polyline ──
+function decodeGeoJsonPolyline(polyline) {
+  if (polyline && polyline.geoJsonLinestring && polyline.geoJsonLinestring.coordinates) {
+    return polyline.geoJsonLinestring.coordinates.map(function(c) {
+      return { lat: c[1], lng: c[0] };
+    });
+  }
+  return [];
+}
+
+// ── Traffic color for speed category ──
+function trafficColor(speed) {
+  switch(speed) {
+    case 'SLOW': return '#FF4444';
+    case 'TRAFFIC_JAM': return '#CC0000';
+    case 'NORMAL': return '#00CC66';
+    default: return '#00FFFF';
+  }
+}
+
+// ══════════════════════════════════════════════════
+// ── MAIN INIT ──
+// ══════════════════════════════════════════════════
+async function init() {
+  var safetyTimer = setTimeout(function() {
+    console.error('[ARNav] SAFETY TIMEOUT — forcing loading screen off');
+    hideLoading();
+  }, 25000);
+
+  try {
+    console.log('[ARNav] init() dest="' + destAddr + '" lat=' + userLat + ' lng=' + userLng + ' mode=' + viewMode + ' pins=' + keywordPins.length);
+    var maps3dPromise = google.maps.importLibrary('maps3d');
+    var isLandmarkMode = (viewMode === 'landmark' || viewMode === 'flyover');
+
+    var userCoordsPromise;
+    if (isLandmarkMode) {
+      // Landmark/flyover mode doesn't need GPS — the viewer focuses on the
+      // destination only. Using the user's GPS here caused the "countryside
+      // between SF and Seattle" bug.
+      userCoordsPromise = Promise.resolve(null);
+    } else if (originLocked && hasUserLocation) {
+      userCoordsPromise = Promise.resolve({ lat: userLat, lng: userLng });
+    } else {
+      userCoordsPromise = new Promise(function(resolve) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        }, function() {
+          if (hasUserLocation) {
+            resolve({ lat: userLat, lng: userLng });
+          } else {
+            resolve(null);
+          }
+        }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 12000 });
+      });
+    }
+
+    // ── Step 1: Geocode destination ──
+    setLoading(hasKeywordPins ? 'Mapping search results…' : (isLandmarkMode ? 'Finding landmark…' : 'Resolving destination…'));
+    destCoords = hasKeywordPins ? keywordPinsCenter() : await geocode(destAddr);
+    if (!destCoords) {
+      clearTimeout(safetyTimer);
+      showFatal('Could not find:<br>' + destAddr.substring(0, 80));
+      return;
+    }
+
+    // ── Step 2: Get user position (skipped in landmark/flyover mode) ──
+    userCoords = await userCoordsPromise;
+    if (!userCoords && !isLandmarkMode) {
+      if (hasUserLocation) {
+        userCoords = {lat:userLat, lng:userLng};
+      } else {
+        userCoords = {lat: destCoords.lat + 0.003, lng: destCoords.lng + 0.005};
+      }
+    }
+
+    // Prefer the geocoded place name for the on-screen destination header so
+    // the user sees e.g. "Blue Bottle Coffee" rather than a raw street string.
+    // Fall back to the search topic, then the raw address.
+    var destHeaderName =
+      (destCoords && destCoords.name && destCoords.name.trim()) ||
+      (typeof searchTopic !== 'undefined' && searchTopic && searchTopic.trim()) ||
+      destAddr;
+    document.getElementById('dest-text').textContent = destHeaderName;
+    renderCandidateList();
+
+    // ── Step 3: Fetch route (ONLY in route mode) ──
+    var route = null;
+    var routeCoords = [];
+    var legDuration = '--';
+    var legDistance = '--';
+    if (!isLandmarkMode) {
+      setLoading('Computing route…');
+      try {
+        route = await fetchRoute(userCoords, destCoords);
+        var leg = route.legs[0];
+        var durationSec = parseInt(leg.duration.replace('s',''));
+        legDuration = formatDuration(durationSec);
+        legDistance = formatDist(leg.distanceMeters);
+        routeCoords = decodeGeoJsonPolyline(route.polyline);
+        cachedRoute = route;          // store globally for zoom re-render
+        cachedRouteCoords = routeCoords;
+        console.log('[ARNav] Route: ' + routeCoords.length + ' points, ' + legDistance + ', ' + legDuration);
+      } catch(e) {
+        console.error('[ARNav] Route fetch failed:', e);
+        routeCoords = [userCoords, destCoords];
+        legDuration = '—';
+        legDistance = formatDist(distanceM(userCoords, destCoords));
+      }
+      document.getElementById('eta-drive').textContent = legDuration;
+      document.getElementById('eta-distance').textContent = legDistance;
+    } else {
+      // Landmark mode: hide the route-oriented HUD rows (ETA) to keep the view clean
+      var hudBottom = document.getElementById('hud-bottom');
+      if (hudBottom) hudBottom.style.display = 'none';
+    }
+
+    // ── Step 4: Create 3D Map ──
+    setLoading(isLandmarkMode ? 'Rendering 3D view…' : 'Rendering 3D map…');
+    var maps3dLib = await maps3dPromise;
+    var Map3DElement = maps3dLib.Map3DElement;
+    var Polyline3DElement = maps3dLib.Polyline3DElement;
+    Marker3DElement = maps3dLib.Marker3DElement; // store globally for zoom re-render
+    // PinElement (from the 'marker' library) lets us give the origin and
+    // destination distinct, clearly-labeled pins instead of two identical
+    // default markers. Best-effort — falls back to plain labels if unavailable.
+    try {
+      PinElement = (await google.maps.importLibrary('marker')).PinElement;
+    } catch (e) { console.warn('[ARNav] PinElement unavailable:', e && e.message); }
+
+    // Calculate optimal camera. For landmark/flyover mode, center tightly on the
+    // destination. For route mode, use the bounding box of the full route.
+    var routeCenter, routeDist;
+    if (hasKeywordPins) {
+      var pinBounds = computeRouteBounds(keywordPins.map(function(pin) {
+        return { lat: pin.lat, lng: pin.lng };
+      }));
+      routeCenter = pinBounds ? pinBounds.center : destCoords;
+      routeDist = Math.max(pinBounds ? pinBounds.diag : 600, 800);
+    } else if (isLandmarkMode) {
+      routeCenter = { lat: destCoords.lat, lng: destCoords.lng };
+      routeDist = 600; // close enough to read building geometry
+    } else {
+      var bounds = computeRouteBounds(routeCoords);
+      if (bounds) {
+        routeCenter = bounds.center;
+        routeDist = bounds.diag;
+      } else {
+        routeCenter = { lat: (userCoords.lat + destCoords.lat) / 2, lng: (userCoords.lng + destCoords.lng) / 2 };
+        routeDist = distanceM(userCoords, destCoords);
+      }
+    }
+
+    if (hasKeywordPins) {
+      currentCenter = routeCenter;
+      currentRange = Math.max(900, Math.min(routeDist * 1.4, 8000));
+      currentHeading = 25;
+      currentTilt = 58;
+    } else if (isLandmarkMode) {
+      // Close cinematic framing for a single landmark
+      currentCenter = routeCenter;
+      currentRange = 650;
+      currentHeading = 35;   // slight angle so facade catches light
+      currentTilt = 67;      // strong perspective to show vertical height
+    } else {
+      // Range: scale with route diagonal, with padding to ensure full route visible.
+      // Need extra range to account for tilt (camera is angled, not top-down).
+      var tiltFactor = 1.6; // compensate for 55° tilt cutting off the far edge
+      currentRange = Math.max(300, Math.min(routeDist * tiltFactor, 30000));
+      // Face along the user→destination bearing so the camera sits on the
+      // origin side and the route leads INTO the frame toward the centered
+      // destination.
+      currentHeading = bearingDeg(userCoords, destCoords);
+      // Center on the DESTINATION (not the route midpoint). This keeps the
+      // destination framed dead-center, and — crucially — means each press of
+      // the + button zooms toward the destination, eventually landing in its
+      // Street View, instead of converging on an arbitrary mid-route point.
+      // The origin still trails into the lower frame because we pulled the
+      // camera back along the user→dest bearing.
+      currentCenter = { lat: destCoords.lat, lng: destCoords.lng };
+      currentTilt = 55;
+
+      // For short routes (<1km), lower tilt for better overview
+      if (routeDist < 1000) {
+        currentTilt = 45;
+        currentRange = Math.max(300, routeDist * 2.2);
+      }
+    }
+
+    map3d = new Map3DElement({
+      center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+      range: currentRange,
+      heading: currentHeading,
+      tilt: currentTilt,
+      mode: 'SATELLITE'
+    });
+
+    document.getElementById('map3d-container').appendChild(map3d);
+    updateZoomButtons();
+
+    // Reveal the fly-over toggle whenever we have a single-place focus
+    // (landmark or flyover mode). In route mode it stays hidden because
+    // orbiting a route midpoint would disorient the driver.
+    if (isLandmarkMode) {
+      var flyBtn = document.getElementById('flyover-toggle');
+      if (flyBtn) flyBtn.classList.add('visible');
+
+      restoreMapBanner();
+    } else if (hasKeywordPins) {
+      restoreMapBanner();
+    }
+    console.log('[ARNav] Map3DElement created, range=' + Math.round(currentRange) + ', heading=' + Math.round(currentHeading) + ', tilt=' + currentTilt + ', dist=' + Math.round(routeDist));
+
+    // Wait only a beat for the first scene. Route overlays can render while
+    // terrain tiles continue streaming, which makes 3D maps feel ready sooner.
+    await new Promise(function(resolve) {
+      var settled = false;
+      function finish() {
+        if (settled) return;
+        settled = true;
+        try { map3d.removeEventListener('gmp-steadychange', onSteady); } catch (e) {}
+        resolve();
+      }
+      function onSteady() { finish(); }
+      try { map3d.addEventListener('gmp-steadychange', onSteady); } catch (e) {}
+      setTimeout(finish, 350);
+    });
+
+    // ── Step 5: Draw route polyline on 3D map (route mode only) ──
+    if (!isLandmarkMode && routeCoords.length >= 2) {
+      var hasTraffic = route && route.travelAdvisory && route.travelAdvisory.speedReadingIntervals;
+
+      if (hasTraffic) {
+        var intervals = route.travelAdvisory.speedReadingIntervals;
+        for (var si = 0; si < intervals.length; si++) {
+          var interval = intervals[si];
+          var startIdx = interval.startPolylinePointIndex || 0;
+          var endIdx = interval.endPolylinePointIndex || routeCoords.length - 1;
+          if (endIdx >= routeCoords.length) endIdx = routeCoords.length - 1;
+          if (startIdx >= routeCoords.length) continue;
+
+          var segCoords = [];
+          for (var k = startIdx; k <= endIdx; k++) {
+            segCoords.push({ lat: routeCoords[k].lat, lng: routeCoords[k].lng, altitude: 25 });
+          }
+          if (segCoords.length < 2) continue;
+
+          try {
+            var segLine = new Polyline3DElement({
+              strokeColor: trafficColor(interval.speed),
+              strokeWidth: 12,
+              altitudeMode: 'RELATIVE_TO_GROUND',
+              coordinates: segCoords
+            });
+            map3d.append(segLine);
+          } catch(pe) { console.warn('[ARNav] Traffic segment failed:', pe.message); }
+        }
+      } else {
+        var lineCoords = routeCoords.map(function(c) {
+          return { lat: c.lat, lng: c.lng, altitude: 25 };
+        });
+        try {
+          var routeLine = new Polyline3DElement({
+            strokeColor: '#00FFFF',
+            strokeWidth: 12,
+            altitudeMode: 'RELATIVE_TO_GROUND',
+            coordinates: lineCoords
+          });
+          map3d.append(routeLine);
+        } catch(pe) { console.warn('[ARNav] Route polyline failed:', pe.message); }
+      }
+
+      // Glow layer for visibility
+      var glowCoords = routeCoords.map(function(c) {
+        return { lat: c.lat, lng: c.lng, altitude: 20 };
+      });
+      try {
+        var glowLine = new Polyline3DElement({
+          strokeColor: 'rgba(0,170,255,0.3)',
+          strokeWidth: 24,
+          altitudeMode: 'RELATIVE_TO_GROUND',
+          coordinates: glowCoords
+        });
+        map3d.append(glowLine);
+      } catch(ge) {}
+    }
+
+    // ── Step 6: Add origin and destination markers ──
+    // Give the two endpoints DISTINCT, clearly-labeled pins so it's obvious
+    // which is the start and which is the destination: a green "A" pin labeled
+    // "Start · You", and a red "B" pin labeled "Destination · <name>". Falls
+    // back to a plain text label if PinElement isn't available.
+    function buildEndpointMarker(lat, lng, glyph, bg, labelText) {
+      var marker = new Marker3DElement({
+        position: { lat: lat, lng: lng, altitude: 30 },
+        altitudeMode: 'RELATIVE_TO_GROUND',
+        label: labelText
+      });
+      if (PinElement) {
+        try {
+          marker.append(new PinElement({
+            background: bg,
+            borderColor: '#FFFFFF',
+            glyphColor: '#FFFFFF',
+            glyphText: glyph,
+            scale: 1.3
+          }));
+        } catch (pe) { console.warn('[ARNav] endpoint pin failed:', pe && pe.message); }
+      }
+      return marker;
+    }
+
+    if (!isLandmarkMode) {
+      try {
+        map3d.append(buildEndpointMarker(
+          userCoords.lat, userCoords.lng, 'A', '#00C853', 'Start'
+        ));
+      } catch(me) { console.warn('[ARNav] Origin marker failed:', me.message); }
+    }
+
+    if (!hasKeywordPins) {
+      try {
+        var destDisplayName =
+          (destCoords && destCoords.name && destCoords.name.trim()) ||
+          (typeof searchTopic !== 'undefined' && searchTopic && searchTopic.trim()) ||
+          (destAddr.split(',')[0] || '').trim() ||
+          'Destination';
+        map3d.append(buildEndpointMarker(
+          destCoords.lat, destCoords.lng, 'B', '#FF1744', destDisplayName
+        ));
+      } catch(me) { console.warn('[ARNav] Dest marker failed:', me.message); }
+    }
+
+    renderKeywordPins();
+
+    // ── Step 6b: Road labels (route mode only) ──
+    if (!isLandmarkMode) {
+      refreshRoadLabels();
+    }
+
+    // ── Done! ──
+    clearTimeout(safetyTimer);
+    hideLoading();
+
+    // ── Step 7: Background data (non-blocking) ──
+    getWeather(destCoords.lat, destCoords.lng).catch(function(){});
+    getAQI(destCoords.lat, destCoords.lng).catch(function(){});
+
+    if (!isLandmarkMode) {
+      fetchWalkEta(userCoords, destCoords).catch(function(){});
+
+      // Parking (route mode — the user is traveling there)
+      getParking(destCoords.lat, destCoords.lng).then(function(spots) {
+        if (!spots.length) return;
+        var parkingEl = document.getElementById('hud-parking');
+        var html = '<div class="parking-title">Parking</div>';
+        spots.forEach(function(p) {
+          html += '<div>🅿 ' + p.name + '</div>';
+          try {
+            var pm = new Marker3DElement({
+              position: { lat: p.lat, lng: p.lng, altitude: 15 },
+              altitudeMode: 'RELATIVE_TO_GROUND',
+              label: '🅿 ' + p.name
+            });
+            map3d.append(pm);
+          } catch(pme) {}
+        });
+        parkingEl.innerHTML = html;
+      }).catch(function(){});
+
+      // POIs along route
+      refreshPOIs();
+    }
+
+    // ── Step 8: Cinematic camera settle ──
+    if (isLandmarkMode) {
+      // Smooth push-in toward the landmark after the initial frame settles.
+      try {
+        map3d.flyCameraTo({
+          endCamera: {
+            center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+            range: Math.max(MIN_RANGE, currentRange * 0.85),
+            heading: currentHeading,
+            tilt: currentTilt
+          },
+          durationMillis: 2800
+        });
+      } catch(fe) {}
+
+      // Auto-start the orbit in fly-over mode.
+      if (viewMode === 'flyover') {
+        setTimeout(startFlyOver, 2900);
+      }
+    } else {
+      try {
+        map3d.flyCameraTo({
+          endCamera: {
+            center: { lat: currentCenter.lat, lng: currentCenter.lng, altitude: 0 },
+            range: currentRange,
+            heading: currentHeading,
+            tilt: currentTilt + 5
+          },
+          durationMillis: 2500
+        });
+      } catch(fe) {}
+    }
+
+  } catch(e) {
+    console.error('[ARNav] init fatal:', e);
+    clearTimeout(safetyTimer);
+    showFatal('3D Map failed to load:<br>' + (e.message || e));
+  }
+}
+
+// Google Maps callback
+function initMap() { init(); }
+window.initMap = initMap;
+
+// Google Maps auth failure callback
+window.gm_authFailure = function() {
+  console.error('[ARNav] Google Maps AUTH FAILURE');
+  showFatal('Google Maps API auth failed.<br><br>Enable <b>Maps JavaScript API</b><br>and <b>Directions API</b><br>in Google Cloud Console.');
+};
+
+// Load Google Maps JS with alpha (required for Map3DElement)
+(function(){
+  if (!apiKey) { showFatal('Google Maps API key missing'); return; }
+  var s = document.createElement('script');
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(apiKey) + '&v=alpha&callback=initMap';
+  s.async = true;
+  s.defer = true;
+  s.onerror = function() { showFatal('Google Maps JS failed to load'); };
+  document.head.appendChild(s);
+  setTimeout(function(){
+    if (!(window.google && window.google.maps)) showFatal('Google Maps JS load timed out');
+  }, 15000);
+})();
+
+// ── Kill any lingering audio contexts from previous page ──
+(function() {
+  try {
+    document.querySelectorAll('video,audio').forEach(function(v){v.pause();v.muted=true;v.src='';v.remove()});
+    if (window.AudioContext) {
+      var OrigAC = window.AudioContext;
+      window.AudioContext = function() { var ctx = new OrigAC(); ctx.suspend(); return ctx; };
+    }
+    if (window.webkitAudioContext) {
+      var OrigWAC = window.webkitAudioContext;
+      window.webkitAudioContext = function() { var ctx = new OrigWAC(); ctx.suspend(); return ctx; };
+    }
+  } catch(ae) {}
+})();
+
+// ── Auto-dismiss Maps alpha developer warning overlay (aggressive) ──
+(function() {
+  var dismissed = false;
+
+  // Search everywhere for buttons/overlays matching warning patterns
+  function nukeWarnings() {
+    if (dismissed) return;
+
+    // 1. Find ALL buttons on page - click any that look like dismiss/close/ok
+    var allBtns = document.querySelectorAll('button');
+    for (var i = 0; i < allBtns.length; i++) {
+      var btn = allBtns[i];
+      var txt = (btn.textContent || '').trim().toLowerCase();
+      var ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+      var cls = (btn.className || '').toLowerCase();
+      if (txt === 'dismiss' || txt === 'ok' || txt === 'close' || txt === 'got it' || txt === 'accept' ||
+          ariaLabel === 'close' || ariaLabel === 'dismiss' ||
+          cls.indexOf('dismiss') !== -1 || cls.indexOf('close') !== -1) {
+        console.log('[ARNav] Clicking warning button: "' + txt + '" class=' + cls);
+        btn.click();
+        dismissed = true;
+        return;
+      }
+    }
+
+    // 2. Find overlays with white/light backgrounds that sit on top (z-index based)
+    var allDivs = document.querySelectorAll('div');
+    for (var d = 0; d < allDivs.length; d++) {
+      var div = allDivs[d];
+      var st = div.style;
+      var txt = (div.textContent || '').toLowerCase();
+      // Check for "development" or "alpha" or "for development purposes" text
+      if ((txt.indexOf('development') !== -1 || txt.indexOf('alpha') !== -1 ||
+           txt.indexOf('for development purposes') !== -1 || txt.indexOf('developer') !== -1) &&
+          txt.length < 500) {
+        // This is likely the warning - hide it and click any button inside
+        div.style.display = 'none';
+        div.style.visibility = 'hidden';
+        div.style.opacity = '0';
+        div.style.height = '0';
+        div.style.overflow = 'hidden';
+        div.style.pointerEvents = 'none';
+        var innerBtn = div.querySelector('button');
+        if (innerBtn) innerBtn.click();
+        console.log('[ARNav] Nuked warning div with text containing development/alpha');
+        dismissed = true;
+        return;
+      }
+    }
+
+    // 3. Probe shadow DOM of gmp-map-3d
+    var map3dEl = document.querySelector('gmp-map-3d');
+    if (map3dEl && map3dEl.shadowRoot) {
+      var shadowBtns = map3dEl.shadowRoot.querySelectorAll('button');
+      for (var sb = 0; sb < shadowBtns.length; sb++) {
+        var sbtn = shadowBtns[sb];
+        var sbtxt = (sbtn.textContent || '').trim().toLowerCase();
+        var sbcls = (sbtn.className || '').toLowerCase();
+        if (sbtxt === 'dismiss' || sbtxt === 'ok' || sbtxt === 'close' || sbtxt === 'got it' ||
+            sbcls.indexOf('dismiss') !== -1) {
+          sbtn.click();
+          console.log('[ARNav] Clicked shadow DOM warning button: "' + sbtxt + '"');
+          dismissed = true;
+          return;
+        }
+      }
+      // Hide any warning-like divs in shadow DOM
+      var shadowDivs = map3dEl.shadowRoot.querySelectorAll('div');
+      for (var sd = 0; sd < shadowDivs.length; sd++) {
+        var sdiv = shadowDivs[sd];
+        var sdtxt = (sdiv.textContent || '').toLowerCase();
+        if ((sdtxt.indexOf('development') !== -1 || sdtxt.indexOf('alpha') !== -1 ||
+             sdtxt.indexOf('developer') !== -1) && sdtxt.length < 500) {
+          sdiv.style.display = 'none';
+          var sdBtn = sdiv.querySelector('button');
+          if (sdBtn) sdBtn.click();
+          console.log('[ARNav] Nuked shadow DOM warning div');
+          dismissed = true;
+          return;
+        }
+      }
+    }
+
+    // 4. Also check iframes
+    var iframes = document.querySelectorAll('iframe');
+    for (var fi = 0; fi < iframes.length; fi++) {
+      try {
+        var fdoc = iframes[fi].contentDocument || iframes[fi].contentWindow.document;
+        var fbtns = fdoc.querySelectorAll('button');
+        for (var fb = 0; fb < fbtns.length; fb++) {
+          var fbtxt = (fbtns[fb].textContent || '').trim().toLowerCase();
+          if (fbtxt === 'dismiss' || fbtxt === 'ok' || fbtxt === 'close' || fbtxt === 'got it') {
+            fbtns[fb].click();
+            console.log('[ARNav] Clicked iframe warning button: "' + fbtxt + '"');
+            dismissed = true;
+            return;
+          }
+        }
+      } catch(ce) {} // cross-origin
+    }
+  }
+
+  // MutationObserver on body AND gmp-map-3d
+  function observeTarget(target) {
+    if (!target) return;
+    var obs = new MutationObserver(function() {
+      setTimeout(nukeWarnings, 50);
+      setTimeout(nukeWarnings, 200);
+    });
+    obs.observe(target, { childList: true, subtree: true });
+  }
+  observeTarget(document.body);
+
+  // Also observe shadow root when map3d is ready
+  var mapWatch = setInterval(function() {
+    var m3 = document.querySelector('gmp-map-3d');
+    if (m3) {
+      if (m3.shadowRoot) { observeTarget(m3.shadowRoot); clearInterval(mapWatch); }
+    }
+  }, 300);
+  setTimeout(function() { clearInterval(mapWatch); }, 15000);
+
+  // Aggressive polling: every 300ms for 30 seconds
+  var attempts = 0;
+  var interval = setInterval(function() {
+    attempts++;
+    nukeWarnings();
+    if (dismissed || attempts >= 100) clearInterval(interval);
+  }, 300);
+})();
+</script>
+</body>
+</html>

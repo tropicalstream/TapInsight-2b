@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The cyan streaming ring has been retired per the updated HUD design
+  brief — it was distracting inside the already-framed camera preview
+  and competed visually with the burgundy camera frame stroke.  This
+  drawable is kept as a no-op placeholder (fully transparent oval) so
+  the legacy `coreEyeRing` View reference in ChatPanelFragment still
+  resolves but renders nothing.  Callers that animate the ring's alpha
+  are also gated off in `setCoreEyeStreamingVisuals`.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#00000000" />
+</shape>

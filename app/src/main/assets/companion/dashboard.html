@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TapInsight Dashboard</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;padding:16px;max-width:720px;margin:0 auto}
+  h1{color:#00e5ff;font-size:22px;margin-bottom:2px}
+  .sub{color:#888;font-size:13px;margin-bottom:20px}
+  .nav{display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid #333}
+  .nav a{flex:1;padding:10px;text-align:center;text-decoration:none;font-size:13px;font-weight:600;color:#aaa;background:#1a1a1a;transition:all .2s}
+  .nav a.active{background:#00e5ff;color:#000}
+  .nav a:hover:not(.active){background:#222}
+
+  .toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .btn{padding:8px 16px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#e0e0e0;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
+  .btn:hover{background:#222;border-color:#00e5ff}
+  .btn.primary{background:#00e5ff;color:#000;border-color:#00e5ff}
+  .btn.primary:hover{background:#00b8d4}
+  .btn.danger{border-color:#e53935;color:#ef5350}
+  .btn.danger:hover{background:#e53935;color:#fff}
+  .btn.small{padding:5px 10px;font-size:11px}
+
+  .category{background:#1a1a1a;border-radius:10px;margin-bottom:14px;border:1px solid #333;overflow:hidden}
+  .cat-header{display:flex;align-items:center;gap:8px;padding:12px 14px;background:#111;border-bottom:1px solid #333;cursor:grab}
+  .cat-header.dragging{opacity:0.5}
+  .cat-title-input{background:transparent;border:1px solid transparent;color:#00e5ff;font-size:15px;font-weight:600;padding:4px 6px;border-radius:4px;flex:1;min-width:0}
+  .cat-title-input:focus{border-color:#00e5ff;outline:none;background:#0a0a0a}
+  .cat-actions{display:flex;gap:6px;flex-shrink:0}
+  .cat-body{padding:10px 14px}
+  .cat-body.collapsed{display:none}
+
+  .link-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0a0a0a;border:1px solid #222;border-radius:8px;margin-bottom:6px;transition:border-color .15s}
+  .link-item:hover{border-color:#444}
+  .link-item.drag-over{border-color:#00e5ff;background:#0d1a1f}
+  .link-item.dragging{opacity:0.4}
+  .link-icon{width:20px;height:20px;border-radius:4px;flex-shrink:0;object-fit:contain}
+  .link-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .link-name{font-size:13px;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .link-url{font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .link-actions{display:flex;gap:4px;flex-shrink:0}
+  .grip{cursor:grab;color:#555;font-size:16px;padding:0 4px;user-select:none}
+  .grip:active{cursor:grabbing}
+
+  /* Move up/down buttons for non-touch */
+  .move-btn{padding:2px 6px;font-size:14px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#aaa;cursor:pointer;line-height:1}
+  .move-btn:hover{background:#333;color:#fff}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100}
+  .modal-overlay.hidden{display:none}
+  .modal{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:20px;width:min(440px,92vw);max-height:90vh;overflow-y:auto}
+  .modal h2{color:#00e5ff;font-size:16px;margin-bottom:14px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:#aaa;margin-bottom:4px}
+  .field input,.field select{width:100%;padding:10px;background:#111;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px}
+  .field input:focus,.field select:focus{border-color:#00e5ff;outline:none}
+  .modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+  .status{padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;display:none}
+  .status.ok{display:block;background:#1b5e20;color:#a5d6a7}
+  .status.err{display:block;background:#b71c1c;color:#ef9a9a}
+
+  .empty-cat{color:#555;font-size:12px;font-style:italic;padding:8px 0}
+</style>
+</head>
+<body>
+
+<h1>TapInsight Dashboard</h1>
+<p class="sub">Edit categories &amp; links synced to TapBrowser</p>
+
+<div class="nav">
+  <a href="/">Setup</a>
+  <a href="/browser">Browser</a>
+  <a href="/dashboard" class="active">Dashboard</a>
+  <a href="/radio">TapRadio</a>
+  <a href="/library">Library</a>
+  <a href="/openclaw">Agents</a>
+</div>
+
+<div id="statusBar" class="status"></div>
+
+<div class="toolbar">
+  <button class="btn primary" onclick="addCategory()">+ Category</button>
+  <button class="btn" onclick="addLink()">+ Link</button>
+  <button class="btn primary" onclick="saveAll()">Save to Glasses</button>
+</div>
+
+<div id="categoryContainer"></div>
+
+<!-- Add/Edit Link Modal -->
+<div id="linkModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="linkModalTitle">Add Link</h2>
+    <div class="field">
+      <label>Name</label>
+      <input id="linkName" type="text" placeholder="e.g. YouTube" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <input id="linkUrl" type="text" placeholder="e.g. https://youtube.com" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select id="linkCategory"></select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeLinkModal()">Cancel</button>
+      <button class="btn primary" onclick="saveLinkModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Category Modal -->
+<div id="catModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Add Category</h2>
+    <div class="field">
+      <label>Category Name</label>
+      <input id="catName" type="text" placeholder="e.g. Gaming" autocomplete="off"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeCatModal()">Cancel</button>
+      <button class="btn primary" onclick="saveCatModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── State ─── */
+let state = { apps: {}, groups: [] };
+let editingLinkKey = null;
+
+/* ─── Default data (mirrors TapBrowser dashboard) ─── */
+const defaultApps = {
+  gmessages:{name:'Google Messages',url:'https://messages.google.com/web/welcome'},
+  discord:{name:'Discord',url:'https://discord.com/app'},
+  whatsapp:{name:'WhatsApp',url:'https://web.whatsapp.com'},
+  instagram:{name:'Instagram',url:'https://www.instagram.com'},
+  reddit:{name:'Reddit',url:'https://www.reddit.com'},
+  telegram:{name:'Telegram',url:'https://web.telegram.org'},
+  tiktok:{name:'TikTok',url:'https://www.tiktok.com'},
+  medialibrary:{name:'Media Library',url:'file:///android_asset/library_local.html'},
+  youtube:{name:'YouTube',url:'https://www.youtube.com'},
+  informaltech:{name:'Informal Tech',url:'https://www.youtube.com/@informal-tech'},
+  gmaps:{name:'Google Maps',url:'https://www.google.com/maps'},
+  minijuegos:{name:'Minijuegos',url:'https://www.minijuegos.com'},
+  tapradio:{name:'TapRadio',url:'file:///android_asset/radio.html'},
+  ytmusic:{name:'YouTube Music',url:'https://music.youtube.com'},
+  spotify:{name:'Spotify',url:'https://open.spotify.com'},
+  applemusic:{name:'Apple Music',url:'https://music.apple.com'},
+  tidal:{name:'Tidal',url:'https://listen.tidal.com'},
+  deezer:{name:'Deezer',url:'https://www.deezer.com'},
+  audiomack:{name:'Audiomack',url:'https://audiomack.com'},
+  soundcloud:{name:'SoundCloud',url:'https://soundcloud.com'},
+  jamendo:{name:'Jamendo Music',url:'https://www.jamendo.com/radios'},
+  photopea:{name:'Photopea (Photo)',url:'https://www.photopea.com'},
+  clipchamp:{name:'Clipchamp (Video)',url:'https://clipchamp.com/en/video-editor/'},
+  bandlab:{name:'BandLab (DAW)',url:'https://www.bandlab.com'},
+  wireframe:{name:'Wireframe.cc',url:'https://wireframe.cc'},
+  kleki:{name:'Kleki',url:'https://kleki.com'},
+  todoist:{name:'Todoist',url:'https://www.todoist.com'},
+  stackedit:{name:'StackEdit (Text)',url:'https://stackedit.io/app'},
+  sejda:{name:'Sejda PDF Editor',url:'https://www.sejda.com/pdf-editor'},
+  gemini:{name:'Gemini',url:'https://gemini.google.com'},
+  googleaistudio:{name:'Google AI Studio',url:'https://aistudio.google.com'},
+  jules:{name:'Jules (Code)',url:'https://jules.google.com'},
+  perplexity:{name:'Perplexity',url:'https://www.perplexity.ai'},
+  chatgpt:{name:'ChatGPT',url:'https://chatgpt.com'},
+  claude:{name:'Claude',url:'https://claude.ai'},
+  deepseek:{name:'DeepSeek',url:'https://chat.deepseek.com'},
+  grok:{name:'Grok',url:'https://grok.com'},
+  wikipedia:{name:'Wikipedia',url:'https://www.wikipedia.org'},
+  translate:{name:'Google Translate',url:'https://translate.google.com'},
+  wolfram:{name:'WolframAlpha',url:'https://www.wolframalpha.com'},
+  suno:{name:'Suno (AI Music)',url:'https://suno.com'},
+  udio:{name:'Udio (AI Music)',url:'https://www.udio.com'},
+  stableaudio:{name:'Stable Audio',url:'https://stableaudio.com'},
+  runway:{name:'Runway (AI Video)',url:'https://runwayml.com'},
+  pika:{name:'Pika (AI Video)',url:'https://pika.art'},
+  luma:{name:'Luma Dream Machine',url:'https://lumalabs.ai/dream-machine'},
+  elevenlabs:{name:'ElevenLabs (Voice)',url:'https://elevenlabs.io'},
+  playht:{name:'PlayHT (Voice)',url:'https://play.ht'}
+};
+
+const defaultGroups = [
+  {title:'Navigation / Entertainment',cls:'sec-nav',keys:['medialibrary','youtube','informaltech','gmaps','minijuegos','tiktok']},
+  {title:'AI / Chatbots',cls:'sec-llm',keys:['gemini','googleaistudio','jules','perplexity','chatgpt','claude','deepseek','grok']},
+  {title:'Social / Communication',cls:'sec-social',keys:['gmessages','discord','whatsapp','instagram','reddit','telegram']},
+  {title:'Music / Streaming',cls:'sec-music',keys:['tapradio','ytmusic','spotify','applemusic','tidal','deezer','audiomack','soundcloud','jamendo']},
+  {title:'Creativity / Multimedia',cls:'sec-creative',keys:['photopea','clipchamp','bandlab','wireframe','kleki']},
+  {title:'Productivity / Documents',cls:'sec-prod',keys:['todoist','stackedit','sejda']},
+  {title:'Utilities / Reference',cls:'sec-util',keys:['wikipedia','translate','wolfram']},
+  {title:'AI Music',cls:'sec-aimusic',keys:['suno','udio','stableaudio']},
+  {title:'AI Video',cls:'sec-aivideo',keys:['runway','pika','luma']},
+  {title:'AI Voice',cls:'sec-voice',keys:['elevenlabs','playht']},
+  {title:'Custom Links',cls:'sec-custom',keys:[]}
+];
+
+const specialIcons = {
+  tapradio: 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22 width=%2220%22 height=%2220%22><circle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231a1a2e%22 stroke=%22%2300e5ff%22 stroke-width=%222%22/><path d=%22M32 18v28%22 stroke=%22%2300e5ff%22 stroke-width=%223%22 stroke-linecap=%22round%22/><path d=%22M24 22c-5 5-5 15 0 20%22 stroke=%22%2300e5ff%22 stroke-width=%222%22 fill=%22none%22 stroke-linecap=%22round%22/><path d=%22M40 22c5 5 5 15 0 20%22 stroke=%22%2300e5ff%22 stroke-width=%222%22 fill=%22none%22 stroke-linecap=%22round%22/><path d=%22M18 16c-9 9-9 23 0 32%22 stroke=%22%2300e5ff%22 stroke-width=%222%22 fill=%22none%22 stroke-linecap=%22round%22 opacity=%22.5%22/><path d=%22M46 16c9 9 9 23 0 32%22 stroke=%22%2300e5ff%22 stroke-width=%222%22 fill=%22none%22 stroke-linecap=%22round%22 opacity=%22.5%22/><circle cx=%2232%22 cy=%2246%22 r=%223%22 fill=%22%2300e5ff%22/></svg>',
+  medialibrary: 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22 width=%2220%22 height=%2220%22><defs><linearGradient id=%22mlg%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22><stop offset=%220%22 stop-color=%22%23112233%22/><stop offset=%221%22 stop-color=%22%23061018%22/></linearGradient></defs><rect x=%222%22 y=%222%22 width=%2260%22 height=%2260%22 rx=%2212%22 ry=%2212%22 fill=%22url(%23mlg)%22 stroke=%22%2300e5ff%22 stroke-width=%222%22/><rect x=%2210%22 y=%2216%22 width=%2228%22 height=%224%22 rx=%222%22 fill=%22%2300e5ff%22/><rect x=%2210%22 y=%2228%22 width=%2224%22 height=%224%22 rx=%222%22 fill=%22%2300e5ff%22 opacity=%22.7%22/><rect x=%2210%22 y=%2240%22 width=%2220%22 height=%224%22 rx=%222%22 fill=%22%2300e5ff%22 opacity=%22.45%22/><circle cx=%2247%22 cy=%2243%22 r=%2212%22 fill=%22%2300e5ff%22/><polygon points=%2243,36 43,50 55,43%22 fill=%22%23061018%22/></svg>'
+};
+
+function ensureTapRadioMigration(dashboardState) {
+  let changed = false;
+  if (!dashboardState.apps) dashboardState.apps = {};
+  if (!Array.isArray(dashboardState.groups)) {
+    dashboardState.groups = JSON.parse(JSON.stringify(defaultGroups));
+    changed = true;
+  }
+
+  if (!dashboardState.apps.tapradio) {
+    dashboardState.apps.tapradio = {...defaultApps.tapradio};
+    changed = true;
+  }
+
+  let musicGroup = dashboardState.groups.find(group => String(group.title || '').trim().toLowerCase() === 'music / streaming');
+  if (!musicGroup) {
+    musicGroup = { title: 'Music / Streaming', cls: 'sec-music', keys: ['tapradio'] };
+    dashboardState.groups.push(musicGroup);
+    changed = true;
+  }
+
+  if (!Array.isArray(musicGroup.keys)) {
+    musicGroup.keys = [];
+    changed = true;
+  }
+
+  if (!musicGroup.keys.includes('tapradio')) {
+    musicGroup.keys.unshift('tapradio');
+    changed = true;
+  }
+
+  return changed;
+}
+
+/* Keep the Media Library icon alive in the dashboard data the companion
+ * pushes to the glasses, so the icon reappears automatically even if the
+ * user previously deleted it by accident. */
+function ensureMediaLibraryMigration(dashboardState) {
+  let changed = false;
+  if (!dashboardState.apps) dashboardState.apps = {};
+  if (!Array.isArray(dashboardState.groups)) {
+    dashboardState.groups = JSON.parse(JSON.stringify(defaultGroups));
+    changed = true;
+  }
+
+  // URL paths we own — anything previously pointing at the server-backed
+  // launcher (or the old /library HTTP endpoint) gets repointed to the
+  // glasses-local bridge page. Custom user URLs are left alone.
+  const LIBRARY_OWNED_URLS = new Set([
+    'file:///android_asset/library_launcher.html',
+    'file:///android_asset/library_local.html',
+    'https://127.0.0.1:19110/library',
+    'http://127.0.0.1:19110/library'
+  ]);
+
+  if (!dashboardState.apps.medialibrary) {
+    dashboardState.apps.medialibrary = {...defaultApps.medialibrary};
+    changed = true;
+  } else {
+    const cur = dashboardState.apps.medialibrary.url || '';
+    if (LIBRARY_OWNED_URLS.has(cur) && cur !== defaultApps.medialibrary.url) {
+      dashboardState.apps.medialibrary.url = defaultApps.medialibrary.url;
+      changed = true;
+    }
+  }
+
+  let navGroup = dashboardState.groups.find(group => String(group.title || '').trim().toLowerCase() === 'navigation / entertainment');
+  if (!navGroup) {
+    navGroup = { title: 'Navigation / Entertainment', cls: 'sec-nav', keys: ['medialibrary'] };
+    dashboardState.groups.unshift(navGroup);
+    changed = true;
+  }
+
+  if (!Array.isArray(navGroup.keys)) {
+    navGroup.keys = [];
+    changed = true;
+  }
+
+  if (!navGroup.keys.includes('medialibrary')) {
+    navGroup.keys.unshift('medialibrary');
+    changed = true;
+  }
+
+  return changed;
+}
+
+/* ─── API ─── */
+function showStatus(msg, type) {
+  const el = document.getElementById('statusBar');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+  if (type === 'ok') setTimeout(() => { el.className = 'status'; }, 3000);
+}
+
+async function loadAll() {
+  try {
+    const r = await fetch('/api/dashboard');
+    if (r.ok) {
+      const data = await r.json();
+      if (data && data.apps && Object.keys(data.apps).length > 0) {
+        state = data;
+      } else {
+        state = { apps: {...defaultApps}, groups: JSON.parse(JSON.stringify(defaultGroups)) };
+      }
+    } else {
+      state = { apps: {...defaultApps}, groups: JSON.parse(JSON.stringify(defaultGroups)) };
+    }
+  } catch(e) {
+    state = { apps: {...defaultApps}, groups: JSON.parse(JSON.stringify(defaultGroups)) };
+  }
+  ensureTapRadioMigration(state);
+  ensureMediaLibraryMigration(state);
+  renderAll();
+  showStatus('Dashboard loaded.', 'ok');
+}
+
+async function saveAll() {
+  // Read category titles from inputs
+  document.querySelectorAll('.cat-title-input').forEach(input => {
+    const idx = parseInt(input.dataset.catIdx);
+    if (!isNaN(idx) && state.groups[idx]) {
+      state.groups[idx].title = input.value.trim() || state.groups[idx].title;
+    }
+  });
+
+  ensureTapRadioMigration(state);
+  ensureMediaLibraryMigration(state);
+
+  try {
+    const r = await fetch('/api/dashboard', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(state)
+    });
+    if (r.ok) {
+      showStatus('Dashboard saved! Changes will appear on next TapBrowser launch.', 'ok');
+    } else {
+      showStatus('Failed to save dashboard.', 'err');
+    }
+  } catch(e) {
+    showStatus('Network error: ' + e.message, 'err');
+  }
+}
+
+// Auto-load on page ready
+document.addEventListener('DOMContentLoaded', loadAll);
+
+/* ─── Rendering ─── */
+function faviconUrl(url) {
+  try { return 'https://www.google.com/s2/favicons?domain=' + new URL(url).hostname + '&sz=64'; }
+  catch(e) { return ''; }
+}
+
+function slugify(v) { return v.toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,16)||'link'; }
+
+function makeKey(name) {
+  const base = slugify(name);
+  let key = base, idx = 1;
+  while (state.apps[key]) { key = base + idx; idx++; }
+  return key;
+}
+
+function renderAll() {
+  const container = document.getElementById('categoryContainer');
+  container.innerHTML = '';
+
+  state.groups.forEach((group, catIdx) => {
+    const catEl = document.createElement('div');
+    catEl.className = 'category';
+    catEl.dataset.catIdx = catIdx;
+    catEl.draggable = true;
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'cat-header';
+
+    const grip = document.createElement('span');
+    grip.className = 'grip';
+    grip.textContent = '\u2630';
+    grip.title = 'Drag to reorder category';
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.className = 'cat-title-input';
+    titleInput.value = group.title;
+    titleInput.dataset.catIdx = catIdx;
+    titleInput.addEventListener('change', () => {
+      state.groups[catIdx].title = titleInput.value.trim();
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'cat-actions';
+
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className = 'btn small';
+    collapseBtn.textContent = '\u25BC';
+    collapseBtn.title = 'Toggle collapse';
+    collapseBtn.onclick = () => {
+      const body = catEl.querySelector('.cat-body');
+      body.classList.toggle('collapsed');
+      collapseBtn.textContent = body.classList.contains('collapsed') ? '\u25B6' : '\u25BC';
+    };
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn small';
+    addBtn.textContent = '+';
+    addBtn.title = 'Add link to this category';
+    addBtn.onclick = () => addLink(catIdx);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn small danger';
+    delBtn.textContent = '\u2715';
+    delBtn.title = 'Delete category';
+    delBtn.onclick = () => {
+      if (!confirm('Delete category "' + group.title + '" and all its links?')) return;
+      // Remove apps in this category
+      (group.keys || []).forEach(k => { delete state.apps[k]; });
+      state.groups.splice(catIdx, 1);
+      renderAll();
+    };
+
+    actions.append(collapseBtn, addBtn, delBtn);
+    header.append(grip, titleInput, actions);
+
+    // Category drag events
+    catEl.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/cat-idx', catIdx.toString());
+      e.dataTransfer.effectAllowed = 'move';
+      catEl.classList.add('dragging');
+    });
+    catEl.addEventListener('dragend', () => catEl.classList.remove('dragging'));
+    catEl.addEventListener('dragover', (e) => {
+      if (e.dataTransfer.types.includes('text/cat-idx')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
+    });
+    catEl.addEventListener('drop', (e) => {
+      const fromIdx = parseInt(e.dataTransfer.getData('text/cat-idx'));
+      if (!isNaN(fromIdx) && fromIdx !== catIdx) {
+        const [moved] = state.groups.splice(fromIdx, 1);
+        state.groups.splice(catIdx, 0, moved);
+        renderAll();
+      }
+    });
+
+    // Body (links)
+    const body = document.createElement('div');
+    body.className = 'cat-body';
+
+    const keys = group.keys || [];
+    if (keys.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-cat';
+      empty.textContent = 'No links in this category';
+      body.append(empty);
+    } else {
+      keys.forEach((key, linkIdx) => {
+        const app = state.apps[key];
+        if (!app) return;
+
+        const item = document.createElement('div');
+        item.className = 'link-item';
+        item.draggable = true;
+        item.dataset.linkKey = key;
+        item.dataset.catIdx = catIdx;
+        item.dataset.linkIdx = linkIdx;
+
+        const linkGrip = document.createElement('span');
+        linkGrip.className = 'grip';
+        linkGrip.textContent = '\u2630';
+
+        const icon = document.createElement('img');
+        icon.className = 'link-icon';
+        icon.src = specialIcons[key] || faviconUrl(app.url);
+        icon.onerror = function() { this.style.display='none'; };
+
+        const info = document.createElement('div');
+        info.className = 'link-info';
+        const nameSpan = document.createElement('div');
+        nameSpan.className = 'link-name';
+        nameSpan.textContent = app.name;
+        const urlSpan = document.createElement('div');
+        urlSpan.className = 'link-url';
+        urlSpan.textContent = app.url;
+        info.append(nameSpan, urlSpan);
+
+        const linkActions = document.createElement('div');
+        linkActions.className = 'link-actions';
+
+        // Move up
+        const upBtn = document.createElement('button');
+        upBtn.className = 'move-btn';
+        upBtn.textContent = '\u25B2';
+        upBtn.title = 'Move up';
+        upBtn.onclick = (e) => { e.stopPropagation(); moveLink(catIdx, linkIdx, -1); };
+
+        // Move down
+        const downBtn = document.createElement('button');
+        downBtn.className = 'move-btn';
+        downBtn.textContent = '\u25BC';
+        downBtn.title = 'Move down';
+        downBtn.onclick = (e) => { e.stopPropagation(); moveLink(catIdx, linkIdx, 1); };
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn small';
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = (e) => { e.stopPropagation(); editLink(key, catIdx); };
+
+        const delLinkBtn = document.createElement('button');
+        delLinkBtn.className = 'btn small danger';
+        delLinkBtn.textContent = '\u2715';
+        delLinkBtn.onclick = (e) => {
+          e.stopPropagation();
+          delete state.apps[key];
+          group.keys.splice(linkIdx, 1);
+          renderAll();
+        };
+
+        linkActions.append(upBtn, downBtn, editBtn, delLinkBtn);
+        item.append(linkGrip, icon, info, linkActions);
+
+        // Link drag-and-drop (within and across categories)
+        item.addEventListener('dragstart', (e) => {
+          e.stopPropagation();
+          e.dataTransfer.setData('text/link-key', key);
+          e.dataTransfer.setData('text/src-cat', catIdx.toString());
+          e.dataTransfer.effectAllowed = 'move';
+          item.classList.add('dragging');
+        });
+        item.addEventListener('dragend', () => item.classList.remove('dragging'));
+        item.addEventListener('dragover', (e) => {
+          if (e.dataTransfer.types.includes('text/link-key')) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            item.classList.add('drag-over');
+          }
+        });
+        item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          item.classList.remove('drag-over');
+          const dragKey = e.dataTransfer.getData('text/link-key');
+          const srcCat = parseInt(e.dataTransfer.getData('text/src-cat'));
+          if (!dragKey || isNaN(srcCat)) return;
+          // Remove from source
+          const srcGroup = state.groups[srcCat];
+          const srcIdx = (srcGroup.keys || []).indexOf(dragKey);
+          if (srcIdx >= 0) srcGroup.keys.splice(srcIdx, 1);
+          // Insert at target position
+          group.keys.splice(linkIdx, 0, dragKey);
+          renderAll();
+        });
+
+        body.append(item);
+      });
+    }
+
+    // Drop zone for links dropped on empty area of category
+    body.addEventListener('dragover', (e) => {
+      if (e.dataTransfer.types.includes('text/link-key')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
+    });
+    body.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('text/link-key')) return;
+      e.preventDefault();
+      const dragKey = e.dataTransfer.getData('text/link-key');
+      const srcCat = parseInt(e.dataTransfer.getData('text/src-cat'));
+      if (!dragKey || isNaN(srcCat)) return;
+      // Remove from source
+      const srcGroup = state.groups[srcCat];
+      const srcIdx = (srcGroup.keys || []).indexOf(dragKey);
+      if (srcIdx >= 0) srcGroup.keys.splice(srcIdx, 1);
+      // Append to this category
+      if (!group.keys.includes(dragKey)) {
+        group.keys.push(dragKey);
+      }
+      renderAll();
+    });
+
+    catEl.append(header, body);
+    container.append(catEl);
+  });
+}
+
+/* ─── Link reorder (button-based for non-touch) ─── */
+function moveLink(catIdx, linkIdx, direction) {
+  const keys = state.groups[catIdx].keys;
+  const newIdx = linkIdx + direction;
+  if (newIdx < 0 || newIdx >= keys.length) return;
+  [keys[linkIdx], keys[newIdx]] = [keys[newIdx], keys[linkIdx]];
+  renderAll();
+}
+
+/* ─── Category modal ─── */
+function addCategory() {
+  document.getElementById('catName').value = '';
+  document.getElementById('catModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('catName').focus(), 50);
+}
+function closeCatModal() {
+  document.getElementById('catModal').classList.add('hidden');
+}
+function saveCatModal() {
+  const name = document.getElementById('catName').value.trim();
+  if (!name) return;
+  state.groups.push({ title: name, cls: 'sec-custom', keys: [] });
+  closeCatModal();
+  renderAll();
+}
+
+/* ─── Link modal ─── */
+function populateCategorySelect(selectedIdx) {
+  const sel = document.getElementById('linkCategory');
+  sel.innerHTML = '';
+  state.groups.forEach((g, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = g.title;
+    if (i === selectedIdx) opt.selected = true;
+    sel.append(opt);
+  });
+}
+
+function addLink(catIdx) {
+  editingLinkKey = null;
+  document.getElementById('linkModalTitle').textContent = 'Add Link';
+  document.getElementById('linkName').value = '';
+  document.getElementById('linkUrl').value = '';
+  populateCategorySelect(typeof catIdx === 'number' ? catIdx : 0);
+  document.getElementById('linkModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('linkName').focus(), 50);
+}
+
+function editLink(key, catIdx) {
+  editingLinkKey = key;
+  const app = state.apps[key];
+  if (!app) return;
+  document.getElementById('linkModalTitle').textContent = 'Edit Link';
+  document.getElementById('linkName').value = app.name;
+  document.getElementById('linkUrl').value = app.url;
+  populateCategorySelect(catIdx);
+  document.getElementById('linkModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('linkName').focus(), 50);
+}
+
+function closeLinkModal() {
+  document.getElementById('linkModal').classList.add('hidden');
+  editingLinkKey = null;
+}
+
+function saveLinkModal() {
+  const name = document.getElementById('linkName').value.trim();
+  let url = document.getElementById('linkUrl').value.trim();
+  const catIdx = parseInt(document.getElementById('linkCategory').value);
+  if (!name || !url) return;
+  if (!/^[a-z]+:\/\//i.test(url)) url = 'https://' + url;
+
+  if (editingLinkKey) {
+    // Update existing
+    state.apps[editingLinkKey] = { name, url };
+    // Move to selected category if different
+    state.groups.forEach((g, i) => {
+      const idx = (g.keys||[]).indexOf(editingLinkKey);
+      if (idx >= 0 && i !== catIdx) g.keys.splice(idx, 1);
+    });
+    if (!state.groups[catIdx].keys.includes(editingLinkKey)) {
+      state.groups[catIdx].keys.push(editingLinkKey);
+    }
+  } else {
+    // Add new
+    const key = makeKey(name);
+    state.apps[key] = { name, url };
+    state.groups[catIdx].keys.push(key);
+  }
+
+  closeLinkModal();
+  renderAll();
+}
+
+/* ─── Keyboard: Enter submits modals, Escape closes ─── */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeLinkModal();
+    closeCatModal();
+  }
+  if (e.key === 'Enter') {
+    if (!document.getElementById('linkModal').classList.contains('hidden')) {
+      e.preventDefault();
+      saveLinkModal();
+    }
+    if (!document.getElementById('catModal').classList.contains('hidden')) {
+      e.preventDefault();
+      saveCatModal();
+    }
+  }
+});
+</script>
+</body>
+</html>

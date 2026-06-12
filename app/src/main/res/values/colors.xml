@@ -1,0 +1,15 @@
+<resources>
+    <color name="bg_panel">#000000</color>
+    <color name="bg_panel_soft">#66000000</color>
+    <!-- Opaque variant of bg_panel_soft for surfaces that must visually
+         mask anything beneath them (e.g. the HUD container, which sits
+         over the chat-card recycler with clipChildren=false and would
+         otherwise show through to overflowing card content during
+         carousel scale animations). Slightly off-pure-black so the
+         glass-panel feel stays consistent with the rest of the UI. -->
+    <color name="bg_panel_opaque">#0F0F12</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="accent">#24E2A7</color>
+    <color name="accent_dark">#129A73</color>
+    <color name="warning">#FFAA00</color>
+</resources>

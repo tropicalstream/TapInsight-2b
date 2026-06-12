@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>TapLink AI</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg: #0b0f1a;
+            --card: #121a2e;
+            --accent: #69f0ae;
+            --text: #e6f1ff;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, Segoe UI, Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body {
+            padding: 12px;
+            box-sizing: border-box;
+        }
+
+        #chatHistory {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-bottom: 12px;
+            padding-right: 30px;
+            /* Ample space for the 24px scrollbar */
+        }
+
+        .msg {
+            padding: 10px 14px;
+            border-radius: 14px;
+            max-width: 85%;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        /* Markdown Styles */
+        .msg p {
+            margin: 0 0 8px 0;
+        }
+
+        .msg p:last-child {
+            margin-bottom: 0;
+        }
+
+        .msg code {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+        }
+
+        .msg pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .msg pre code {
+            background: transparent;
+            padding: 0;
+            display: block;
+        }
+
+        .msg ul,
+        .msg ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .msg.user {
+            align-self: flex-end;
+            background: var(--accent);
+            color: #000;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg.ai {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg.error {
+            align-self: center;
+            color: #ff5252;
+            font-size: 12px;
+            background: rgba(255, 82, 82, 0.1);
+        }
+
+        .msg.loading {
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        /* Input Area */
+        .chat-input-area button#micBtn {
+            background: linear-gradient(145deg, #1e3a5f, #264b70);
+            color: var(--text);
+            border: none;
+            padding: 8px 14px;
+            border-radius: 16px;
+            font-size: 12px;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chat-input-area button#micBtn.active {
+            background: linear-gradient(145deg, #ff4444, #cc3333);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 10px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin: 6px 2px 10px;
+        }
+
+        .tts-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .tts-toggle input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .toggle-track {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 999px;
+            transition: background 0.2s ease;
+        }
+
+        .toggle-track::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .tts-toggle input:checked+.toggle-track {
+            background: rgba(105, 240, 174, 0.8);
+        }
+
+        .tts-toggle input:checked+.toggle-track::after {
+            transform: translateX(16px);
+        }
+
+        #chatInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            padding: 4px;
+        }
+
+        #sendBtn {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+        }
+
+        #sendBtn.taplink-hover {
+            box-shadow: 0 0 0 2px rgba(105, 240, 174, 0.7);
+            transform: scale(1.03);
+        }
+
+        #summarizeBtn.taplink-hover {
+            border-color: rgba(105, 240, 174, 0.8);
+            box-shadow: 0 0 0 2px rgba(105, 240, 174, 0.35);
+        }
+
+        #sendBtn:active {
+            transform: scale(0.95);
+        }
+
+        #summarizeBtn {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 6px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: transform 0.1s, background 0.2s, border-color 0.2s;
+        }
+
+        #summarizeBtn:active {
+            transform: scale(0.97);
+        }
+
+        #summarizeBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 24px;
+            /* Large target area for glasses cursor */
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin: 4px 0;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            border: 4px solid transparent;
+            background-clip: content-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+            background-clip: content-box;
+        }
+
+        ::-webkit-scrollbar-thumb:active {
+            background: var(--accent);
+            background-clip: content-box;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="chatHistory" data-taplink-scroll="true">
+        <!-- Messages will appear here -->
+        <div class="msg ai">Hello! I am TapLink AI, your personal assistant. How can I help you today?</div>
+    </div>
+
+    <div class="chat-toolbar">
+        <label class="tts-toggle" for="ttsToggle">
+            <input id="ttsToggle" type="checkbox" />
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span>Speak replies</span>
+        </label>
+    </div>
+
+    <div class="chat-input-area">
+        <input id="chatInput" type="text" placeholder="Ask anything..." autocomplete="off" />
+        <button id="micBtn" type="button" aria-label="Voice input">Mic</button>
+        <button id="summarizeBtn" type="button" aria-label="Summarize this webpage">Summarize</button>
+        <button id="sendBtn" type="button">➤</button>
+    </div>
+
+    <script>
+        const chatHistory = document.getElementById('chatHistory');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const summarizeBtn = document.getElementById('summarizeBtn');
+        const micBtn = document.getElementById('micBtn');
+        const ttsToggle = document.getElementById('ttsToggle');
+
+        let messages = [];
+        let ttsEnabled = false;
+        let activeTtsAudio = null;
+        let pendingTtsAudio = null;
+        let isMicActive = false;
+
+        // Auto-scroll to bottom on load
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+
+        // Mic button handler
+        function toggleMic() {
+            if (window.ChatInputBridge && window.ChatInputBridge.onMicrophonePressed) {
+                window.ChatInputBridge.onMicrophonePressed();
+            } else {
+                console.warn("ChatInputBridge.onMicrophonePressed not found");
+            }
+        }
+
+        // Called by native code to set mic active state
+        window.setMicActive = function (active) {
+            isMicActive = active;
+            if (active) {
+                micBtn.classList.add('active');
+            } else {
+                micBtn.classList.remove('active');
+            }
+        };
+
+        // Called by native code to insert transcribed text
+        window.insertVoiceText = function (text) {
+            if (text) {
+                chatInput.value = (chatInput.value || '') + text;
+                chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        };
+
+        function requestTts(text) {
+            if (!ttsEnabled) return;
+            if (window.GroqBridge && window.GroqBridge.speakWithOrpheus) {
+                window.GroqBridge.speakWithOrpheus(text);
+            } else {
+                console.warn("GroqBridge TTS not found");
+            }
+        }
+
+        window.receiveGroqTtsAudio = function (base64Audio, mimeType) {
+            const audioSrc = `data:${mimeType || 'audio/mpeg'};base64,${base64Audio}`;
+            playTtsAudio(audioSrc);
+        };
+
+        window.receiveGroqTtsError = function (message) {
+            console.warn('TTS error', message);
+        };
+
+        function appendMessage(role, text) {
+            // Map 'assistant' to 'ai' for CSS styling
+            const displayRole = (role === 'assistant') ? 'ai' : role;
+
+            const msg = document.createElement('div');
+            msg.className = `msg ${displayRole}`;
+
+            // Use marked for AI/Assistant and User messages
+            if (role === 'ai' || role === 'assistant' || role === 'user') {
+                msg.innerHTML = marked.parse(text);
+            } else {
+                msg.textContent = text;
+            }
+
+            chatHistory.append(msg);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            if (role !== 'error' && role !== 'loading') {
+                // Ensure we store 'assistant' for API calls
+                const apiRole = (role === 'ai') ? 'assistant' : role;
+                messages.push({ role: apiRole, content: text });
+            }
+        }
+
+        window.receiveGroqResponse = function (text) {
+            const loading = chatHistory.querySelector('.msg.loading');
+            if (loading) loading.remove();
+
+            if (text.startsWith("Error:")) {
+                appendMessage('error', text);
+            } else {
+                appendMessage('assistant', text);
+                // TTS is now handled via receiveGroqResponseWithTts when enabled
+            }
+        };
+
+        window.receiveGroqResponseWithTts = function (text, base64Audio, mimeType) {
+            const loading = chatHistory.querySelector('.msg.loading');
+            if (loading) loading.remove();
+
+            if (text.startsWith("Error:")) {
+                appendMessage('error', text);
+                return;
+            }
+
+            // Display text
+            appendMessage('assistant', text);
+
+            // Play audio if provided
+            if (base64Audio) {
+                const audioSrc = `data:${mimeType || 'audio/mpeg'};base64,${base64Audio}`;
+                playTtsAudio(audioSrc);
+            } else if (ttsEnabled) {
+                // Native bundled TTS audio may occasionally fail to arrive on some devices;
+                // fall back to a separate TTS request so speech still plays.
+                requestTts(text);
+            }
+        };
+
+        function playTtsAudio(audioSrc) {
+            if (!audioSrc) return;
+            if (activeTtsAudio) {
+                activeTtsAudio.pause();
+                activeTtsAudio = null;
+            }
+            const audio = new Audio(audioSrc);
+            audio.preload = 'auto';
+            activeTtsAudio = audio;
+            pendingTtsAudio = null;
+            audio.play().catch((err) => {
+                console.warn('TTS playback failed', err);
+                pendingTtsAudio = audio;
+            });
+        }
+
+        function resumePendingTtsPlayback() {
+            if (!pendingTtsAudio) return;
+            const queuedAudio = pendingTtsAudio;
+            pendingTtsAudio = null;
+            queuedAudio.play().catch((err) => {
+                console.warn('Queued TTS playback failed', err);
+                pendingTtsAudio = queuedAudio;
+            });
+        }
+
+        function showLoading() {
+            // Add loading indicator
+            const loading = document.createElement('div');
+            loading.className = 'msg ai loading';
+            loading.textContent = 'Thinking...';
+            chatHistory.append(loading);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function sendMessage(text) {
+            appendMessage('user', text);
+            // Call Native Bridge
+            showLoading();
+            if (window.GroqBridge && window.GroqBridge.chatWithGroq) {
+                window.GroqBridge.chatWithGroq(text, JSON.stringify(messages.slice(0, -1)), ttsEnabled);
+            } else {
+                console.warn("GroqBridge not found");
+                setTimeout(() => {
+                    const loading = chatHistory.querySelector('.msg.loading');
+                    if (loading) loading.remove();
+                    appendMessage('error', 'Error: AI bridge not connected.');
+                }, 1000);
+            }
+        }
+
+        function sendChat() {
+            const text = (chatInput.value || '').trim();
+            if (!text) return;
+            chatInput.value = '';
+            sendMessage(text);
+        }
+
+        function getActivePageUrl() {
+            try {
+                if (window.GroqBridge && window.GroqBridge.getActivePageUrl) {
+                    return (window.GroqBridge.getActivePageUrl() || '').trim();
+                }
+            } catch (err) {
+                console.warn('getActivePageUrl failed', err);
+            }
+            return '';
+        }
+
+        function sendSummary() {
+            const url = getActivePageUrl();
+            if (!url) {
+                appendMessage('error', 'Error: No active webpage to summarize.');
+                return;
+            }
+            const text = `Summarize this webpage's contents:\n${url}`;
+            sendMessage(text);
+        }
+
+        sendBtn.addEventListener('click', sendChat);
+        summarizeBtn.addEventListener('click', sendSummary);
+        micBtn.addEventListener('click', toggleMic);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+        ttsToggle.addEventListener('change', (e) => {
+            ttsEnabled = e.target.checked;
+        });
+        document.addEventListener('click', (e) => {
+            resumePendingTtsPlayback();
+            const link = e.target.closest && e.target.closest('a');
+            if (!link || !link.href) return;
+            e.preventDefault();
+            if (window.GroqBridge && window.GroqBridge.openUrlInNewTab) {
+                window.GroqBridge.openUrlInNewTab(link.href);
+            } else {
+                window.open(link.href, '_blank', 'noopener');
+            }
+        });
+
+        // Prevent context menu
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('keydown', resumePendingTtsPlayback);
+
+    </script>
+</body>
+
+</html>

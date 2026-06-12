@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <title>Spotify &mdash; TapInsight</title>
+  <!--
+    TapInsight Spotify player.
+
+    Routed to from SpotifyTool via an open_taplink URL with these query params:
+      access_token   Spotify user-OAuth access token
+      expires_at_ms  epoch-ms the access token expires at
+      queue          JSON array of tracks:
+                     [{uri,title,artist,album,albumArtUrl,durationMs,openUrl}, ...]
+      index          0-based queue start index
+      playName       "Title — Artist" for the current track (used by the media toolbar)
+      playArtist     Artist name (for the toolbar subtitle)
+      playKind       "spotify_sdk" — distinguishes from TapRadio preview clips
+
+    ─── Output device model (April 2026) ─────────────────────────────────
+
+    Spotify does not permit third-party apps to stream full tracks through
+    their own audio pipeline (ExoPlayer direct-URL playback of licensed
+    Spotify content is explicitly disallowed), and the 30-second
+    preview_url field is being phased out of the Web API.  That leaves
+    exactly two places a full track can be rendered from:
+
+      1. Web Playback SDK running inside this WebView.  Registers a
+         Spotify Connect device called "TapInsight (AR glasses)" and
+         plays the queue locally on the glasses.  Requires a Premium
+         account AND a Widevine/EME-capable WebView — the X3's WebView
+         sometimes can't satisfy the second, in which case the SDK's
+         initialization_error fires.
+
+      2. Spotify Connect transfer to an existing Spotify device the
+         user has online — most usefully their paired phone, whose
+         audio can then be routed to the glasses via Bluetooth.  This
+         works for Free AND Premium accounts, and is the reliable
+         fallback path when the SDK fails on this hardware.
+
+    So the control flow is:
+      • Start the SDK.  If it becomes ready, we're done — audio plays on
+        the glasses through the SDK.
+      • If the SDK fails (Widevine, EME, Premium missing, timeout), find
+        a "Smartphone" device in /v1/me/player/devices and auto-transfer
+        playback there.  Audio plays on the user's phone, reaching the
+        glasses through their existing Bluetooth pairing.
+      • If no Smartphone is online, fall back to whatever Connect device
+        IS online — the user can correct via the picker.
+      • If no Connect device is online at all, surface a clear error.
+
+    ─── UI: DOM-based output picker (binocular-safe) ─────────────────────
+
+    A native <select> spawns an OS-level Android Spinner dialog on top of
+    the WebView, which ignores BinocularSbsLayout's half-width viewport
+    clipping and shows up only on one eye.  To render correctly in SBS
+    mode we build the picker entirely out of HTML <div> elements so the
+    dropdown panel is part of the WebView's own render tree, and the
+    BinocularSbsLayout draw path mirrors it into both eyes automatically.
+
+    State (queue, token, output preference) persists via localStorage so
+    re-opening the page re-anchors to whatever the user was doing.
+  -->
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel: #101014;
+      --panel-hi: #1a1a22;
+      --accent: #1DB954;
+      --accent-dim: #106931;
+      --border: #2a2a33;
+      --text: #f6f6f6;
+      --text-dim: #a8a8b2;
+      --error: #ff6b6b;
+      --burgundy: #4a0f1c;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #statusBar {
+      padding: 8px 14px;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      min-height: 26px;
+    }
+    #statusBar .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; background:#555; }
+    #statusBar.ok .dot { background: var(--accent); }
+    #statusBar.warn .dot { background: #e2b13c; }
+    #statusBar.err .dot { background: var(--error); }
+
+    /* ─── Output device picker (DOM-based, binocular-safe) ─────────── */
+    #outputRow {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative; /* anchor for the absolutely-positioned menu */
+    }
+    #outputRow .lbl {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      flex: 0 0 auto;
+    }
+    #outputTrigger {
+      flex: 1 1 auto;
+      background: var(--panel-hi);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 28px 7px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      position: relative;
+      min-height: 32px;
+    }
+    #outputTrigger::after {
+      content: "";
+      position: absolute;
+      right: 10px; top: 50%;
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid var(--text-dim);
+      transform: translateY(-50%);
+    }
+    #outputTrigger:focus { outline: 1px solid var(--accent); }
+    #outputRefresh {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    #outputRefresh:hover { color: var(--text); border-color: var(--text-dim); }
+    /* The dropdown menu is rendered inside the WebView's DOM so
+       BinocularSbsLayout mirrors it into both eyes correctly.
+       Positioned below #outputRow and scrollable when there are many
+       Connect devices. */
+    #outputMenu {
+      position: absolute;
+      top: 100%;
+      left: 14px;
+      right: 14px;
+      margin-top: 4px;
+      background: var(--panel-hi);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+      z-index: 10;
+    }
+    #outputMenu.open { display: block; }
+    #outputMenu .group {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      padding: 8px 12px 4px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    #outputMenu .opt {
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    #outputMenu .opt:last-child { border-bottom: none; }
+    #outputMenu .opt:hover { background: rgba(29,185,84,0.10); }
+    #outputMenu .opt.active { background: rgba(29,185,84,0.18); color: var(--accent); }
+    #outputMenu .opt.disabled { color: var(--text-dim); opacity: 0.5; cursor: not-allowed; }
+    #outputMenu .opt .sub {
+      display: block;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    #artwork {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #060606;
+      overflow: hidden;
+      position: relative;
+      padding: 24px;
+    }
+    #artwork img {
+      max-width: 70vmin;
+      max-height: 70vmin;
+      border-radius: 10px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+      background: #222;
+    }
+    #artwork .placeholder {
+      width: 60vmin;
+      height: 60vmin;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0f2717, #1DB954);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 700;
+      opacity: 0.85;
+    }
+    #toolbar {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 12px 14px 16px;
+    }
+    #meta {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 10px;
+    }
+    #meta .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.25;
+      max-height: 2.4em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    #meta .artist {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.3;
+    }
+    #meta .queuePos {
+      font-size: 11px;
+      color: var(--text-dim);
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+    #controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 6px;
+    }
+    .ctl {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 22px;
+      cursor: pointer;
+      padding: 10px;
+      border-radius: 50%;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .ctl:hover { background: var(--panel-hi); }
+    .ctl:active { transform: scale(0.94); }
+    .ctl.primary {
+      background: var(--accent);
+      color: #000;
+      width: 62px;
+      height: 62px;
+      font-size: 26px;
+    }
+    .ctl.primary:hover { background: #1ed760; }
+    .ctl:disabled { opacity: 0.4; cursor: not-allowed; }
+    #error {
+      padding: 14px;
+      background: #2a1414;
+      border: 1px solid #4a2020;
+      border-radius: 8px;
+      margin: 12px;
+      color: #ffbaba;
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+    }
+    #error a { color: #ff8c8c; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--accent-dim);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+    .badge.connect { background: #3a3a55; }
+    .badge.warn { background: #6b4c12; }
+    .badge.phone { background: #2e4c5a; }
+
+    /* ─── Lyrics button (above the play controls) ─────────────────────── */
+    #lyricsBar {
+      display: flex;
+      justify-content: flex-end;
+      margin: 0 0 6px;
+    }
+    #lyricsBtn {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      border-radius: 18px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      font-family: inherit;
+      cursor: pointer;
+      line-height: 1;
+    }
+    #lyricsBtn:hover { background: rgba(29,185,84,0.10); }
+    #lyricsBtn:active { transform: scale(0.96); }
+    #lyricsBtn .note { font-size: 14px; margin-right: 4px; }
+
+    /* ─── Full-screen lyrics overlay ───────────────────────────────────
+       Modelled on Spotify's own lyrics view: large centred typography,
+       dim inactive lines, a single bold white active line, and smooth
+       auto-scroll that keeps the active line centred on screen.  The
+       panel lives in the WebView DOM (not a native dialog), so
+       BinocularSbsLayout mirrors it correctly into both eyes. */
+    #lyricsPanel {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #060606;
+      display: none;
+      flex-direction: column;
+      z-index: 20;
+    }
+    #lyricsPanel.open { display: flex; }
+    #lyricsHeader {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    #lyricsHeader .lTitle {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #lyricsHeader .lArtist {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #lyricsClose {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      flex: 0 0 auto;
+      padding: 0;
+    }
+    #lyricsClose:hover { background: var(--panel-hi); }
+    #lyricsStatus {
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      display: none;
+    }
+    #lyricsStatus.shown { display: block; }
+    #lyricsScroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40vh 18px 50vh; /* big top/bottom pad so active line centres */
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    #lyricsScroll .line {
+      font-size: 20px;
+      line-height: 1.55;
+      color: rgba(246,246,246,0.38);
+      text-align: center;
+      margin: 6px 0;
+      transition: color 0.25s ease, transform 0.25s ease;
+      font-weight: 500;
+    }
+    #lyricsScroll .line.empty { color: rgba(246,246,246,0.15); }
+    #lyricsScroll .line.active {
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 22px;
+      transform: scale(1.03);
+    }
+    /* Static (non-synced) lyrics render left-aligned and at a gentler
+       size so a tall block of text stays readable on the glasses. */
+    #lyricsScroll.static { padding: 18px 20px 80px; }
+    #lyricsScroll.static .line {
+      text-align: left;
+      color: rgba(246,246,246,0.85);
+      font-size: 16px;
+      line-height: 1.7;
+      font-weight: 500;
+      transform: none;
+    }
+    #lyricsAttrib {
+      padding: 8px 14px 10px;
+      font-size: 10.5px;
+      color: var(--text-dim);
+      text-align: center;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      letter-spacing: 0.3px;
+    }
+    #lyricsAttrib a { color: var(--text-dim); text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div id="statusBar"><span class="dot"></span><span id="statusText">Initializing Spotify&hellip;</span></div>
+<div id="error"></div>
+<!-- DOM-based output picker.  The trigger is a <button> and the menu is
+     a sibling <div> inside #outputRow.  Both are regular WebView DOM so
+     BinocularSbsLayout mirrors them correctly into the left and right
+     eye — unlike a native <select>, whose dropdown is an OS-level
+     Android Spinner that skips the SBS clip rect. -->
+<div id="outputRow">
+  <span class="lbl">Output</span>
+  <button id="outputTrigger" aria-haspopup="listbox" aria-expanded="false">
+    <span id="outputTriggerLabel">This glasses (connecting&hellip;)</span>
+  </button>
+  <button id="outputRefresh" title="Refresh Spotify devices">Refresh</button>
+  <div id="outputMenu" role="listbox"></div>
+</div>
+<div id="artwork">
+  <div class="placeholder" id="artworkPh">Spotify</div>
+  <img id="artworkImg" alt="Album art" style="display:none">
+</div>
+<div id="toolbar">
+  <div id="meta">
+    <div class="title" id="trackTitle">&mdash;</div>
+    <div class="artist" id="trackArtist">Loading queue&hellip;</div>
+    <div class="queuePos" id="queuePos"></div>
+  </div>
+  <div id="lyricsBar">
+    <button id="lyricsBtn" type="button" title="Show lyrics">
+      <span class="note">&#9835;</span>Lyrics
+    </button>
+  </div>
+  <div id="controls">
+    <button class="ctl" id="btnPrev" title="Previous">&#9198;</button>
+    <button class="ctl primary" id="btnPlay" title="Play / Pause">&#9658;</button>
+    <button class="ctl" id="btnNext" title="Next">&#9197;</button>
+  </div>
+</div>
+
+<!-- Full-screen lyrics overlay.  Hidden by default; opened by #lyricsBtn.
+     Uses only DOM nodes inside the WebView so BinocularSbsLayout's
+     dispatchDraw clips + double-draws it into both eyes automatically,
+     the same way the output-picker dropdown does. -->
+<div id="lyricsPanel" aria-hidden="true">
+  <div id="lyricsHeader">
+    <div style="flex:1 1 auto; min-width:0">
+      <div class="lTitle" id="lyricsTitle">&mdash;</div>
+      <div class="lArtist" id="lyricsArtist"></div>
+    </div>
+    <button id="lyricsClose" type="button" title="Close lyrics">&times;</button>
+  </div>
+  <div id="lyricsStatus">Loading lyrics&hellip;</div>
+  <div id="lyricsScroll"></div>
+  <div id="lyricsAttrib">
+    Lyrics provided by <a href="https://lrclib.net" target="_blank" rel="noopener">LRClib</a>
+  </div>
+</div>
+
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ── URL params ────────────────────────────────────────────────────────
+  const params = new URLSearchParams(location.search);
+  const urlAccessToken = params.get('access_token') || '';
+  const urlExpiresAtMs = parseInt(params.get('expires_at_ms') || '0', 10) || 0;
+  const urlQueueRaw = params.get('queue') || '';
+  const urlIndex = parseInt(params.get('index') || '0', 10) || 0;
+  const urlAutoplay = params.get('autoplay') !== '0' && params.get('start_paused') !== '1';
+
+  // ── localStorage state ────────────────────────────────────────────────
+  const LS_KEY = 'tapinsight_spotify_state_v1';
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { console.warn('[Spotify] loadState', e); }
+    return {
+      queue: [],
+      index: 0,
+      accessToken: '',
+      expiresAtMs: 0,
+      outputMode: 'sdk',
+      wantPlaying: false
+    };
+  }
+  function saveState(s) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  let state = loadState();
+  if (!state.outputMode) state.outputMode = 'sdk';
+  if (typeof state.wantPlaying !== 'boolean') state.wantPlaying = false;
+
+  // Persisted last device pick the user manually made — used to default the
+  // dropdown back to e.g. "my phone" on subsequent Gemini-launched sessions
+  // instead of always resetting to 'sdk'. Stored separately from
+  // [state.outputMode] so the Gemini reset can read it.
+  const LS_LAST_PICK_KEY = 'tapSpotifyLastUserPick.v1';
+  function loadLastUserPick() {
+    try { return localStorage.getItem(LS_LAST_PICK_KEY) || ''; }
+    catch (e) { return ''; }
+  }
+  function saveLastUserPick(mode) {
+    try { localStorage.setItem(LS_LAST_PICK_KEY, mode); } catch (e) {}
+  }
+
+  if (urlQueueRaw) {
+    try {
+      const q = JSON.parse(urlQueueRaw);
+      if (Array.isArray(q) && q.length > 0) {
+        state.queue = q;
+        state.index = Math.max(0, Math.min(urlIndex, q.length - 1));
+        state.wantPlaying = urlAutoplay;
+        // Mark this queue as Gemini-supplied. While the flag is set,
+        // syncQueueToSpotifyItem will refuse to overwrite state.queue[index]
+        // with whatever track the device is *currently* playing (typically
+        // the phone's previous song). Without this, the brief window
+        // between "transfer session to phone" and "play our URI on phone"
+        // lets the poll fetch the phone's stale current item and stomp
+        // our queued track — which is what produced the "displayed song
+        // is wrong until I tap next" bug. The flag clears the first time
+        // the polled URI matches anything in our queue (= the device is
+        // confirmed playing our content), or when the user taps next/prev.
+        state.geminiQueueIntent = true;
+        // Gemini-launched non-autoplay session: default output to the user's
+        // last manual pick (typically their phone) so they don't have to
+        // re-select it every time. Falls back to SDK when no pick is saved.
+        if (!urlAutoplay) {
+          const lastPick = loadLastUserPick();
+          state.outputMode = lastPick || 'sdk';
+        }
+      }
+    } catch (e) { console.warn('[Spotify] bad queue param', e); }
+  }
+  if (urlAccessToken) {
+    state.accessToken = urlAccessToken;
+    state.expiresAtMs = urlExpiresAtMs;
+  }
+  saveState(state);
+
+  // ── UI helpers ────────────────────────────────────────────────────────
+  function setStatus(text, level) {
+    const bar = document.getElementById('statusBar');
+    bar.classList.remove('ok','warn','err');
+    if (level) bar.classList.add(level);
+    document.getElementById('statusText').innerHTML = text;
+  }
+  function showError(html) {
+    const el = document.getElementById('error');
+    el.innerHTML = html;
+    el.style.display = 'block';
+  }
+  function clearError() { document.getElementById('error').style.display = 'none'; }
+
+  function currentTrack() {
+    return (state.queue && state.queue[state.index]) || {};
+  }
+
+  function displayArtist(item) {
+    return (item && item.artist) || '';
+  }
+
+  function displayTitle(item) {
+    return (item && item.title) || '(untitled)';
+  }
+
+  function updateDocumentTitle() {
+    const t = currentTrack();
+    const title = displayTitle(t);
+    const artist = displayArtist(t);
+    document.title = 'Spotify · ' + title + (artist ? ' — ' + artist : '');
+  }
+
+  function renderMeta() {
+    if (!state.queue || state.queue.length === 0) {
+      document.getElementById('trackTitle').textContent = 'No queue';
+      document.getElementById('trackArtist').textContent = 'Say "play <song> on Spotify" to start.';
+      document.getElementById('queuePos').textContent = '';
+      document.getElementById('artworkPh').style.display = 'flex';
+      document.getElementById('artworkImg').style.display = 'none';
+      document.title = 'Spotify — TapInsight';
+      return;
+    }
+    const t = currentTrack();
+    document.getElementById('trackTitle').textContent = displayTitle(t);
+    document.getElementById('trackArtist').textContent = t.artist || '';
+    document.getElementById('queuePos').textContent =
+      'Track ' + (state.index + 1) + ' of ' + state.queue.length +
+      (t.album ? '  \u2022  ' + t.album : '');
+    updateDocumentTitle();
+    const img = document.getElementById('artworkImg');
+    const ph = document.getElementById('artworkPh');
+    if (t.albumArtUrl) {
+      img.onload = () => { img.style.display = 'block'; ph.style.display = 'none'; };
+      img.onerror = () => { img.style.display = 'none'; ph.style.display = 'flex'; };
+      img.src = t.albumArtUrl;
+    } else {
+      img.style.display = 'none';
+      ph.style.display = 'flex';
+    }
+  }
+
+  // ── Token freshness ───────────────────────────────────────────────────
+  //
+  // Spotify user-OAuth access tokens live for ~3600 s.  The token expires
+  // mid-song unless we refresh BEFORE it expires — reacting only to a 401
+  // from the Playback API leaves a visible audio gap.  So we do two things:
+  //
+  //   1) `ensureFreshToken()` is called before any Connect API call and
+  //      (reactively) refreshes a stale token.
+  //   2) `scheduleTokenRefresh()` arms a one-shot timer to fire ~5 min
+  //      before `state.expiresAtMs`, so refreshes happen quietly in the
+  //      background and the user never hears audio stop.
+  //
+  // The native side of the refresh lives in tapbrowser's AndroidInterface
+  // (`refreshSpotifyAccessToken()`), which does the POST to
+  // https://accounts.spotify.com/api/token and writes the new tokens back
+  // to `visionclaw_prefs` so both the app module and the glasses WebView
+  // read the same values.
+  function tokenIsFresh() {
+    return state.accessToken && Date.now() < (state.expiresAtMs || 0) - 5000;
+  }
+
+  // Inflight guard so concurrent callers (e.g. the scheduled timer + a
+  // user-triggered play action hitting a 401 at the same moment) don't
+  // fire two /api/token POSTs back-to-back.
+  let _refreshInflight = null;
+
+  async function refreshToken() {
+    if (_refreshInflight) return _refreshInflight;
+    _refreshInflight = (async () => {
+      try {
+        if (typeof AndroidInterface !== 'undefined' &&
+            typeof AndroidInterface.refreshSpotifyAccessToken === 'function') {
+          // Call is synchronous on the JS side but blocks on a background
+          // HTTP request inside AndroidInterface.  WebView runs @JavascriptInterface
+          // methods on a non-UI worker thread so this doesn't stall rendering.
+          const json = AndroidInterface.refreshSpotifyAccessToken();
+          if (json) {
+            const parsed = JSON.parse(json);
+            if (parsed && parsed.access_token) {
+              state.accessToken = parsed.access_token;
+              state.expiresAtMs = parsed.expires_at_ms || (Date.now() + 3300000);
+              saveState(state);
+              // Re-arm the proactive refresh timer every time we land a
+              // fresh token so the next refresh is correctly timed against
+              // the NEW expiry (not the previous one).
+              scheduleTokenRefresh();
+              return true;
+            }
+          }
+        }
+      } catch (e) { console.warn('[Spotify] native refresh failed', e); }
+      return false;
+    })();
+    try {
+      return await _refreshInflight;
+    } finally {
+      _refreshInflight = null;
+    }
+  }
+
+  async function ensureFreshToken() {
+    if (tokenIsFresh()) return true;
+    const ok = await refreshToken();
+    if (!ok) {
+      setStatus('Spotify access token expired. Re-connect in the companion app.', 'err');
+      showError(
+        'Spotify session expired. Open the AITap companion app, scroll to the Spotify step, and click ' +
+        '<b>Refresh status</b> or re-run <b>Connect Spotify</b>.'
+      );
+      return false;
+    }
+    return true;
+  }
+
+  // ── Proactive token refresh timer ─────────────────────────────────────
+  //
+  // Arms a single setTimeout to fire ~5 minutes before `state.expiresAtMs`.
+  // If the token is already within that 5-minute window (or expired), the
+  // refresh fires on the next tick.  Any previously-armed timer is cleared
+  // first so we never leak overlapping timers across track changes, SDK
+  // reconnects, or manual reloads.
+  let _refreshTimer = null;
+  const REFRESH_LEAD_MS = 5 * 60 * 1000;   // refresh 5 min before expiry
+  const MIN_REFRESH_DELAY_MS = 1000;       // never fire faster than 1 s
+
+  function scheduleTokenRefresh() {
+    if (_refreshTimer) {
+      clearTimeout(_refreshTimer);
+      _refreshTimer = null;
+    }
+    if (!state.accessToken) return;
+    const expiresAt = state.expiresAtMs || 0;
+    if (!expiresAt) return;
+    const delay = Math.max(
+      MIN_REFRESH_DELAY_MS,
+      expiresAt - Date.now() - REFRESH_LEAD_MS
+    );
+    _refreshTimer = setTimeout(async () => {
+      _refreshTimer = null;
+      try {
+        const ok = await refreshToken();
+        if (!ok) {
+          // Refresh failed — try again in 60 s; this handles transient
+          // network flaps without leaving the user permanently stranded.
+          _refreshTimer = setTimeout(scheduleTokenRefresh, 60 * 1000);
+        }
+      } catch (e) {
+        console.warn('[Spotify] scheduled refresh threw', e);
+        _refreshTimer = setTimeout(scheduleTokenRefresh, 60 * 1000);
+      }
+    }, delay);
+    console.log('[Spotify] next token refresh in ' + Math.round(delay / 1000) + 's');
+  }
+
+  // ── Web Playback SDK ─────────────────────────────────────────────────
+  let sdkPlayer = null;
+  let sdkDeviceId = null;
+  let sdkReady = false;
+  let sdkFailed = false;
+  let sdkPaused = true;
+
+  function initSdk() {
+    if (typeof window.Spotify === 'undefined' || !window.Spotify.Player) {
+      setStatus('Web Playback SDK not available on this WebView.', 'warn');
+      sdkFailed = true;
+      autoRouteToPhoneOrBest('SDK script did not load');
+      return false;
+    }
+    sdkPlayer = new window.Spotify.Player({
+      name: 'TapInsight (AR glasses)',
+      getOAuthToken: async (cb) => {
+        if (!tokenIsFresh()) await refreshToken();
+        cb(state.accessToken || '');
+      },
+      volume: 0.8
+    });
+    sdkPlayer.addListener('ready', ({ device_id }) => {
+      sdkDeviceId = device_id;
+      sdkReady = true;
+      populateMenu();
+      if (state.outputMode === 'sdk') {
+        setStatus(
+          state.wantPlaying
+            ? 'Playing on this glasses via Spotify SDK. <span class="badge">SDK</span>'
+            : 'Ready on this glasses via Spotify SDK. Press play when ready. <span class="badge">SDK</span>',
+          'ok'
+        );
+        transferPlaybackToSdk().then(() => {
+          if (state.wantPlaying) playCurrentOnSdk();
+          else {
+            sdkPaused = true;
+            syncPlayButtonIcon();
+          }
+        });
+      }
+    });
+    sdkPlayer.addListener('not_ready', () => {
+      sdkReady = false;
+      if (state.outputMode === 'sdk') setStatus('Spotify SDK device went offline.', 'warn');
+      populateMenu();
+    });
+    sdkPlayer.addListener('player_state_changed', (s) => {
+      if (!s) return;
+      sdkPaused = s.paused;
+      syncPlayButtonIcon();
+      // Keep the lyrics time-sync clock calibrated off the SDK's own
+      // position value, which is updated on every state change (track
+      // advance, seek, pause/resume).
+      recordPosition(s.position || 0, !s.paused);
+      // If the track advanced while the lyrics panel is open, reload
+      // lyrics for the new track.  Guard against firing twice for the
+      // same track by comparing the uri.
+      if (lyricsState.panelOpen) {
+        const curUri = s.track_window && s.track_window.current_track &&
+          s.track_window.current_track.uri;
+        if (curUri && curUri !== lyricsState.loadedForUri) {
+          fetchLyricsForCurrent();
+        }
+      }
+      if (s.paused && s.position === 0 && s.track_window && s.track_window.previous_tracks &&
+          s.track_window.previous_tracks.length > 0 && s.duration > 0 &&
+          (s.track_window.current_track == null || s.track_window.current_track.id == null)) {
+        spotifyNext();
+      }
+    });
+    sdkPlayer.addListener('initialization_error', ({ message }) => {
+      console.error('[Spotify] SDK init error', message);
+      sdkFailed = true;
+      autoRouteToPhoneOrBest('SDK initialization_error: ' + (message || 'unknown'));
+    });
+    sdkPlayer.addListener('authentication_error', ({ message }) => {
+      console.error('[Spotify] SDK auth error', message);
+      setStatus('Spotify authentication failed. Re-connect in the companion app.', 'err');
+    });
+    sdkPlayer.addListener('account_error', ({ message }) => {
+      console.error('[Spotify] SDK account error', message);
+      sdkFailed = true;
+      autoRouteToPhoneOrBest('SDK account_error (Premium required for on-glasses SDK streaming)');
+    });
+    sdkPlayer.connect().then((ok) => {
+      if (!ok) {
+        sdkFailed = true;
+        autoRouteToPhoneOrBest('SDK connect() returned false');
+      }
+    });
+    return true;
+  }
+
+  async function transferPlaybackToSdk() {
+    if (!sdkDeviceId) return;
+    if (!(await ensureFreshToken())) return;
+    try {
+      await fetch('https://api.spotify.com/v1/me/player', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ device_ids: [sdkDeviceId], play: false })
+      });
+    } catch (e) { console.warn('[Spotify] transfer failed', e); }
+  }
+
+  async function playCurrentOnSdk() {
+    if (!sdkDeviceId) return;
+    if (!state.queue || state.queue.length === 0) return;
+    if (!(await ensureFreshToken())) return;
+    const uris = state.queue
+      .slice(state.index)
+      .map(t => t && t.uri)
+      .filter(Boolean);
+    if (uris.length === 0) return;
+    try {
+      const resp = await fetch('https://api.spotify.com/v1/me/player/play?device_id=' + encodeURIComponent(sdkDeviceId), {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ uris: uris })
+      });
+      if (!resp.ok) {
+        const body = await resp.text();
+        console.warn('[Spotify] SDK play failed', resp.status, body);
+        if (resp.status === 403) {
+          showError('Spotify rejected SDK playback (403). Premium is required, and the device must be active.');
+        }
+      } else {
+        clearError();
+      }
+    } catch (e) {
+      console.warn('[Spotify] SDK play exception', e);
+    }
+  }
+
+  // ── Playback-position tracking (shared between SDK and Connect modes)
+  // These values drive the lyrics time-sync below.  Both output paths feed
+  // `lastPosMs` / `lastPosAt` + `isPlayingNow` so a single interpolation
+  // function covers SDK playback AND Connect-to-phone playback.
+  let lastPosMs = 0;
+  let lastPosAt = 0;          // performance.now() captured alongside lastPosMs
+  let isPlayingNow = false;
+
+  function recordPosition(ms, isPlaying) {
+    lastPosMs = ms || 0;
+    lastPosAt = performance.now();
+    isPlayingNow = !!isPlaying;
+  }
+  function estimatedPositionMs() {
+    if (!isPlayingNow) return lastPosMs;
+    return lastPosMs + (performance.now() - lastPosAt);
+  }
+
+  // ── Spotify Connect (phone / desktop / speakers) ─────────────────────
+  let connectDevices = []; // cache of /v1/me/player/devices
+  let connectPollTimer = null; // setInterval handle for the Connect-mode poll
+
+  /**
+   * Update the play-button icon to reflect the current value of sdkPaused.
+   * Kept as a single helper so both the SDK listener path and the Connect
+   * polling path draw the exact same glyphs.
+   */
+  function syncPlayButtonIcon() {
+    const btn = document.getElementById('btnPlay');
+    if (!btn) return;
+    btn.innerHTML = sdkPaused ? '&#9658;' : '&#10074;&#10074;';
+  }
+
+  function trackFromSpotifyItem(item) {
+    if (!item) return null;
+    const artists = Array.isArray(item.artists)
+      ? item.artists.map(a => a && a.name).filter(Boolean).join(', ')
+      : '';
+    const album = item.album || {};
+    let art = '';
+    if (Array.isArray(album.images) && album.images.length) {
+      const sorted = album.images.slice().sort((a, b) =>
+        Math.abs((a.width || 0) - 300) - Math.abs((b.width || 0) - 300));
+      art = (sorted[0] && sorted[0].url) || '';
+    }
+    return {
+      uri: item.uri || '',
+      title: item.name || '(untitled)',
+      artist: artists,
+      album: album.name || '',
+      albumArtUrl: art,
+      durationMs: item.duration_ms || 0,
+      openUrl: item.external_urls && item.external_urls.spotify || ''
+    };
+  }
+
+  function syncQueueToSpotifyItem(item) {
+    const track = trackFromSpotifyItem(item);
+    if (!track || !track.uri) return false;
+    const old = currentTrack();
+    if (old && old.uri === track.uri) {
+      // Metadata can still improve after the first search result (for
+      // example album art from the active item), so merge and re-render.
+      state.queue[state.index] = Object.assign({}, old, track);
+      saveState(state);
+      renderMeta();
+      return false;
+    }
+    const existingIdx = (state.queue || []).findIndex(t => t && t.uri === track.uri);
+    if (existingIdx >= 0) {
+      state.index = existingIdx;
+      state.queue[existingIdx] = Object.assign({}, state.queue[existingIdx], track);
+      // Device is now confirmed playing FROM our Gemini-supplied queue —
+      // future polls can freely sync the queue to the device's current
+      // item (e.g. when the user skips on the phone, the glasses follow).
+      if (state.geminiQueueIntent) state.geminiQueueIntent = false;
+    } else {
+      if (!Array.isArray(state.queue) || state.queue.length === 0) {
+        state.queue = [track];
+        state.index = 0;
+      } else if (state.geminiQueueIntent) {
+        // Gemini-supplied queue is still in protection window. The polled
+        // URI isn't one of our queued items — almost certainly the phone's
+        // pre-transfer track still showing on the API before our play
+        // command lands. Refuse to stomp the requested track. Once the
+        // device actually starts playing our content, the existingIdx
+        // branch above will fire and clear this flag.
+        return false;
+      } else {
+        state.queue[state.index] = track;
+      }
+    }
+    saveState(state);
+    renderMeta();
+    // Auto-fetch lyrics for the new track ALWAYS, not only when the lyrics
+    // panel happens to be open. Karaoke-in-dim-mode needs synced lyrics
+    // loaded for the current track so the glasses can show the live line
+    // without the user opening the panel first.
+    try { lyricsState.autoFetchedUri = track.uri || ''; } catch (_e) {}
+    updateLyricsHeader();
+    fetchLyricsForCurrent(track.uri, item);
+    return true;
+  }
+
+  /**
+   * Poll /v1/me/player and mirror is_playing onto sdkPaused (plus the
+   * play-button glyph).  Used in Connect mode where we have no event
+   * stream and the real state lives on the phone/desktop that's actually
+   * rendering the audio — without this, the button icon drifts the
+   * moment the user pauses on the phone directly, or immediately after
+   * auto-route finishes (where sdkPaused is still `true` from init but
+   * the Connect target is already playing).
+   */
+  async function pollCurrentPlaybackState() {
+    if (!(await ensureFreshToken())) return;
+    try {
+      const r = await fetch('https://api.spotify.com/v1/me/player', {
+        headers: { 'Authorization': 'Bearer ' + state.accessToken }
+      });
+      // 204 means "no active device / nothing playing" — treat as paused
+      // rather than mutating sdkPaused in a way that yanks the glyph.
+      if (r.status === 204) {
+        sdkPaused = true;
+        isPlayingNow = false;
+        syncPlayButtonIcon();
+        return;
+      }
+      if (!r.ok) return;
+      const body = await r.json();
+      if (body && typeof body.is_playing === 'boolean') {
+        sdkPaused = !body.is_playing;
+        syncPlayButtonIcon();
+        // Capture progress_ms too so the lyrics line-highlight can tick
+        // between polls via the interpolation helper.  Without this,
+        // synced lyrics would jump only once every 4s.
+        if (typeof body.progress_ms === 'number') {
+          recordPosition(body.progress_ms, body.is_playing);
+        }
+        // If the Connect target jumped to a different track while we were
+        // idle (e.g. user skipped on the phone), update the glasses UI too.
+        //
+        // EXCEPTION: when the user has a Gemini-queued track that they
+        // haven't pressed play on yet (state.wantPlaying === false and
+        // state.queue is populated), don't let the target device's
+        // previously-active track stomp the requested one. The user
+        // explicitly asked Gemini for THIS song; the glasses should keep
+        // showing it until they press play (which transfers + starts the
+        // queue) or skip away. Once playback is intentionally underway,
+        // we resume tracking the device freely.
+        const curUri = body.item && body.item.uri;
+        const haveQueuedButNotPlaying =
+          !state.wantPlaying && Array.isArray(state.queue) && state.queue.length > 0;
+        if (body.item && curUri && !haveQueuedButNotPlaying) {
+          syncQueueToSpotifyItem(body.item);
+        }
+        if (curUri && lyricsState.panelOpen && curUri !== lyricsState.loadedForUri) {
+          fetchLyricsForCurrent(curUri, body.item);
+        }
+      }
+    } catch (e) {
+      console.warn('[Spotify] player-state poll failed', e);
+    }
+  }
+
+  /**
+   * Start or stop the periodic Connect-mode playback-state poll.  We only
+   * poll while a Connect target is the active output; SDK mode already
+   * gets authoritative updates via player_state_changed, so polling
+   * there would just burn tokens against rate limits.
+   */
+  function syncConnectPollTimer() {
+    const inConnect = state.outputMode && state.outputMode.indexOf('connect:') === 0;
+    if (inConnect && !connectPollTimer) {
+      connectPollTimer = setInterval(pollCurrentPlaybackState, 2000);
+      pollCurrentPlaybackState();
+    } else if (!inConnect && connectPollTimer) {
+      clearInterval(connectPollTimer);
+      connectPollTimer = null;
+    }
+  }
+
+  async function refreshConnectDevices() {
+    if (!(await ensureFreshToken())) return;
+    try {
+      const r = await fetch('https://api.spotify.com/v1/me/player/devices', {
+        headers: { 'Authorization': 'Bearer ' + state.accessToken }
+      });
+      if (!r.ok) {
+        console.warn('[Spotify] /devices failed', r.status);
+        return;
+      }
+      const d = await r.json();
+      connectDevices = (d && d.devices) || [];
+    } catch (e) {
+      console.warn('[Spotify] /devices exception', e);
+    }
+    populateMenu();
+  }
+
+  /** Return the best phone device: prefer type=Smartphone and active, then
+   *  any Smartphone, then null. */
+  function findPhoneDevice() {
+    const devs = connectDevices || [];
+    const smartphones = devs.filter(d =>
+      d && d.id && (String(d.type || '').toLowerCase() === 'smartphone'));
+    return smartphones.find(d => d.is_active)
+      || smartphones.find(d => !d.is_restricted)
+      || smartphones[0]
+      || null;
+  }
+
+  /** Called on any SDK failure.  Tries the user's phone first; if that
+   *  isn't online we pick any non-restricted Connect device; if nothing
+   *  is online we surface a clear error rather than trying to play a
+   *  30-s preview clip (preview_url is being deprecated by Spotify). */
+  async function autoRouteToPhoneOrBest(reason) {
+    console.warn('[Spotify] auto-routing off SDK:', reason);
+    // Make sure the device list is fresh before we pick a target.
+    await refreshConnectDevices();
+    if (!state.wantPlaying) {
+      setStatus('Spotify is loaded paused. Choose an output device, then press play.', 'ok');
+      populateMenu();
+      syncConnectPollTimer();
+      return;
+    }
+    const phone = findPhoneDevice();
+    if (phone) {
+      setStatus('Playing on your phone (' + (phone.name || 'Smartphone') +
+        '). <span class="badge phone">Phone</span>', 'ok');
+      state.outputMode = 'connect:' + phone.id;
+      saveState(state);
+      populateMenu();
+      syncConnectPollTimer();
+      await playCurrentOnConnect(phone.id);
+      return;
+    }
+    // No phone — fall through to any device that isn't restricted.
+    const anyUsable = (connectDevices || []).find(d =>
+      d && d.id && !d.is_restricted);
+    if (anyUsable) {
+      setStatus('Playing on ' + (anyUsable.name || 'Spotify device') +
+        '. <span class="badge connect">Connect</span>', 'ok');
+      state.outputMode = 'connect:' + anyUsable.id;
+      saveState(state);
+      populateMenu();
+      syncConnectPollTimer();
+      await playCurrentOnConnect(anyUsable.id);
+      return;
+    }
+    // Nothing online anywhere.
+    setStatus('No Spotify Connect device is online right now.', 'err');
+    showError(
+      'TapInsight couldn\'t stream in-browser on this WebView, and no Spotify device is currently online to hand ' +
+      'playback off to.  Open the <b>Spotify app on your phone</b>, start any track so the phone shows up as an ' +
+      'active device, then press <b>Refresh</b> above.  Full-track playback will then resume on your phone, and ' +
+      'the audio will reach the glasses through the existing Bluetooth pairing.'
+    );
+  }
+
+  async function playCurrentOnConnect(deviceId) {
+    if (!deviceId) return;
+    if (!state.queue || state.queue.length === 0) return;
+    if (!(await ensureFreshToken())) return;
+    const uris = state.queue
+      .slice(state.index)
+      .map(t => t && t.uri)
+      .filter(Boolean);
+    if (uris.length === 0) return;
+    try {
+      // Transfer session focus to the chosen device first.
+      await fetch('https://api.spotify.com/v1/me/player', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ device_ids: [deviceId], play: false })
+      });
+      if (!state.wantPlaying) {
+        sdkPaused = true;
+        syncPlayButtonIcon();
+        setTimeout(pollCurrentPlaybackState, 800);
+        return;
+      }
+      // Then start the queue.  Both calls target the same deviceId so
+      // the user's pick sticks even if another device was briefly active.
+      const r = await fetch('https://api.spotify.com/v1/me/player/play?device_id=' + encodeURIComponent(deviceId), {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ uris: uris })
+      });
+      if (!r.ok) {
+        const body = await r.text();
+        console.warn('[Spotify] connect play failed', r.status, body);
+        if (r.status === 404) {
+          setStatus('That Spotify device went offline. Pick another from the dropdown.', 'warn');
+        } else if (r.status === 403) {
+          setStatus('Spotify refused the transfer. Premium is required for some remote targets.', 'warn');
+        }
+      } else {
+        clearError();
+        // Optimistically reflect "now playing" on the button so the first
+        // tap after auto-route does a real pause instead of a no-op play.
+        sdkPaused = false;
+        syncPlayButtonIcon();
+        // And confirm against the server a moment later, once Spotify's
+        // state has settled, so we don't strand a stale glyph if the
+        // transfer actually failed silently on the target device.
+        setTimeout(pollCurrentPlaybackState, 800);
+      }
+    } catch (e) { console.warn('[Spotify] connect play failed', e); }
+  }
+
+  // ── Output dispatcher ────────────────────────────────────────────────
+  async function playCurrent() {
+    if (!state.queue || state.queue.length === 0) return;
+    renderMeta();
+    if (state.outputMode === 'sdk') {
+      if (sdkReady) {
+        await transferPlaybackToSdk();
+        if (state.wantPlaying) await playCurrentOnSdk();
+      } else if (sdkFailed) await autoRouteToPhoneOrBest('sdk selected but sdkFailed');
+      // else: SDK still initialising — ready-event handler will kick it off.
+    } else if (state.outputMode && state.outputMode.indexOf('connect:') === 0) {
+      const id = state.outputMode.slice('connect:'.length);
+      await playCurrentOnConnect(id);
+    }
+  }
+
+  async function switchOutput(mode, auto) {
+    if (state.outputMode === mode) { closeMenu(); return; }
+    state.outputMode = mode;
+    saveState(state);
+    // Remember manual picks so future Gemini-launched sessions default to
+    // the same device. Auto-routes (e.g. SDK failed → fallback to phone)
+    // are excluded so they don't overwrite the user's preference.
+    if (!auto) saveLastUserPick(mode);
+    closeMenu();
+    populateMenu();
+    if (mode !== 'sdk' && sdkPlayer) {
+      try { await sdkPlayer.pause(); } catch (e) {}
+    }
+    if (!auto) {
+      if (mode === 'sdk') {
+        setStatus('Switching to this glasses (SDK)&hellip;');
+      } else if (mode.indexOf('connect:') === 0) {
+        const id = mode.slice('connect:'.length);
+        const d = (connectDevices || []).find(x => x.id === id);
+        setStatus('Switching to ' + (d ? d.name : 'Spotify Connect device') + '&hellip;');
+      }
+    }
+    // Start/stop the Connect-mode poll timer to match the new output.
+    syncConnectPollTimer();
+    if (!state.wantPlaying) {
+      // User hasn't pressed play yet — they're just choosing the target
+      // device for the Gemini-queued song. DO NOT transfer playback here:
+      // calling /v1/me/player would let Spotify report whatever was last
+      // playing on that device, and the subsequent poll's
+      // syncQueueToSpotifyItem would stomp the Gemini-requested track off
+      // the glasses display. Just remember the pick + show a status. The
+      // actual transfer happens inside playCurrent() when the user
+      // presses play, against the correct queue.
+      if (mode === 'sdk') {
+        setStatus('Spotify is paused on this glasses. Press play when ready.', 'ok');
+      } else if (mode.indexOf('connect:') === 0) {
+        const id = mode.slice('connect:'.length);
+        const d = (connectDevices || []).find(x => x.id === id);
+        setStatus('Spotify is paused on ' + (d ? d.name : 'the selected device') + '. Press play when ready.', 'ok');
+      }
+      return;
+    }
+    await playCurrent();
+  }
+
+  // ── DOM-based device picker ──────────────────────────────────────────
+  const menu = document.getElementById('outputMenu');
+  const trigger = document.getElementById('outputTrigger');
+  const triggerLabel = document.getElementById('outputTriggerLabel');
+
+  function openMenu() {
+    menu.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+  function closeMenu() {
+    menu.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+  function toggleMenu() {
+    if (menu.classList.contains('open')) closeMenu(); else openMenu();
+  }
+
+  /**
+   * Render the current trigger-button label plus the full menu list.
+   * Called whenever device list, SDK readiness, or selection changes.
+   */
+  function populateMenu() {
+    // 1) Label on the trigger button reflects current selection.
+    const current = state.outputMode || 'sdk';
+    if (current === 'sdk') {
+      triggerLabel.textContent = sdkReady
+        ? 'This glasses (Spotify SDK)'
+        : sdkFailed
+          ? 'This glasses (SDK unavailable)'
+          : 'This glasses (connecting\u2026)';
+    } else if (current.indexOf('connect:') === 0) {
+      const id = current.slice('connect:'.length);
+      const d = (connectDevices || []).find(x => x.id === id);
+      triggerLabel.textContent = d ? ('Spotify Connect: ' + d.name) : 'Spotify Connect device';
+    } else {
+      triggerLabel.textContent = 'Choose output\u2026';
+    }
+
+    // 2) Menu contents.
+    menu.innerHTML = '';
+    const addGroup = (label) => {
+      const g = document.createElement('div');
+      g.className = 'group';
+      g.textContent = label;
+      menu.appendChild(g);
+    };
+    const addOpt = (value, primary, sub, opts) => {
+      const o = document.createElement('div');
+      o.className = 'opt';
+      if (opts && opts.disabled) o.classList.add('disabled');
+      if (value === current) o.classList.add('active');
+      o.setAttribute('role', 'option');
+      o.setAttribute('data-value', value);
+      const p = document.createElement('span');
+      p.textContent = primary;
+      o.appendChild(p);
+      if (sub) {
+        const s = document.createElement('span');
+        s.className = 'sub';
+        s.textContent = sub;
+        o.appendChild(s);
+      }
+      if (!(opts && opts.disabled)) {
+        o.addEventListener('click', () => switchOutput(value, /*auto*/ false));
+      }
+      menu.appendChild(o);
+    };
+
+    // Group 1: this glasses (SDK).
+    addGroup('This glasses');
+    addOpt('sdk',
+      'Spotify SDK on glasses',
+      sdkReady
+        ? 'Full tracks, Premium — playing on the glasses speakers.'
+        : sdkFailed
+          ? 'Unavailable on this WebView (Widevine/EME).  Use a Connect target below.'
+          : 'Connecting\u2026',
+      { disabled: sdkFailed });
+
+    // Group 2: Connect devices, phone-first.
+    const devs = (connectDevices || []).filter(d => d && d.id && d.id !== sdkDeviceId);
+    if (devs.length > 0) {
+      addGroup('Spotify Connect (full tracks)');
+      const smartphones = devs.filter(d => String(d.type || '').toLowerCase() === 'smartphone');
+      const others = devs.filter(d => String(d.type || '').toLowerCase() !== 'smartphone');
+      smartphones.forEach(d => addOpt('connect:' + d.id,
+        d.name || 'Smartphone',
+        'Phone' + (d.is_active ? ' (active)' : '') + ' — audio reaches the glasses via Bluetooth.'));
+      others.forEach(d => addOpt('connect:' + d.id,
+        d.name || 'Spotify device',
+        (d.type || 'Device') + (d.is_active ? ' (active)' : '')));
+    } else {
+      addGroup('Spotify Connect');
+      const info = document.createElement('div');
+      info.className = 'opt disabled';
+      info.innerHTML = '<span>No Connect devices online</span>' +
+        '<span class="sub">Open Spotify on your phone, start any track, then press Refresh.</span>';
+      menu.appendChild(info);
+    }
+  }
+
+  // ── Lyrics (LRClib) ──────────────────────────────────────────────────
+  //
+  // Spotify does not expose an official third-party lyrics API (their own
+  // in-app lyrics come via a private Musixmatch partnership), so TapInsight
+  // can't pull lyrics from Spotify directly.  Instead we query LRClib
+  // (https://lrclib.net) — a free, no-auth, community-curated lyrics
+  // database that returns both plain text AND synchronized-timestamp LRC
+  // data where available, which is exactly what this synced scrolling
+  // view needs.  Attribution is shown at the bottom of the panel per
+  // LRClib's recommended etiquette.
+  //
+  // The visual language mirrors Spotify's own full-screen lyrics view:
+  // dim inactive lines, a single bold active line, centred typography,
+  // and smooth auto-scroll that keeps the active line anchored near the
+  // middle of the viewport.
+  const lyricsState = {
+    panelOpen: false,
+    loadedForUri: '',
+    linesSynced: [],     // [{ t: seconds, text: string, el: HTMLElement }]
+    linesPlain: [],      // array of strings for the fallback static view
+    activeIdx: -1,
+    tickTimer: null,
+    fastPollTimer: null, // 1s /v1/me/player poll while panel open (Connect mode)
+  };
+
+  function setLyricsStatus(text) {
+    const el = document.getElementById('lyricsStatus');
+    if (!text) { el.classList.remove('shown'); el.textContent = ''; return; }
+    el.textContent = text;
+    el.classList.add('shown');
+  }
+
+  /** Parse LRC text into [{ t: seconds, text }].  Spec supports repeated
+   *  timestamps on a single line like "[00:12.00][01:45.50]text"; we
+   *  expand those into separate entries so each occurrence highlights at
+   *  the right moment. */
+  function parseLrc(lrc) {
+    if (!lrc) return [];
+    const out = [];
+    const stampRe = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+    for (const raw of lrc.split(/\r?\n/)) {
+      stampRe.lastIndex = 0;
+      const stamps = [];
+      let m;
+      let lastEnd = 0;
+      while ((m = stampRe.exec(raw)) !== null) {
+        stamps.push(parseInt(m[1], 10) * 60 + parseFloat(m[2]));
+        lastEnd = stampRe.lastIndex;
+      }
+      if (stamps.length === 0) continue;
+      const text = raw.slice(lastEnd).trim();
+      for (const t of stamps) out.push({ t: t, text: text });
+    }
+    out.sort((a, b) => a.t - b.t);
+    return out;
+  }
+
+  function renderLyricsScroll() {
+    const scroll = document.getElementById('lyricsScroll');
+    scroll.innerHTML = '';
+    scroll.classList.remove('static');
+    lyricsState.activeIdx = -1;
+    if (lyricsState.linesSynced.length > 0) {
+      lyricsState.linesSynced.forEach((ln, i) => {
+        const div = document.createElement('div');
+        div.className = 'line' + (ln.text ? '' : ' empty');
+        div.textContent = ln.text || '\u2022';
+        ln.el = div;
+        scroll.appendChild(div);
+      });
+      tickLyrics(); // immediate first highlight pass
+    } else if (lyricsState.linesPlain.length > 0) {
+      scroll.classList.add('static');
+      lyricsState.linesPlain.forEach(text => {
+        const div = document.createElement('div');
+        div.className = 'line' + (text ? '' : ' empty');
+        div.textContent = text || '\u00a0';
+        scroll.appendChild(div);
+      });
+    }
+  }
+
+  function updateLyricsHeader() {
+    const t = (state.queue && state.queue[state.index]) || {};
+    document.getElementById('lyricsTitle').textContent = t.title || '\u2014';
+    document.getElementById('lyricsArtist').textContent = t.artist || '';
+  }
+
+  /** Fetch lyrics from LRClib.  Tries the exact-metadata endpoint first
+   *  (best quality match incl. synced timestamps), falls back to /search
+   *  for fuzzier matches when the exact tuple isn't indexed.
+   *
+   *  @param {string} [forUri] Optional Spotify URI; when omitted, uses the
+   *                           current queue item.
+   *  @param {object} [spotifyItem] Optional /v1/me/player item for the
+   *                                Connect-side "track changed under us"
+   *                                case, where state.queue may be stale. */
+  async function fetchLyricsForCurrent(forUri, spotifyItem) {
+    const fallbackItem = (state.queue && state.queue[state.index]) || {};
+    // Prefer Spotify's own item when we have it (it's authoritative for
+    // the currently-sounding track); fall back to our queue metadata.
+    const title = (spotifyItem && spotifyItem.name) || fallbackItem.title || '';
+    const artist = (spotifyItem && spotifyItem.artists && spotifyItem.artists[0] &&
+                    spotifyItem.artists[0].name) || fallbackItem.artist || '';
+    const album = (spotifyItem && spotifyItem.album && spotifyItem.album.name) ||
+                   fallbackItem.album || '';
+    const durationMs = (spotifyItem && spotifyItem.duration_ms) || fallbackItem.durationMs || 0;
+    const uri = forUri || (spotifyItem && spotifyItem.uri) || fallbackItem.uri || '';
+
+    if (!title) {
+      lyricsState.loadedForUri = uri;
+      lyricsState.linesSynced = [];
+      lyricsState.linesPlain = [];
+      renderLyricsScroll();
+      setLyricsStatus('No track loaded.');
+      return;
+    }
+
+    lyricsState.loadedForUri = uri;
+    lyricsState.linesSynced = [];
+    lyricsState.linesPlain = [];
+    renderLyricsScroll();
+    updateLyricsHeader();
+    setLyricsStatus('Loading lyrics\u2026');
+
+    try {
+      const exactParams = new URLSearchParams({
+        track_name: title,
+        artist_name: artist
+      });
+      if (album) exactParams.set('album_name', album);
+      if (durationMs > 0) exactParams.set('duration', Math.round(durationMs / 1000).toString());
+
+      let data = null;
+      const exactResp = await fetch('https://lrclib.net/api/get?' + exactParams.toString());
+      if (exactResp.ok) {
+        data = await exactResp.json();
+      } else if (exactResp.status === 404) {
+        // Fuzzier search fallback.  Take the top hit that has lyrics of some kind.
+        const searchParams = new URLSearchParams({ track_name: title });
+        if (artist) searchParams.set('artist_name', artist);
+        const sr = await fetch('https://lrclib.net/api/search?' + searchParams.toString());
+        if (sr.ok) {
+          const arr = await sr.json();
+          if (Array.isArray(arr)) {
+            data = arr.find(e => e && (e.syncedLyrics || e.plainLyrics)) || arr[0] || null;
+          }
+        }
+      }
+
+      // Ignore the response if the user skipped to a different track
+      // while this fetch was in flight.
+      const curUri = (state.queue && state.queue[state.index] && state.queue[state.index].uri) || '';
+      if (uri && curUri && uri !== curUri) return;
+
+      if (!data || (!data.syncedLyrics && !data.plainLyrics)) {
+        setLyricsStatus('No lyrics found for this track on LRClib.');
+        return;
+      }
+      if (data.instrumental) {
+        setLyricsStatus('This track is marked as instrumental on LRClib.');
+        return;
+      }
+      if (data.syncedLyrics) {
+        lyricsState.linesSynced = parseLrc(data.syncedLyrics);
+      }
+      if (!lyricsState.linesSynced.length && data.plainLyrics) {
+        lyricsState.linesPlain = data.plainLyrics.split(/\r?\n/);
+      }
+      renderLyricsScroll();
+      setLyricsStatus('');
+    } catch (e) {
+      console.warn('[Lyrics] fetch failed', e);
+      setLyricsStatus('Couldn\'t reach the lyrics service.');
+    }
+  }
+
+  function tickLyrics() {
+    if (!lyricsState.panelOpen) return;
+    const lines = lyricsState.linesSynced;
+    if (!lines || lines.length === 0) return;
+    const posSec = estimatedPositionMs() / 1000;
+    // Binary-search the largest i such that lines[i].t <= posSec.
+    let lo = 0, hi = lines.length - 1, idx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (lines[mid].t <= posSec) { idx = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    if (idx === lyricsState.activeIdx) return;
+    if (lyricsState.activeIdx >= 0 && lines[lyricsState.activeIdx]) {
+      const prev = lines[lyricsState.activeIdx].el;
+      if (prev) prev.classList.remove('active');
+    }
+    lyricsState.activeIdx = idx;
+    if (idx >= 0 && lines[idx] && lines[idx].el) {
+      lines[idx].el.classList.add('active');
+      // Auto-scroll so the active line sits ~40% down the viewport.
+      const scroll = document.getElementById('lyricsScroll');
+      const el = lines[idx].el;
+      const target = el.offsetTop - scroll.clientHeight * 0.4;
+      scroll.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    }
+  }
+
+  function openLyrics() {
+    lyricsState.panelOpen = true;
+    document.getElementById('lyricsPanel').classList.add('open');
+    document.getElementById('lyricsPanel').setAttribute('aria-hidden', 'false');
+    updateLyricsHeader();
+    fetchLyricsForCurrent();
+    if (lyricsState.tickTimer) clearInterval(lyricsState.tickTimer);
+    lyricsState.tickTimer = setInterval(tickLyrics, 250);
+    // In Connect mode we need a tighter poll while lyrics are visible so
+    // the active line is <1s off from reality; the background 4s poll is
+    // kept for the play-button sync.
+    if (state.outputMode && state.outputMode.indexOf('connect:') === 0) {
+      if (lyricsState.fastPollTimer) clearInterval(lyricsState.fastPollTimer);
+      lyricsState.fastPollTimer = setInterval(pollCurrentPlaybackState, 1000);
+    }
+  }
+
+  function closeLyrics() {
+    lyricsState.panelOpen = false;
+    document.getElementById('lyricsPanel').classList.remove('open');
+    document.getElementById('lyricsPanel').setAttribute('aria-hidden', 'true');
+    if (lyricsState.tickTimer) { clearInterval(lyricsState.tickTimer); lyricsState.tickTimer = null; }
+    if (lyricsState.fastPollTimer) { clearInterval(lyricsState.fastPollTimer); lyricsState.fastPollTimer = null; }
+  }
+
+  // ── Queue nav (FF / Rewind / Play-Pause) ─────────────────────────────
+  async function spotifyNext() {
+    if (!state.queue || state.queue.length === 0) return;
+    if (state.index < state.queue.length - 1) {
+      state.index += 1;
+      saveState(state);
+      renderMeta();
+      if (lyricsState.panelOpen) {
+        updateLyricsHeader();
+        fetchLyricsForCurrent();
+      }
+      await playCurrent();
+    } else {
+      setStatus('End of queue.', 'warn');
+    }
+  }
+  async function spotifyPrev() {
+    if (!state.queue || state.queue.length === 0) return;
+    if (state.index > 0) {
+      state.index -= 1;
+      saveState(state);
+      renderMeta();
+      if (lyricsState.panelOpen) {
+        updateLyricsHeader();
+        fetchLyricsForCurrent();
+      }
+      await playCurrent();
+    } else {
+      setStatus('Already at the start of the queue.', 'warn');
+    }
+  }
+  async function spotifyTogglePlay() {
+    if (!(await ensureFreshToken())) return;
+    if (state.outputMode === 'sdk' && sdkReady && sdkPlayer) {
+      try {
+        if (sdkPaused) {
+          state.wantPlaying = true;
+          saveState(state);
+          await playCurrent();
+        } else {
+          state.wantPlaying = false;
+          saveState(state);
+          await sdkPlayer.pause();
+          sdkPaused = true;
+          syncPlayButtonIcon();
+        }
+      } catch (e) { console.warn(e); }
+      return;
+    }
+    if (state.outputMode === 'sdk' && sdkFailed) {
+      state.wantPlaying = true;
+      saveState(state);
+      await autoRouteToPhoneOrBest('user pressed play while SDK unavailable');
+      return;
+    }
+    if (state.outputMode && state.outputMode.indexOf('connect:') === 0) {
+      const id = state.outputMode.slice('connect:'.length);
+      if (sdkPaused) {
+        state.wantPlaying = true;
+        saveState(state);
+        await playCurrent();
+        return;
+      }
+      state.wantPlaying = false;
+      saveState(state);
+      const url = 'https://api.spotify.com/v1/me/player/pause?device_id=' + encodeURIComponent(id);
+      try {
+        await fetch(url, {
+          method: 'PUT',
+          headers: { 'Authorization': 'Bearer ' + state.accessToken }
+        });
+        // Flip optimistically so the glyph matches the user's intent
+        // right away, then confirm against the server so it self-heals
+        // if Spotify rejected the command (e.g. device just went offline).
+        sdkPaused = true;
+        syncPlayButtonIcon();
+        setTimeout(pollCurrentPlaybackState, 600);
+      } catch (e) { console.warn(e); }
+    }
+  }
+
+  // ── Wire up controls ─────────────────────────────────────────────────
+  document.getElementById('btnNext').addEventListener('click', spotifyNext);
+  document.getElementById('btnPrev').addEventListener('click', spotifyPrev);
+  document.getElementById('btnPlay').addEventListener('click', spotifyTogglePlay);
+  document.getElementById('lyricsBtn').addEventListener('click', openLyrics);
+  document.getElementById('lyricsClose').addEventListener('click', closeLyrics);
+  trigger.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
+  document.getElementById('outputRefresh').addEventListener('click', (e) => {
+    e.stopPropagation();
+    refreshConnectDevices();
+  });
+  // Close the menu when tapping anywhere else in the WebView.
+  document.addEventListener('click', (e) => {
+    if (!menu.classList.contains('open')) return;
+    if (menu.contains(e.target) || trigger.contains(e.target)) return;
+    closeMenu();
+  });
+
+  // Expose for outer controllers (matches radio.html pattern).
+  window.tapSpotifyNext = spotifyNext;
+  window.tapSpotifyPrev = spotifyPrev;
+  window.tapSpotifyTogglePlay = spotifyTogglePlay;
+  window.gestureNextTrack = spotifyNext;
+  window.gesturePrevTrack = spotifyPrev;
+  window.tapInsightTogglePlayback = spotifyTogglePlay;
+  window.tapSpotifyOpenLyrics = openLyrics;
+  window.tapSpotifyToggleLyrics = function() {
+    if (lyricsState.panelOpen) closeLyrics(); else openLyrics();
+  };
+  window.tapSpotifyNowPlaying = function() {
+    const t = currentTrack();
+    const posMs = Math.max(0, Math.round(estimatedPositionMs() || 0));
+    const posSec = posMs / 1000;
+
+    // Karaoke-in-dim-mode: make sure synced lyrics exist for the current
+    // track so the glasses can show the currently-sung line WITHOUT the
+    // user having to open the lyrics panel. Fetch is one-shot per track
+    // (guarded by uri) and harmless if a fetch is already in flight.
+    try {
+      const uri = t.uri || '';
+      const haveLyrics =
+        (lyricsState.linesSynced && lyricsState.linesSynced.length > 0) ||
+        (lyricsState.linesPlain && lyricsState.linesPlain.length > 0);
+      if (!haveLyrics && uri && uri !== lyricsState.autoFetchedUri &&
+          typeof fetchLyricsForCurrent === 'function') {
+        lyricsState.autoFetchedUri = uri;
+        // Fire and forget — the next poll will see lines populated.
+        Promise.resolve().then(function(){ try { fetchLyricsForCurrent(); } catch(e) {} });
+      }
+    } catch(e) {}
+
+    // Compute the currently-active synced lyric line so the dim-mode
+    // overlay can show one line at a time (auto-updating with playback).
+    // Plain (non-timed) lyrics intentionally don't surface here because
+    // we can't pick a line for them — they only render in the full panel.
+    let currentLyricLine = '';
+    try {
+      const lines = (lyricsState && lyricsState.linesSynced) || [];
+      if (lines.length > 0) {
+        let lo = 0, hi = lines.length - 1, idx = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (lines[mid].t <= posSec) { idx = mid; lo = mid + 1; }
+          else hi = mid - 1;
+        }
+        if (idx >= 0 && lines[idx] && lines[idx].text) {
+          currentLyricLine = String(lines[idx].text || '').trim();
+        }
+      }
+    } catch(e) {}
+
+    return JSON.stringify({
+      service: 'Spotify',
+      title: t.title || '',
+      artist: t.artist || '',
+      album: t.album || '',
+      uri: t.uri || '',
+      albumArtUrl: t.albumArtUrl || '',
+      progressMs: posMs,
+      durationMs: t.durationMs || 0,
+      isPlaying: !!isPlayingNow,
+      paused: !!sdkPaused,
+      lyricsOpen: !!lyricsState.panelOpen,
+      lyricsLoaded: (lyricsState.linesSynced && lyricsState.linesSynced.length > 0) ||
+        (lyricsState.linesPlain && lyricsState.linesPlain.length > 0),
+      hasSyncedLyrics: !!(lyricsState.linesSynced && lyricsState.linesSynced.length > 0),
+      currentLyricLine: currentLyricLine
+    });
+  };
+
+  // ── Startup ──────────────────────────────────────────────────────────
+  renderMeta();
+  populateMenu();
+  refreshConnectDevices();
+  // If a prior session left us in Connect mode, start polling immediately
+  // so the play-button glyph reflects whatever the target is doing right
+  // now (e.g. user returns to the page mid-song).
+  syncConnectPollTimer();
+  // Arm the proactive token-refresh timer up-front so a long Connect
+  // session (phone playing music for an hour+) never hits a mid-song
+  // 401 from an expired access_token.  refreshToken() also re-arms it
+  // on every successful refresh, so the chain self-sustains.
+  scheduleTokenRefresh();
+
+  // When the device is resumed (glasses woken, Spotify tab refocused),
+  // immediately reconcile the token — `setTimeout` can be throttled by
+  // the WebView when the tab is backgrounded, so we can't rely purely on
+  // the scheduled timer surviving a long sleep.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      if (!tokenIsFresh()) {
+        refreshToken().catch(() => {});
+      } else {
+        scheduleTokenRefresh();
+      }
+    }
+  });
+
+  if (!state.queue || state.queue.length === 0) {
+    setStatus('Ready. Ask Gemini to play something on Spotify.', 'ok');
+  } else {
+    setStatus(
+      state.wantPlaying
+        ? 'Connecting Spotify Premium SDK on this glasses&hellip;'
+        : 'Spotify loaded paused. Choose an output device, then press play.',
+      'ok'
+    );
+    sdkPaused = !state.wantPlaying;
+    syncPlayButtonIcon();
+    // Gemini-launched autoplay against a Connect target (typically the
+    // user's phone, restored from lastUserPick): kick off the transfer +
+    // play right away. The SDK-ready handler covers the 'sdk' output
+    // case; without this branch a Connect target would sit idle waiting
+    // for a manual play press.
+    if (state.wantPlaying &&
+        state.outputMode &&
+        state.outputMode.indexOf('connect:') === 0) {
+      // Defer briefly so refreshConnectDevices has a chance to confirm
+      // the target is online before we transfer. playCurrentOnConnect
+      // surfaces a clean error toast if the device went offline.
+      setTimeout(function(){ try { playCurrent(); } catch(e) { console.warn(e); } }, 250);
+    }
+  }
+
+  window.onSpotifyWebPlaybackSDKReady = function() {
+    if (!tokenIsFresh()) {
+      refreshToken().then(() => {
+        if (tokenIsFresh()) initSdk();
+        else {
+          sdkFailed = true;
+          autoRouteToPhoneOrBest('no fresh token for SDK init');
+        }
+      });
+    } else {
+      initSdk();
+    }
+  };
+  // Safety timeout: if the SDK never becomes ready within 6 s (common on
+  // the X3 WebView where Widevine/EME may be locked down), auto-route
+  // to the user's phone via Connect so they still hear full tracks.
+  setTimeout(() => {
+    if (!sdkReady && state.outputMode === 'sdk' && !sdkFailed) {
+      sdkFailed = true;
+      autoRouteToPhoneOrBest('SDK readiness timeout (6s)');
+    }
+  }, 6000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Red unread-count pill that overhangs the HUD bell's top-right corner. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#FFFF3B30" />
+    <stroke
+        android:width="0.5dp"
+        android:color="#66FFFFFF" />
+</shape>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Chat card row.  Each row is a short full-width horizontal strip to
+  match the mock-up — a rounded bubble that stretches from the chat
+  recycler's left gutter to its right edge.  The fragment drives the
+  row height via ChatAdapter.CARD_HEIGHT_DP (see ChatPanelFragment),
+  so this layout uses `wrap_content` and a modest minHeight that's
+  overridden from code.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/messageRow"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:minHeight="88dp"
+    android:paddingHorizontal="4dp"
+    android:paddingVertical="4dp"
+    android:gravity="center_vertical">
+
+    <LinearLayout
+        android:id="@+id/messageBubble"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@drawable/bg_chat_bubble_assistant"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        android:orientation="vertical"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="14dp">
+
+        <ScrollView
+            android:id="@+id/messageScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadingEdge="vertical"
+            android:fadingEdgeLength="12dp"
+            android:requiresFadingEdge="vertical"
+            android:scrollbars="none">
+
+            <TextView
+                android:id="@+id/messageText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+        </ScrollView>
+
+        <LinearLayout
+            android:id="@+id/launchCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp"
+            android:background="#000000"
+            android:focusable="true"
+            android:focusableInTouchMode="false"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/launchCardUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#FFFFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

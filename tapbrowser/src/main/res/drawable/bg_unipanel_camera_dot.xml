@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 2 Step 2c.4: small "recording" dot drawn next to the
+  CAM label in the unipanel camera-status chip. Solid red oval,
+  sized 8dp × 8dp at the call-site. The vivid red reads as
+  "camera is live" at a glance over any browser content.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#FFFF3344" />
+</shape>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Unipanel v2: foreground service permissions for the
+         GeminiSessionForegroundService. FOREGROUND_SERVICE_MICROPHONE
+         is the Android 14+ flavour required to keep the AudioRecord
+         open while visionclaw is backgrounded (which is its normal
+         state after the launcher swap below). POST_NOTIFICATIONS is
+         requested at runtime in MainActivity.onCreate. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Phase 4d: FOREGROUND_SERVICE_CAMERA so the Service can drive
+         CameraX while in foreground (Android 14+ enforcement). Pairs
+         with foregroundServiceType="microphone|camera" on the Service
+         element below. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
+    <!--
+      Media access for the photos gallery's DCIM merge: lets the
+      companion app + on-glasses gallery enumerate the RayNeo native
+      Camera app's photos & videos (in /DCIM/Camera) alongside
+      TapInsight's own /Android/data/com.rayneo.visionclaw/files/Media/
+      Photos. READ_MEDIA_IMAGES / READ_MEDIA_VIDEO are the API 33+
+      granular replacements for READ_EXTERNAL_STORAGE; the legacy
+      permission stays declared with maxSdkVersion=32 so older
+      Android builds still work.
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="true" />
+
+    <application
+        android:name=".VisionClawApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="true"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VisionClawRayNeo"
+        tools:targetApi="31">
+
+        <meta-data
+            android:name="com.rayneo.mercury.app"
+            android:value="true" />
+
+        <!-- Removed ar_mode to enable binocular (both lenses) display.
+             ar_mode restricts rendering to left lens only. -->
+
+        <!-- Unipanel v2: visionclaw no longer holds the launcher
+             intent filter — tapbrowser does. visionclaw is still
+             exported so tapbrowser can warm-start it with
+             EXTRA_TAPCLAW_WARM_START, and so the chat-side can be
+             brought to the front explicitly if a future commit
+             wires that path. -->
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="density|orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustNothing"
+            android:theme="@style/Theme.VisionClawRayNeo" />
+
+        <!-- Unipanel v2: foreground service that keeps the Gemini
+             Live AudioRecord alive while visionclaw is in the
+             background. Type=microphone is mandatory on Android
+             14+. -->
+        <service
+            android:name=".core.session.GeminiSessionForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera" />
+
+    </application>
+
+</manifest>

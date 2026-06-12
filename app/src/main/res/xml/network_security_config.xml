@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Allow cleartext (HTTP) traffic so the app can reach the local-network
+    OpenClaw bridge at e.g. http://openclaw.ai:18789.
+    Android 9+ blocks cleartext by default.
+    Using base-config here because Android domain-config does not support
+    IP-address subnet matching — only exact hostnames.  Public APIs
+    (Gemini, etc.) already use HTTPS regardless of this setting.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,29 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.VisionClawRayNeo" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryVariant">@color/accent_dark</item>
+        <item name="colorSecondary">@color/accent</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+    </style>
+
+    <!--
+      Unipanel v2 — translucent variant used by visionclaw MainActivity
+      ONLY when it was warm-started by tapbrowser. Parents off the main
+      VisionClaw theme so AppCompat / MaterialComponents requirements
+      stay satisfied (android.R.style.Theme_Translucent_NoTitleBar
+      crashed AppCompatActivity with "You need to use a Theme.AppCompat
+      theme (or descendant)"). Adds windowIsTranslucent + null window
+      animations so the warm-start path is fully invisible — the user
+      perceives only tapbrowser ever drawing during launch.
+    -->
+    <style name="Theme.VisionClawRayNeo.Headless" parent="Theme.VisionClawRayNeo">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+</resources>

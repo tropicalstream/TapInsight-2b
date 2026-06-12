@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Customize chat orb — TapInsight</title>
+<style>
+:root {
+  --bg: #0a0e14;
+  --panel: #111821;
+  --border: #233141;
+  --accent: #00e5ff;
+  --accent-dim: rgba(0, 229, 255, 0.2);
+  --text: #e6edf3;
+  --muted: #8b96a3;
+  --danger: #ff5252;
+  --success: #00d68f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding: 16px;
+  min-height: 100vh;
+}
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+}
+header .back {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+header .back:hover { color: var(--accent); }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.panel h2 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.3px;
+}
+.panel p.hint {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.cropper-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none;
+}
+canvas#cropCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+canvas#cropCanvas:active { cursor: grabbing; }
+.circle-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* The mask reveals everything OUTSIDE the circle so the user sees what
+     gets cropped OFF (darker) versus what stays (full brightness). */
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  align-items: center;
+}
+.controls label {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 140px;
+}
+.controls input[type=range] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn.primary {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+.btn.primary:hover { filter: brightness(1.1); }
+.btn.danger {
+  border-color: rgba(255, 82, 82, 0.4);
+  color: var(--danger);
+}
+.btn.danger:hover {
+  background: rgba(255, 82, 82, 0.1);
+  color: #fff;
+  border-color: var(--danger);
+}
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.toggle-row input[type=checkbox] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.preview-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.preview-orb {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-orb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.preview-info {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  flex: 1;
+  min-width: 160px;
+}
+input[type=file] {
+  display: none;
+}
+.file-pick {
+  margin-top: 4px;
+}
+.status {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: none;
+}
+.status.show { display: block; }
+.status.success { background: rgba(0, 214, 143, 0.1); color: var(--success); }
+.status.error { background: rgba(255, 82, 82, 0.1); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Customize chat orb</h1>
+  <a class="back" href="/">&larr; Back</a>
+</header>
+
+<div class="panel">
+  <h2>Current chat-panel orb</h2>
+  <div class="preview-row">
+    <div class="preview-orb" id="currentOrbPreview">
+      <!-- Real <img> rather than a CSS background-image: errors are
+           visible (broken-image icon if the URL fails), and it works
+           consistently across browsers without depending on background
+           shorthand parsing. -->
+      <img id="currentOrbImg" alt="Current orb" />
+    </div>
+    <div class="preview-info" id="currentOrbInfo">Loading…</div>
+  </div>
+  <div class="toggle-row">
+    <input type="checkbox" id="visibleToggle">
+    <label for="visibleToggle">Show the orb in the chat panel</label>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Upload a custom image</h2>
+  <p class="hint">
+    Pick any image. Drag to reposition, pinch or use the zoom slider to
+    fit. The dimmed area outside the circle will be cropped off — only
+    what's inside the circle becomes your orb. Aspect ratio is preserved;
+    nothing gets stretched.
+  </p>
+
+  <div class="cropper-wrap">
+    <canvas id="cropCanvas"></canvas>
+    <svg class="circle-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <defs>
+        <mask id="circleMask">
+          <rect width="100" height="100" fill="white"/>
+          <circle cx="50" cy="50" r="48" fill="black"/>
+        </mask>
+      </defs>
+      <rect width="100" height="100" fill="rgba(0,0,0,0.55)" mask="url(#circleMask)"/>
+      <circle cx="50" cy="50" r="48" fill="none"
+              stroke="rgba(0,229,255,0.7)" stroke-width="0.4"/>
+    </svg>
+  </div>
+
+  <div class="controls">
+    <label for="zoom">
+      <span>Zoom</span>
+      <input type="range" id="zoom" min="1" max="4" step="0.01" value="1">
+    </label>
+  </div>
+
+  <div class="file-pick">
+    <input type="file" id="filePicker" accept="image/png,image/jpeg,image/webp">
+    <label for="filePicker" class="btn">Choose image…</label>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn primary" id="saveBtn" disabled>Save as orb</button>
+    <button class="btn danger" id="resetBtn">Reset to default</button>
+  </div>
+
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Session token (companion pages hit /api/* with X-Session-Token).
+  // Stored in sessionStorage by the index page during pairing; if it's
+  // not there we still try cookie auth (which CompanionServer also
+  // accepts), and surface a clear error if all paths reject us.
+  function sessionToken() {
+    try { return sessionStorage.getItem('cw_session_token') || ''; } catch (e) { return ''; }
+  }
+  function authHeaders(extra) {
+    var h = Object.assign({}, extra || {});
+    var t = sessionToken();
+    if (t) h['X-Session-Token'] = t;
+    return h;
+  }
+
+  // ── DOM
+  var canvas = document.getElementById('cropCanvas');
+  var ctx = canvas.getContext('2d');
+  var zoomInput = document.getElementById('zoom');
+  var filePicker = document.getElementById('filePicker');
+  var saveBtn = document.getElementById('saveBtn');
+  var resetBtn = document.getElementById('resetBtn');
+  var visibleToggle = document.getElementById('visibleToggle');
+  var statusEl = document.getElementById('status');
+  var currentImg = document.getElementById('currentOrbImg');
+  var currentInfo = document.getElementById('currentOrbInfo');
+
+  // ── Cropper state
+  // We render the loaded image into a square canvas. The circle overlay is
+  // a fixed inscribed circle (radius = canvasSize/2 * 0.96 to leave a hair
+  // of breathing room — same proportion the chat panel renders). The user
+  // pans (offsetX/offsetY) and zooms (scale) the image; we redraw on
+  // every change. When they save, we render the canvas at OUTPUT_SIZE
+  // and POST the PNG bytes.
+  var img = null;
+  var scale = 1;
+  var minScale = 1;       // Computed when an image loads — the scale at
+                          // which the image just covers the circle.
+  var offsetX = 0;
+  var offsetY = 0;
+  var dragging = false;
+  var dragStart = null;
+  var lastPinchDist = 0;
+
+  // The crop output is a square that bounds the displayed circle.
+  // 512×512 PNG keeps file size small (~50–150 KB) while having plenty
+  // of resolution for the 78dp orb on the glasses (≈234 px on 3x).
+  var OUTPUT_SIZE = 512;
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status show ' + (kind || '');
+    if (kind === 'success') {
+      setTimeout(function () {
+        statusEl.classList.remove('show');
+      }, 2400);
+    }
+  }
+
+  // Resize the cropper canvas's BACKING store to match its CSS size
+  // (keeps things crisp on devicePixelRatio screens). Call this on load
+  // and on window resize. We then redraw the current image (if any).
+  function fitCanvasToBacking() {
+    var rect = canvas.getBoundingClientRect();
+    var dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    redraw();
+  }
+
+  function computeMinScaleForCircle() {
+    if (!img) return 1;
+    var rect = canvas.getBoundingClientRect();
+    // The visible circle radius is rect.width / 2 (the overlay uses the
+    // full square). The image must cover that circle from edge to edge,
+    // so we need its smaller side to be ≥ the circle diameter.
+    var circleDiameter = rect.width;
+    var smaller = Math.min(img.naturalWidth, img.naturalHeight);
+    return circleDiameter / smaller;
+  }
+
+  function clampOffsets() {
+    if (!img) return;
+    var rect = canvas.getBoundingClientRect();
+    var drawnW = img.naturalWidth * scale;
+    var drawnH = img.naturalHeight * scale;
+    // Don't let the image edges enter the circle — keep the image
+    // covering the circle at all times. The circle is centred in the
+    // canvas (rect.width/2, rect.height/2) with radius rect.width/2.
+    var maxOffsetX = (drawnW - rect.width) / 2;
+    var maxOffsetY = (drawnH - rect.height) / 2;
+    if (drawnW < rect.width) offsetX = 0;
+    else offsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, offsetX));
+    if (drawnH < rect.height) offsetY = 0;
+    else offsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, offsetY));
+  }
+
+  function redraw() {
+    var rect = canvas.getBoundingClientRect();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    if (!img) return;
+    clampOffsets();
+    var drawnW = img.naturalWidth * scale;
+    var drawnH = img.naturalHeight * scale;
+    var x = (rect.width - drawnW) / 2 + offsetX;
+    var y = (rect.height - drawnH) / 2 + offsetY;
+    ctx.drawImage(img, x, y, drawnW, drawnH);
+  }
+
+  // Object URL is held alive for the lifetime of the previous image so
+  // late drawImage calls (e.g. from save() after the user paused) can
+  // still pull from the decoded source. We revoke the previous one when
+  // a new image replaces it.
+  var lastBlobUrl = null;
+  function loadImageFromBlob(blob) {
+    var url = URL.createObjectURL(blob);
+    var i = new Image();
+    i.onload = function () {
+      // Revoke the OLD url, keep the NEW one alive.
+      if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+      lastBlobUrl = url;
+      img = i;
+      minScale = computeMinScaleForCircle();
+      scale = minScale;
+      offsetX = 0;
+      offsetY = 0;
+      // The slider exposes 1×–4× of minScale (1× = circle just covered).
+      zoomInput.value = '1';
+      saveBtn.disabled = false;
+      redraw();
+      console.log('Orb cropper loaded:', i.naturalWidth + 'x' + i.naturalHeight,
+                  'minScale=' + minScale.toFixed(3));
+    };
+    i.onerror = function () {
+      URL.revokeObjectURL(url);
+      setStatus('Could not load that image. Try a PNG, JPEG, or WebP.', 'error');
+    };
+    i.src = url;
+  }
+
+  // ── Pan handlers
+  function pointerPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    var t = e.touches && e.touches[0] ? e.touches[0] : e;
+    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  }
+  canvas.addEventListener('pointerdown', function (e) {
+    if (!img) return;
+    canvas.setPointerCapture(e.pointerId);
+    dragging = true;
+    var p = pointerPos(e);
+    dragStart = { x: p.x - offsetX, y: p.y - offsetY };
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (!dragging || !img || !dragStart) return;
+    var p = pointerPos(e);
+    offsetX = p.x - dragStart.x;
+    offsetY = p.y - dragStart.y;
+    redraw();
+  });
+  function endDrag(e) {
+    dragging = false;
+    dragStart = null;
+    if (e && e.pointerId != null) {
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  // ── Pinch zoom (two-finger touch) — supplements the slider on mobile.
+  canvas.addEventListener('touchmove', function (e) {
+    if (!img || !e.touches || e.touches.length !== 2) return;
+    e.preventDefault();
+    var t1 = e.touches[0];
+    var t2 = e.touches[1];
+    var dx = t1.clientX - t2.clientX;
+    var dy = t1.clientY - t2.clientY;
+    var dist = Math.hypot(dx, dy);
+    if (lastPinchDist > 0) {
+      var ratio = dist / lastPinchDist;
+      var nextScale = scale * ratio;
+      var maxScale = minScale * 4;
+      nextScale = Math.max(minScale, Math.min(maxScale, nextScale));
+      scale = nextScale;
+      // Reflect on the slider (slider is in 1×–4× of minScale).
+      zoomInput.value = String((scale / minScale).toFixed(2));
+      redraw();
+    }
+    lastPinchDist = dist;
+  }, { passive: false });
+  canvas.addEventListener('touchend', function () { lastPinchDist = 0; });
+
+  // ── Slider zoom
+  zoomInput.addEventListener('input', function () {
+    if (!img) return;
+    scale = minScale * parseFloat(zoomInput.value);
+    redraw();
+  });
+
+  // ── File picker
+  filePicker.addEventListener('change', function () {
+    var f = filePicker.files && filePicker.files[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) {
+      setStatus('File too large (max 5 MB).', 'error');
+      return;
+    }
+    // Save the original to the server too — lets the user reopen the
+    // cropper later with their full image and reposition without re-
+    // uploading. Fire-and-forget; failure is non-fatal.
+    uploadOriginal(f);
+    loadImageFromBlob(f);
+    setStatus('Loaded. Drag and zoom, then Save.', 'success');
+  });
+
+  // ── Save
+  saveBtn.addEventListener('click', function () {
+    if (!img) {
+      setStatus('Pick an image first.', 'error');
+      return;
+    }
+    saveBtn.disabled = true;
+    var rect = canvas.getBoundingClientRect();
+    if (!rect.width || !img.naturalWidth) {
+      setStatus('Image not ready yet, try again in a second.', 'error');
+      saveBtn.disabled = false;
+      return;
+    }
+    // Render the cropped square at OUTPUT_SIZE×OUTPUT_SIZE. We map the
+    // currently-visible square (the canvas viewport) to OUTPUT_SIZE.
+    var out = document.createElement('canvas');
+    out.width = OUTPUT_SIZE;
+    out.height = OUTPUT_SIZE;
+    var outCtx = out.getContext('2d');
+    // Clear → fill black. fillRect alone is enough, but explicit clear
+    // first matches the canvas-blank-state that callers expect.
+    outCtx.clearRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+    outCtx.fillStyle = '#000000';
+    outCtx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+    var srcScale = OUTPUT_SIZE / rect.width;
+    var drawnW = img.naturalWidth * scale * srcScale;
+    var drawnH = img.naturalHeight * scale * srcScale;
+    var x = (OUTPUT_SIZE - drawnW) / 2 + offsetX * srcScale;
+    var y = (OUTPUT_SIZE - drawnH) / 2 + offsetY * srcScale;
+    // Diagnostics: log what we're about to draw so a console-share can
+    // expose any obvious bug (zero dimensions, NaN coords, etc.).
+    console.log('Orb save:', {
+      cropperRect: rect.width + 'x' + rect.height,
+      naturalSize: img.naturalWidth + 'x' + img.naturalHeight,
+      scale: scale,
+      offsetX: offsetX,
+      offsetY: offsetY,
+      srcScale: srcScale,
+      drawn: drawnW + 'x' + drawnH,
+      drawAt: x + ',' + y
+    });
+    try {
+      outCtx.drawImage(img, x, y, drawnW, drawnH);
+    } catch (e) {
+      setStatus('drawImage failed: ' + e.message, 'error');
+      saveBtn.disabled = false;
+      return;
+    }
+    out.toBlob(function (blob) {
+      if (!blob || blob.size === 0) {
+        setStatus('Could not encode crop (empty blob).', 'error');
+        saveBtn.disabled = false;
+        return;
+      }
+      console.log('Orb save: blob size = ' + blob.size + ' bytes');
+      var fd = new FormData();
+      fd.append('file', blob, 'orb.png');
+      fetch('/api/orb/upload', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: fd
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (resp) {
+        console.log('Orb save: server saved ' + resp.sizeBytes + ' bytes');
+        setStatus('Orb saved. Open the chat panel to see it.', 'success');
+        loadCurrentState();
+      }).catch(function (e) {
+        setStatus('Save failed: ' + e.message, 'error');
+      }).finally(function () {
+        saveBtn.disabled = false;
+      });
+    }, 'image/png');
+  });
+
+  function uploadOriginal(file) {
+    var fd = new FormData();
+    fd.append('file', file, file.name || 'original.bin');
+    fetch('/api/orb/upload-original', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd
+    }).catch(function () { /* non-fatal */ });
+  }
+
+  // ── Reset to default
+  resetBtn.addEventListener('click', function () {
+    if (!confirm('Remove the custom orb image and revert to the default earth icon?')) return;
+    fetch('/api/orb', { method: 'DELETE', headers: authHeaders() })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        setStatus('Reverted to default.', 'success');
+        img = null;
+        saveBtn.disabled = true;
+        redraw();
+        loadCurrentState();
+      })
+      .catch(function (e) { setStatus('Reset failed: ' + e.message, 'error'); });
+  });
+
+  // ── Visibility toggle
+  visibleToggle.addEventListener('change', function () {
+    var visible = visibleToggle.checked;
+    fetch('/api/orb/visibility', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ visible: visible })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      setStatus(visible ? 'Orb will be shown.' : 'Orb will be hidden.', 'success');
+    }).catch(function (e) { setStatus('Toggle failed: ' + e.message, 'error'); });
+  });
+
+  // ── Load current state from server (used on page load + after save/reset)
+  function loadCurrentState() {
+    fetch('/api/orb/state', { headers: authHeaders() })
+      .then(function (r) { return r.json(); })
+      .then(function (state) {
+        visibleToggle.checked = !!state.visible;
+        // Cache-bust on every refresh so a freshly-uploaded image shows
+        // up immediately. The companion server also sends Cache-Control:
+        // no-store on /api/orb/preview, but the t= param is belt-and-
+        // braces in case some browser ignores the header.
+        var bust = '&t=' + Date.now();
+        if (state.hasCustom) {
+          currentImg.src = '/api/orb/preview?which=cropped' + bust;
+          currentInfo.textContent = state.visible
+            ? 'Custom orb is set and will be shown.'
+            : 'Custom orb is set, but currently hidden.';
+        } else {
+          // No upload yet — show the bundled default earth icon so the
+          // user can see what the chat panel currently looks like.
+          currentImg.src = '/api/orb/default?t=' + Date.now();
+          currentInfo.textContent = state.visible
+            ? 'Default earth icon is in use.'
+            : 'No custom orb set, and the orb is hidden.';
+        }
+        // If we have an original on the server, prefill the cropper with
+        // it so the user can reposition without uploading again.
+        if (state.hasOriginal && !img) {
+          fetch('/api/orb/preview?which=original' + bust, { headers: authHeaders() })
+            .then(function (r) { return r.ok ? r.blob() : null; })
+            .then(function (b) { if (b) loadImageFromBlob(b); });
+        }
+      })
+      .catch(function () {
+        currentInfo.textContent = 'Could not reach the glasses.';
+      });
+  }
+
+  // ── Init
+  window.addEventListener('resize', fitCanvasToBacking);
+  fitCanvasToBacking();
+  loadCurrentState();
+})();
+</script>
+
+</body>
+</html>

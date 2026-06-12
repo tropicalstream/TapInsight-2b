@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TapInsight Browser</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;padding:16px;max-width:720px;margin:0 auto}
+  h1{color:#00e5ff;font-size:22px;margin-bottom:2px}
+  .sub{color:#888;font-size:13px;margin-bottom:20px}
+  .nav{display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid #333}
+  .nav a{flex:1;padding:10px;text-align:center;text-decoration:none;font-size:13px;font-weight:600;color:#aaa;background:#1a1a1a;transition:all .2s}
+  .nav a.active{background:#00e5ff;color:#000}
+  .nav a:hover:not(.active){background:#222}
+
+  .toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .btn{padding:8px 16px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#e0e0e0;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
+  .btn:hover{background:#222;border-color:#00e5ff}
+  .btn.primary{background:#00e5ff;color:#000;border-color:#00e5ff}
+  .btn.primary:hover{background:#00b8d4}
+  .btn.danger{border-color:#e53935;color:#ef5350}
+  .btn.danger:hover{background:#e53935;color:#fff}
+  .btn.small{padding:5px 10px;font-size:11px}
+
+  .section{background:#1a1a1a;border-radius:10px;margin-bottom:14px;border:1px solid #333;overflow:hidden}
+  .sec-header{display:flex;align-items:center;gap:8px;padding:12px 14px;background:#111;border-bottom:1px solid #333}
+  .sec-title{font-size:15px;font-weight:600;color:#00e5ff;flex:1;min-width:0}
+  .sec-actions{display:flex;gap:6px;flex-shrink:0}
+  .sec-body{padding:14px}
+  .sec-desc{font-size:12px;color:#888;margin-bottom:10px;line-height:1.5}
+
+  label{display:block;font-size:12px;color:#aaa;margin-bottom:4px;margin-top:10px}
+  label:first-of-type{margin-top:0}
+  input[type="text"],input[type="password"],textarea{width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px;font-family:inherit}
+  input:focus,textarea:focus{border-color:#00e5ff;outline:none}
+  textarea{min-height:60px;resize:vertical;font-family:'SF Mono',Menlo,monospace;font-size:12px}
+  select{width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px}
+  .hint{font-size:11px;color:#666;margin-top:4px;line-height:1.4}
+
+  /* Bookmarks list */
+  .bookmark-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0a0a0a;border:1px solid #222;border-radius:8px;margin-bottom:6px;transition:border-color .15s}
+  .bookmark-item:hover{border-color:#444}
+  .bookmark-item.is-home{border-color:#00e5ff;background:#0d1a1f}
+  .bookmark-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .bookmark-host{font-size:13px;color:#e0e0e0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bookmark-url{font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'SF Mono',Menlo,monospace}
+  .bookmark-actions{display:flex;gap:4px;flex-shrink:0}
+  .home-badge{font-size:10px;color:#000;background:#00e5ff;padding:2px 6px;border-radius:4px;font-weight:700;letter-spacing:.5px;flex-shrink:0}
+  .move-btn{padding:2px 8px;font-size:14px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#aaa;cursor:pointer;line-height:1}
+  .move-btn:hover{background:#333;color:#fff}
+  .move-btn:disabled{opacity:.3;cursor:not-allowed}
+  .empty-state{color:#555;font-size:12px;font-style:italic;padding:14px;text-align:center;background:#0a0a0a;border-radius:8px;border:1px dashed #333}
+
+  /* Cookie sync (kept compact) */
+  .cookie-entry{background:#0a0a0a;border:1px solid #222;border-radius:8px;padding:10px;margin-top:8px}
+  .cookie-entry .domain-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+  .cookie-entry input[type="text"]{font-size:13px;padding:8px}
+  .cookie-entry textarea{min-height:50px;font-size:11px}
+  .quick-sites{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .quick-site{background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:6px 12px;font-size:12px;color:#ccc;cursor:pointer}
+  .quick-site:hover{background:#00e5ff;color:#000;border-color:#00e5ff}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .modal-overlay.hidden{display:none}
+  .modal{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:20px;width:min(440px,92vw);max-height:90vh;overflow-y:auto}
+  .modal h2{color:#00e5ff;font-size:16px;margin-bottom:14px}
+  .modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+  /* Status banner */
+  .status{padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;display:none}
+  .status.ok{display:block;background:#1b5e20;color:#a5d6a7}
+  .status.err{display:block;background:#b71c1c;color:#ef9a9a}
+
+  /* Groq key state */
+  .key-state{display:flex;align-items:center;gap:10px;padding:10px;background:#0a0a0a;border:1px solid #222;border-radius:8px;margin-bottom:10px}
+  .key-state.set{border-color:#1b5e20}
+  .key-state.unset{border-color:#5d4037}
+  .key-dot{width:10px;height:10px;border-radius:50%;background:#5d4037;flex-shrink:0}
+  .key-state.set .key-dot{background:#4caf50}
+  .key-text{font-size:12px;color:#aaa}
+  .key-text strong{color:#fff}
+  .key-preview{font-family:'SF Mono',Menlo,monospace;color:#00e5ff}
+
+  /* Help modal */
+  .modal h3{color:#00e5ff;margin-bottom:10px;font-size:16px}
+  .modal p,.modal li{font-size:13px;line-height:1.7;color:#ccc}
+  .modal ol{padding-left:20px;margin:10px 0}
+  .modal code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#00e5ff}
+  .help-btn{background:#222;color:#00e5ff;border:1px solid #333;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+  .help-btn:hover{background:#00e5ff;color:#000}
+</style>
+</head>
+<body>
+
+<h1>TapInsight Browser</h1>
+<p class="sub">TapBrowser settings, bookmarks, login sync &amp; API keys</p>
+
+<div class="nav">
+  <a href="/">Setup</a>
+  <a href="/browser" class="active">Browser</a>
+  <a href="/dashboard">Dashboard</a>
+  <a href="/radio">TapRadio</a>
+  <a href="/library">Library</a>
+  <a href="/openclaw">Agents</a>
+</div>
+
+<div class="toolbar">
+  <button class="btn primary" onclick="saveAll()">Save Settings</button>
+  <button class="btn" onclick="loadAll()">Reload</button>
+</div>
+
+<div id="statusBar" class="status"></div>
+
+<!-- ════ Display Settings ═══════════════════════════════════════════════ -->
+<div class="section">
+  <div class="sec-header">
+    <div class="sec-title">Display Settings</div>
+  </div>
+  <div class="sec-body">
+    <label>Desktop Mode <button class="help-btn" onclick="showHelp('desktop')">?</button></label>
+    <select id="webDesktopMode"><option value="false">Mobile (default)</option><option value="true">Desktop</option></select>
+    <div class="hint">Desktop mode requests full-size pages. Some sites work better in desktop mode on the HUD.</div>
+
+    <label>Force Dark Mode</label>
+    <select id="webForceDarkMode"><option value="true">On (default)</option><option value="false">Off</option></select>
+    <div class="hint">Applies dark theme to web pages for better visibility on the MicroLED display.</div>
+
+    <label>Show Browser Status Overlay</label>
+    <select id="browserShowSystemInfo"><option value="true">On (default)</option><option value="false">Off</option></select>
+    <div class="hint">Controls the TapBrowser Wi-Fi, battery, and time strip. Turn this off to keep videos unobstructed.</div>
+
+    <label>Pointer Sensitivity (0.4 &ndash; 1.8)</label>
+    <input type="text" id="webPointerSensitivity" placeholder="1.0">
+    <div class="hint">Controls trackpad cursor speed in the browser. Lower = more precise, higher = faster.</div>
+  </div>
+</div>
+
+<!-- ════ Bookmarks ══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="sec-header">
+    <div class="sec-title">Bookmarks</div>
+    <div class="sec-actions">
+      <button class="btn small primary" onclick="openBookmarkModal()">+ Add bookmark</button>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-desc">
+      Bookmarks shown in TapBrowser's bookmarks bar on the glasses.
+      One bookmark is the home page (loaded when the browser opens).
+      Reorder with the arrows; the home pin can be moved to any entry.
+    </div>
+    <div id="bookmarkList"></div>
+  </div>
+</div>
+
+<!-- ════ Login Sync (cookies) ═══════════════════════════════════════════ -->
+<div class="section">
+  <div class="sec-header">
+    <div class="sec-title">Login Sync</div>
+    <div class="sec-actions">
+      <button class="help-btn" onclick="showHelp('cookies')">?</button>
+      <button class="btn small" onclick="addSite('','')">+ Add site</button>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-desc">
+      Log into websites on your phone, then sync the session to TapBrowser
+      on your glasses. This avoids typing passwords on the X3 keyboard.
+    </div>
+    <div class="quick-sites">
+      <span class="quick-site" onclick="addSite('.google.com','Google (YouTube, Calendar, etc.)')">Google</span>
+      <span class="quick-site" onclick="addSite('.youtube.com','YouTube')">YouTube</span>
+      <span class="quick-site" onclick="addSite('calendar.google.com','Google Calendar')">Calendar</span>
+      <span class="quick-site" onclick="addSite('radio.garden','Radio Garden')">Radio Garden</span>
+      <span class="quick-site" onclick="addSite('.reddit.com','Reddit')">Reddit</span>
+      <span class="quick-site" onclick="addSite('.twitter.com','Twitter/X')">Twitter</span>
+    </div>
+    <div id="cookieList"></div>
+  </div>
+</div>
+
+<!-- ════ Groq API Key ═══════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="sec-header">
+    <div class="sec-title">Groq API Key</div>
+    <div class="sec-actions">
+      <button class="help-btn" onclick="showHelp('groq')">?</button>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-desc">
+      Powers the Groq-backed chat hook inside TapBrowser. Get a free key at
+      <a href="https://console.groq.com/keys" target="_blank" style="color:#00e5ff">console.groq.com/keys</a>
+      and paste it here — saves you from typing on the X3 keyboard.
+    </div>
+    <div id="groqKeyState" class="key-state unset">
+      <span class="key-dot"></span>
+      <div class="key-text" id="groqKeyText">Loading…</div>
+    </div>
+    <label>API Key</label>
+    <input type="password" id="groqApiKey" placeholder="gsk_..." autocomplete="off">
+    <div class="hint">Stored locally on the glasses. Never transmitted except to Groq's API when chat fires.</div>
+    <div class="toolbar" style="margin-top:10px;margin-bottom:0">
+      <button class="btn primary small" onclick="saveGroqKey()">Save key</button>
+      <button class="btn danger small" onclick="clearGroqKey()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ Add/Edit bookmark modal ════════════════════════════════════════ -->
+<div id="bookmarkModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="bookmarkModalTitle">Add bookmark</h2>
+    <label>URL</label>
+    <input type="text" id="bookmarkUrlInput" placeholder="https://example.com" autocomplete="off">
+    <div class="hint" style="margin-top:6px">If you skip the scheme we'll add <code>https://</code> automatically.</div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeBookmarkModal()">Cancel</button>
+      <button class="btn primary" onclick="saveBookmarkModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ Help modal ═════════════════════════════════════════════════════ -->
+<div id="helpModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h3 id="helpTitle"></h3>
+    <div id="helpBody"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeHelp()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config-key glue (mirrors the bridge AiTapBridge already uses for
+//    other companion pages). The helper auto-loads SharedPreferences via
+//    /api/config and writes back via applyConfig().
+const BROWSER_FIELDS = {
+  webDesktopMode:        { key: 'web_desktop_mode',         type: 'bool'  },
+  webForceDarkMode:      { key: 'web_force_dark_mode',      type: 'bool'  },
+  browserShowSystemInfo: { key: 'browser_show_system_info', type: 'bool'  },
+  webPointerSensitivity: { key: 'web_pointer_sensitivity',  type: 'float' }
+};
+
+const HELP = {
+  desktop: {
+    title: 'Desktop Mode',
+    body: '<p>When enabled, TapBrowser requests desktop versions of websites instead of mobile.</p>' +
+          '<p>This is useful for sites like Google Calendar that have better desktop interfaces. ' +
+          'However, some sites may be harder to navigate on the small HUD.</p>'
+  },
+  cookies: {
+    title: 'How Login Sync Works',
+    body: '<p>Since typing on the X3 Pro keyboard is difficult, you can log into websites on your ' +
+          'phone and transfer the session cookies to TapBrowser.</p>' +
+          '<p><b>Steps:</b></p>' +
+          '<ol>' +
+            '<li>On your phone or computer, open Chrome and go to the site (e.g. youtube.com)</li>' +
+            '<li>Log in normally</li>' +
+            '<li>Open Chrome DevTools (desktop: F12, or phone: <code>chrome://inspect</code>)</li>' +
+            '<li>In the Console tab, paste: <code>document.cookie</code></li>' +
+            '<li>Copy the entire output</li>' +
+            '<li>Paste it into the Cookie String field here</li>' +
+            '<li>Click Save Settings</li>' +
+          '</ol>' +
+          '<p><b>Easier alternative:</b> Use the ' +
+          '<a href="https://chromewebstore.google.com/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg" ' +
+          'target="_blank" style="color:#00e5ff">EditThisCookie</a> Chrome extension to export cookies.</p>' +
+          '<p><b>Note:</b> Session cookies expire when you log out or after a period of inactivity. ' +
+          'You may need to re-sync periodically.</p>'
+  },
+  groq: {
+    title: 'Groq API Key',
+    body: '<p>TapBrowser ships with a Groq-powered chat hook. To use it you need a Groq API key.</p>' +
+          '<ol>' +
+            '<li>Sign up at <a href="https://console.groq.com" target="_blank" style="color:#00e5ff">console.groq.com</a> (free).</li>' +
+            '<li>Open <a href="https://console.groq.com/keys" target="_blank" style="color:#00e5ff">console.groq.com/keys</a> and create a new key.</li>' +
+            '<li>Paste it into the field below and tap Save key.</li>' +
+          '</ol>' +
+          '<p>The key is stored on the glasses in their private app storage. It\'s only sent to ' +
+          'Groq\'s API when the chat feature is invoked. Click Clear to revoke it from the glasses ' +
+          '(this does not deactivate the key on Groq\'s side — do that from the Groq console).</p>'
+  }
+};
+
+// ── Session token helper (same shape as orb.html / library.html).
+function sessionToken() {
+  try { return sessionStorage.getItem('cw_session_token') || ''; } catch (e) { return ''; }
+}
+function authHeaders(extra) {
+  const h = Object.assign({}, extra || {});
+  const t = sessionToken();
+  if (t) h['X-Session-Token'] = t;
+  return h;
+}
+
+let cookieEntries = [];
+let nextCookieId = 0;
+let bookmarks = [];          // [{ id, url, isHome }]
+let bookmarkEditingId = null; // null = adding new, otherwise the id being edited
+
+// ── Status / help / modal helpers ────────────────────────────────────
+function showStatus(msg, cls) {
+  const e = document.getElementById('statusBar');
+  e.textContent = msg;
+  e.className = 'status ' + (cls || '');
+  if (cls === 'ok') setTimeout(() => { e.textContent = ''; e.className = 'status'; }, 4000);
+}
+function showHelp(key) {
+  const h = HELP[key]; if (!h) return;
+  document.getElementById('helpTitle').textContent = h.title;
+  document.getElementById('helpBody').innerHTML = h.body;
+  document.getElementById('helpModal').classList.remove('hidden');
+}
+function closeHelp() { document.getElementById('helpModal').classList.add('hidden'); }
+
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Bookmarks ────────────────────────────────────────────────────────
+
+function hostFromUrl(u) {
+  try { return new URL(u).host.replace(/^www\./,''); } catch (e) { return u; }
+}
+
+function renderBookmarks() {
+  const list = document.getElementById('bookmarkList');
+  if (!bookmarks.length) {
+    list.innerHTML = '<div class="empty-state">No bookmarks yet. Tap "+ Add bookmark" to start.</div>';
+    return;
+  }
+  list.innerHTML = bookmarks.map((b, i) => `
+    <div class="bookmark-item ${b.isHome ? 'is-home' : ''}" data-id="${escHtml(b.id)}">
+      <div class="bookmark-info">
+        <div class="bookmark-host">${escHtml(hostFromUrl(b.url))}</div>
+        <div class="bookmark-url">${escHtml(b.url)}</div>
+      </div>
+      ${b.isHome ? '<span class="home-badge">HOME</span>' : ''}
+      <div class="bookmark-actions">
+        <button class="move-btn" title="Move up" onclick="moveBookmark('${escHtml(b.id)}', -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="move-btn" title="Move down" onclick="moveBookmark('${escHtml(b.id)}', 1)" ${i === bookmarks.length - 1 ? 'disabled' : ''}>↓</button>
+        ${b.isHome ? '' : `<button class="btn small" onclick="setHome('${escHtml(b.id)}')">Set home</button>`}
+        <button class="btn small" onclick="editBookmark('${escHtml(b.id)}')">Edit</button>
+        <button class="btn small danger" onclick="deleteBookmark('${escHtml(b.id)}')">×</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function moveBookmark(id, delta) {
+  const idx = bookmarks.findIndex(b => b.id === id);
+  if (idx < 0) return;
+  const target = idx + delta;
+  if (target < 0 || target >= bookmarks.length) return;
+  const [item] = bookmarks.splice(idx, 1);
+  bookmarks.splice(target, 0, item);
+  renderBookmarks();
+}
+
+function setHome(id) {
+  bookmarks.forEach(b => { b.isHome = (b.id === id); });
+  // Move the home bookmark to position 0 — TapBrowser's BookmarkManager
+  // expects the home to be first and it makes the on-glasses UI cleaner.
+  const idx = bookmarks.findIndex(b => b.id === id);
+  if (idx > 0) {
+    const [item] = bookmarks.splice(idx, 1);
+    bookmarks.unshift(item);
+  }
+  renderBookmarks();
+}
+
+function deleteBookmark(id) {
+  const b = bookmarks.find(x => x.id === id);
+  if (!b) return;
+  if (b.isHome) {
+    if (!confirm('This is the home page bookmark. Delete it anyway? Another bookmark will become home.')) return;
+  } else {
+    if (!confirm('Delete bookmark for ' + hostFromUrl(b.url) + '?')) return;
+  }
+  bookmarks = bookmarks.filter(x => x.id !== id);
+  // Ensure at least one bookmark is marked home if any remain.
+  if (bookmarks.length && !bookmarks.some(x => x.isHome)) bookmarks[0].isHome = true;
+  renderBookmarks();
+}
+
+function openBookmarkModal() {
+  bookmarkEditingId = null;
+  document.getElementById('bookmarkModalTitle').textContent = 'Add bookmark';
+  document.getElementById('bookmarkUrlInput').value = '';
+  document.getElementById('bookmarkModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('bookmarkUrlInput').focus(), 50);
+}
+
+function editBookmark(id) {
+  const b = bookmarks.find(x => x.id === id);
+  if (!b) return;
+  bookmarkEditingId = id;
+  document.getElementById('bookmarkModalTitle').textContent = 'Edit bookmark';
+  document.getElementById('bookmarkUrlInput').value = b.url;
+  document.getElementById('bookmarkModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('bookmarkUrlInput').select(), 50);
+}
+
+function closeBookmarkModal() {
+  document.getElementById('bookmarkModal').classList.add('hidden');
+  bookmarkEditingId = null;
+}
+
+function saveBookmarkModal() {
+  let url = document.getElementById('bookmarkUrlInput').value.trim();
+  if (!url) { showStatus('URL is required.', 'err'); return; }
+  if (!/^https?:\/\//i.test(url) && !/^file:\/\//i.test(url)) url = 'https://' + url;
+  // Try to parse — surface bad URLs early.
+  try { new URL(url); } catch (e) { showStatus('That doesn\'t look like a valid URL.', 'err'); return; }
+
+  if (bookmarkEditingId) {
+    const b = bookmarks.find(x => x.id === bookmarkEditingId);
+    if (b) b.url = url;
+  } else {
+    bookmarks.push({
+      id: 'tmp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      url,
+      isHome: bookmarks.length === 0  // First bookmark auto-becomes home.
+    });
+  }
+  closeBookmarkModal();
+  renderBookmarks();
+}
+
+async function loadBookmarks() {
+  console.log('loadBookmarks: fetching /api/browser/bookmarks');
+  let lastError = null;
+  try {
+    const r = await fetch('/api/browser/bookmarks', { headers: authHeaders() });
+    console.log('loadBookmarks: HTTP', r.status);
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      lastError = 'HTTP ' + r.status + (txt ? ' — ' + txt.slice(0, 120) : '');
+      throw new Error(lastError);
+    }
+    const parsed = await r.json();
+    console.log('loadBookmarks: got', Array.isArray(parsed) ? parsed.length : '(not array)', 'entries:', parsed);
+    bookmarks = Array.isArray(parsed) ? parsed : [];
+    if (bookmarks.length && !bookmarks.some(b => b.isHome)) bookmarks[0].isHome = true;
+  } catch (e) {
+    console.error('loadBookmarks failed:', e);
+    bookmarks = [];
+    showStatus('Bookmarks load failed: ' + (lastError || e.message), 'err');
+  }
+  renderBookmarks();
+}
+
+async function saveBookmarks() {
+  try {
+    const r = await fetch('/api/browser/bookmarks', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(bookmarks)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return true;
+  } catch (e) {
+    console.error('saveBookmarks failed:', e);
+    showStatus('Bookmark save failed: ' + e.message, 'err');
+    return false;
+  }
+}
+
+// ── Cookie sync (kept from previous browser.html) ───────────────────
+
+function addSite(domain, label) {
+  if (domain && cookieEntries.some(e => e.domain === domain)) {
+    showStatus('Domain already added.', 'err');
+    return;
+  }
+  const id = nextCookieId++;
+  cookieEntries.push({ id, domain, cookies: '', label: label || '' });
+  renderCookieList();
+}
+
+function removeSite(id) {
+  cookieEntries = cookieEntries.filter(e => e.id !== id);
+  renderCookieList();
+}
+
+function renderCookieList() {
+  const list = document.getElementById('cookieList');
+  if (!cookieEntries.length) {
+    list.innerHTML = '<div class="empty-state" style="margin-top:12px">No sites added yet. Tap a quick-add chip above or "+ Add site".</div>';
+    return;
+  }
+  list.innerHTML = cookieEntries.map(e => `
+    <div class="cookie-entry" data-id="${e.id}">
+      <div class="domain-row">
+        <input type="text" value="${escHtml(e.domain)}" placeholder=".example.com" onchange="updateCookieEntry(${e.id},'domain',this.value)" style="flex:1">
+        <button class="btn small danger" onclick="removeSite(${e.id})">Remove</button>
+      </div>
+      <label style="margin-top:4px">${e.label ? escHtml(e.label) + ' — ' : ''}Cookie String</label>
+      <textarea placeholder="Paste cookie string from browser console: document.cookie" onchange="updateCookieEntry(${e.id},'cookies',this.value)">${escHtml(e.cookies)}</textarea>
+    </div>
+  `).join('');
+}
+
+function updateCookieEntry(id, field, value) {
+  const entry = cookieEntries.find(e => e.id === id);
+  if (entry) entry[field] = value;
+}
+
+// ── Groq API key ────────────────────────────────────────────────────
+
+async function loadGroqKey() {
+  console.log('loadGroqKey: fetching /api/browser/groq_key');
+  const stateEl = document.getElementById('groqKeyState');
+  const textEl = document.getElementById('groqKeyText');
+  try {
+    const r = await fetch('/api/browser/groq_key', { headers: authHeaders() });
+    console.log('loadGroqKey: HTTP', r.status);
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      throw new Error('HTTP ' + r.status + (txt ? ' — ' + txt.slice(0, 120) : ''));
+    }
+    const state = await r.json();
+    console.log('loadGroqKey: state =', state);
+    if (state.hasKey) {
+      stateEl.classList.add('set');
+      stateEl.classList.remove('unset');
+      textEl.innerHTML = '<strong>Key configured</strong> &nbsp;·&nbsp; <span class="key-preview">' +
+        escHtml(state.keyPreview || '') + '</span> · ' + state.keyLength + ' chars';
+    } else {
+      stateEl.classList.remove('set');
+      stateEl.classList.add('unset');
+      textEl.innerHTML = 'No key configured. Chat hook in TapBrowser will prompt on first use.';
+    }
+    document.getElementById('groqApiKey').value = '';
+  } catch (e) {
+    console.error('loadGroqKey failed:', e);
+    stateEl.classList.remove('set');
+    stateEl.classList.add('unset');
+    textEl.textContent = 'Could not reach the glasses (' + e.message + ').';
+  }
+}
+
+async function saveGroqKey() {
+  const key = document.getElementById('groqApiKey').value.trim();
+  if (!key) { showStatus('Paste a key into the field first.', 'err'); return; }
+  try {
+    const r = await fetch('/api/browser/groq_key', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ key })
+    });
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(text || ('HTTP ' + r.status));
+    }
+    showStatus('Groq key saved.', 'ok');
+    loadGroqKey();
+  } catch (e) {
+    showStatus('Save failed: ' + e.message, 'err');
+  }
+}
+
+async function clearGroqKey() {
+  if (!confirm('Remove the Groq API key from the glasses?')) return;
+  try {
+    const r = await fetch('/api/browser/groq_key', { method: 'DELETE', headers: authHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showStatus('Groq key cleared.', 'ok');
+    loadGroqKey();
+  } catch (e) {
+    showStatus('Clear failed: ' + e.message, 'err');
+  }
+}
+
+// ── Settings load / save ────────────────────────────────────────────
+
+async function loadAll() {
+  // Display Settings + cookies (via /api/config bridge)
+  try {
+    const r = await fetch('/api/config', { headers: authHeaders() });
+    if (r.ok) {
+      const cache = await r.json();
+      for (const [id, cfg] of Object.entries(BROWSER_FIELDS)) {
+        const el = document.getElementById(id);
+        if (cache[cfg.key] != null) el.value = String(cache[cfg.key]);
+      }
+      try {
+        const raw = cache['browser_cookies'];
+        if (raw) {
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          cookieEntries = (parsed || []).map((e, i) => ({ ...e, id: i }));
+          nextCookieId = cookieEntries.length;
+        }
+      } catch (e) { console.error('Cookie load error:', e); }
+    }
+  } catch (e) { console.error('Config load failed:', e); }
+  renderCookieList();
+
+  await loadBookmarks();
+  await loadGroqKey();
+
+  showStatus('Settings loaded.', 'ok');
+}
+
+async function saveAll() {
+  // 1) Display Settings + cookies via /api/config
+  const payload = {};
+  for (const [id, cfg] of Object.entries(BROWSER_FIELDS)) {
+    const el = document.getElementById(id);
+    const v = el.value.trim();
+    if (cfg.type === 'float') payload[cfg.key] = parseFloat(v) || 1.0;
+    else if (cfg.type === 'bool') payload[cfg.key] = (v === 'true');
+    else payload[cfg.key] = v;
+  }
+  // Sync cookie textarea values back to entries
+  document.querySelectorAll('.cookie-entry').forEach(el => {
+    const id = parseInt(el.dataset.id);
+    const entry = cookieEntries.find(e => e.id === id);
+    if (entry) {
+      entry.domain = el.querySelector('input[type="text"]').value.trim();
+      entry.cookies = el.querySelector('textarea').value.trim();
+    }
+  });
+  const cookieData = cookieEntries
+    .filter(e => e.domain)
+    .map(e => ({ domain: e.domain, cookies: e.cookies, label: e.label || '' }));
+  payload['browser_cookies'] = JSON.stringify(cookieData);
+
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('config HTTP ' + r.status);
+  } catch (e) {
+    showStatus('Settings save failed: ' + e.message, 'err');
+    return;
+  }
+
+  // 2) Bookmarks via /api/browser/bookmarks
+  if (!await saveBookmarks()) return;
+
+  showStatus('Settings saved! Cookies will sync on next browser launch.', 'ok');
+}
+
+// Auto-load on page ready
+document.addEventListener('DOMContentLoaded', loadAll);
+
+// Belt-and-braces: if loadAll didn't populate bookmarks / Groq state within
+// a short grace period (e.g. an older cached copy of this page whose
+// loadAll predates these load calls, or a transient fetch hiccup), force
+// the individual loaders directly. Both are idempotent so a redundant run
+// is harmless if loadAll already succeeded.
+setTimeout(function () {
+  try {
+    var bmList = document.getElementById('bookmarkList');
+    if (bmList && !bmList.innerHTML.trim()) {
+      console.warn('Bookmarks list still empty after grace period — forcing loadBookmarks().');
+      if (typeof loadBookmarks === 'function') loadBookmarks();
+    }
+    var groqText = document.getElementById('groqKeyText');
+    if (groqText && /Loading/i.test(groqText.textContent || '')) {
+      console.warn('Groq state still "Loading…" after grace period — forcing loadGroqKey().');
+      if (typeof loadGroqKey === 'function') loadGroqKey();
+    }
+  } catch (e) { console.error('post-load fallback failed:', e); }
+}, 800);
+</script>
+
+</body>
+</html>
